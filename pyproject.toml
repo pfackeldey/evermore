@@ -1,0 +1,42 @@
+[tool.poetry]
+name = "dilax"
+version = "0.1.0"
+description = "differentiable (binned) likelihoods with JAX"
+authors = ["Peter Fackeldey <peter.fackeldey@rwth-aachen.de>"]
+readme = "README.md"
+homepage = "https://github.com/pfackeldey/dilax/tree/main"
+repository = "https://github.com/pfackeldey/dilax/tree/main"
+keywords = ["fit", "likelihood", "hep", "jax", "differentiable", "binned"]
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: BSD License",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+]
+include = [
+    "LICENSE",
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+chex = "^0.1.7"
+jax = "^0.4.7"
+jaxopt = "^0.6"
+tqdm = "^4.65.0"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.1.0"
+isort = "^5.12.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
