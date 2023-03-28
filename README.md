@@ -55,3 +55,5 @@ params, state = optimizer.fit(fun=nll, init_params=model.parameter_strengths, mo
 print(params)
 >> {'mu': DeviceArray(1.6666667, dtype=float32), 'norm': DeviceArray(0., dtype=float32)}
 ```
+
+### See more in `examples/`
