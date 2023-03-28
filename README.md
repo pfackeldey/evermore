@@ -29,11 +29,9 @@ class SPlusBModel(Model):
             if process == "signal":
                 sumw = self.parameters["mu"].apply(sumw)
 
-            # background norms
-            elif process == "background1":
-                sumw = self.parameters["norm1"].apply(sumw)
-            elif process == "background2":
-                sumw = self.parameters["norm2"].apply(sumw)
+            # background norm
+            elif process == "bkg":
+                sumw = self.parameters["norm"].apply(sumw)
 
             expectation += sumw
         return expectation
@@ -42,7 +40,7 @@ class SPlusBModel(Model):
 # Initialize S+B model
 model = SPlusBModel(
     processes={"signal": jnp.array([3.0]), "bkg": jnp.array([10.0])},
-    parameters={"mu": r(strength=jnp.array(1.0)), "norm1": lnN(strength=jnp.array(0.0), width=jnp.array(0.1))},
+    parameters={"mu": r(strength=jnp.array(1.0)), "norm": lnN(strength=jnp.array(0.0), width=jnp.array(0.1))},
 )
 
 # Define data
@@ -55,5 +53,5 @@ optimizer = JaxOptimizer.make(name="LBFGS", settings={"maxiter": 30, "tol": 1e-6
 params, state = optimizer.fit(fun=nll, init_params=model.parameter_strengths, model=model, observation=observation)
 
 print(params)
->> {'mu': DeviceArray(1.6666667, dtype=float32), 'norm1': DeviceArray(0., dtype=float32)}
+>> {'mu': DeviceArray(1.6666667, dtype=float32), 'norm': DeviceArray(0., dtype=float32)}
 ```
