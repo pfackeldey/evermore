@@ -46,7 +46,7 @@ model = SPlusBModel(
 # Define data
 observation = jnp.array([15.0])
 
-# Detup optimizer
+# Setup optimizer, see more at https://jaxopt.github.io/stable/ 
 optimizer = JaxOptimizer.make(name="LBFGS", settings={"maxiter": 30, "tol": 1e-6})
 
 # Run fit
