@@ -1,5 +1,5 @@
 # dilax
-differentiable (binned) likelihoods with JAX
+**di**fferentiable (binned) **li**kelihoods with J**AX**
 
 
 ## TL;DR
