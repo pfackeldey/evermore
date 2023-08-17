@@ -67,7 +67,7 @@ nll = NLL(model=model, observation=observation)
 init_values = model.parameter_values
 values, state = optimizer.fit(fun=nll, init_values=init_values)
 
-print(params)
+print(values)
 >> {'mu': Array([1.1638741], dtype=float32),
  'norm1': Array([0.01125314], dtype=float32),
  'norm2': Array([0.0052684], dtype=float32)}
