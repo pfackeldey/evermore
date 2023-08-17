@@ -2,17 +2,46 @@ from __future__ import annotations
 
 from typing import Callable, Hashable
 
-import chex
+import equinox as eqx
 import jax
 import jaxopt
 
 from dilax.model import Model
 
 
-@chex.dataclass(frozen=True)
-class JaxOptimizer:
+class JaxOptimizer(eqx.Module):
+    """
+    Wrapper around `jaxopt` optimizers to make them hashable.
+    This allows to pass the optimizer as a parameter to a `jax.jit` function, and setup the optimizer therein.
+
+    Example:
+    ```
+        optimizer = JaxOptimizer.make(
+            name="ScipyMinimize",
+            settings={"method": "trust-constr"},
+        )
+
+        # or
+
+        optimizer = JaxOptimizer.make(
+            name="LBFGS",
+            settings={
+                "maxiter": 30,
+                "tol": 1e-6,
+                "jit": True,
+                "unroll": True,
+            },
+        )
+
+    ```
+    """
+
     name: str
     _settings: tuple[tuple[str, Hashable], ...]
+
+    def __init__(self, name: str, _settings: tuple[tuple[str, Hashable], ...]) -> None:
+        self.name = name
+        self._settings = _settings
 
     @classmethod
     def make(cls: type[JaxOptimizer], name: str, settings: dict[str, Hashable]) -> JaxOptimizer:
@@ -25,14 +54,6 @@ class JaxOptimizer:
     def solver_instance(self, fun: Callable) -> jaxopt._src.base.Solver:
         return getattr(jaxopt, self.name)(fun=fun, **self.settings)
 
-    def fit(
-        self,
-        fun: Callable,
-        init_params: dict[str, float],
-        model: Model,
-        observation: jax.Array,
-    ) -> jax.Array:
-        params, state = self.solver_instance(fun=fun).run(
-            init_params, model=model, observation=observation
-        )
-        return params, state
+    def fit(self, fun: Callable, init_values: dict[str, float]) -> jax.Array:
+        values, state = self.solver_instance(fun=fun).run(init_values)
+        return values, state

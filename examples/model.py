@@ -1,61 +1,39 @@
-import jax
 import jax.numpy as jnp
 
-import chex
-
-from dilax.parameter import r, lnN, add_mc_stats
-from dilax.model import Model
+from dilax.parameter import Parameter
+from dilax.model import Model, EvaluationResult
 from dilax.optimizer import JaxOptimizer
 
 
-@chex.dataclass(frozen=True)
 class SPlusBModel(Model):
-    @jax.jit
-    def eval(self) -> jax.Array:
-        expectation = jnp.array(0.0)
+    def evaluate(self) -> EvaluationResult:
+        expectations = {}
 
-        # modify affected processes
-        for process, (sumw, sumw2) in self.processes.items():
-            # mu
-            if process == "signal":
-                sumw = self.parameters["mu"].apply(sumw)
+        expectations["signal"], mu_penalty = self.parameters["mu"](
+            self.processes["signal"], type="r"
+        )
+        expectations["background1"], norm1_penalty = self.parameters["norm1"](
+            self.processes["background1"], type="lnN", width=0.1
+        )
+        expectations["background2"], norm2_penalty = self.parameters["norm2"](
+            self.processes["background2"], type="lnN", width=0.05
+        )
 
-            # background norms
-            elif process == "background1":
-                sumw = self.parameters["norm1"].apply(sumw)
-            elif process == "background2":
-                sumw = self.parameters["norm2"].apply(sumw)
-
-            # mc stat per bin per process
-            for i in range(sumw.shape[0]):
-                mcstat = f"mcstat_{process}_{i}"
-                if mcstat in self.parameters:
-                    sumw = sumw.at[i].set(self.parameters[mcstat].apply(sumw[i]))
-
-            expectation += sumw
-
-        # mc stat per bin
-        mcstat = f"mcstat_{i}"
-        for i in range(expectation.shape[0]):
-            if mcstat in self.parameters:
-                expectation = expectation.at[i].set(self.parameters[mcstat].apply(expectation[i]))
-
-        return expectation
+        penalty = mu_penalty + norm1_penalty + norm2_penalty
+        return EvaluationResult(expectations=expectations, penalty=penalty)
 
 
 def create_model():
     processes = {
-        "signal": (jnp.array([3]), jnp.array([4])),
-        "background1": (jnp.array([10]), jnp.array([12])),
-        "background2": (jnp.array([20]), jnp.array([30])),
+        "signal": jnp.array([3]),
+        "background1": jnp.array([10]),
+        "background2": jnp.array([20]),
     }
     parameters = {
-        "mu": r(strength=jnp.array(1.0)),
-        "norm1": lnN(strength=jnp.array(0.0), width=jnp.array(0.1)),
-        "norm2": lnN(strength=jnp.array(0.0), width=jnp.array(0.05)),
+        "mu": Parameter(value=jnp.array([1.0]), bounds=(-jnp.inf, jnp.inf)),
+        "norm1": Parameter(value=jnp.array([0.0]), bounds=(-jnp.inf, jnp.inf)),
+        "norm2": Parameter(value=jnp.array([0.0]), bounds=(-jnp.inf, jnp.inf)),
     }
-
-    parameters.update(add_mc_stats(processes=processes, treshold=10, prefix="mcstat"))
 
     # return model
     return SPlusBModel(processes=processes, parameters=parameters)
@@ -64,17 +42,12 @@ def create_model():
 model = create_model()
 
 
-init_params = model.parameter_strengths
+init_values = model.parameter_values
 observation = jnp.array([37])
 
 
 # create optimizer (from `jaxopt`)
 optimizer = JaxOptimizer.make(
     name="LBFGS",
-    settings={
-        "maxiter": 30,
-        "tol": 1e-6,
-        "jit": True,
-        "unroll": True,
-    },
+    settings={"maxiter": 5, "jit": True, "unroll": True},
 )

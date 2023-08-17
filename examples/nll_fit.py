@@ -1,16 +1,17 @@
-from dilax.likelihood import nll
+from dilax.likelihood import NLL
 
-from examples.model import model, init_params, observation, optimizer
+from examples.model import model, init_values, observation, optimizer
 
 from jax.config import config
 
 config.update("jax_enable_x64", True)
 
 
-# fit
-params, state = optimizer.fit(
-    fun=nll, init_params=init_params, model=model, observation=observation
-)
+# create negative log likelihood
+nll = NLL(model=model, observation=observation)
 
-# update model with fitted parameters
-fitted_model = model.apply(parameters=params)
+# fit
+values, state = optimizer.fit(fun=nll, init_values=init_values)
+
+# update model with fitted values
+fitted_model = model.update(values=values)

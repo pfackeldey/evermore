@@ -1,36 +1,29 @@
-import jax
-import jax.numpy as jnp
+import equinox as eqx
 
-from dilax.likelihood import nll
+from dilax.likelihood import NLL, Hessian, CovMatrix
 
-from examples.model import model, init_params, observation, optimizer
+from examples.model import model, init_values, observation, optimizer
 
 from jax.config import config
 
 config.update("jax_enable_x64", True)
 
+# create negative log likelihood
+nll = NLL(model=model, observation=observation)
 
 # fit
-params, state = optimizer.fit(
-    fun=nll, init_params=init_params, model=model, observation=observation
-)
+params, state = optimizer.fit(fun=nll, init_values=init_values)
 
 # gradients of nll of fitted model
-grads = jax.grad(nll, argnums=0)(params, model, observation)
+fast_grad_nll = eqx.filter_jit(eqx.filter_grad(nll))
+grads = fast_grad_nll(params)
 # gradients of nll of fitted model only wrt to `mu`
 # basically: pass the parameters dict of which you want the gradients
 params_ = {k: v for k, v in params.items() if k == "mu"}
-grad_mu = jax.grad(nll, argnums=0)(params_, model, observation)
+grad_mu = fast_grad_nll(params_)
 
 # hessian + cov_matrix of nll of fitted model
-hessian = jax.hessian(nll, argnums=0)(params, model, observation)
-hessian, _ = jax.tree_util.tree_flatten(hessian)
-hessian = jnp.reshape(jnp.array(hessian), (len(params), len(params)))
+hessian = eqx.filter_jit(Hessian(model=model, observation=observation))()
 
 # covariance matrix of fitted model
-cov_matrix = jnp.linalg.inv(hessian)
-
-# or simply
-from dilax.likelihood import cov_matrix
-
-covmatrix = cov_matrix(params, model, observation)
+covmatrix = eqx.filter_jit(CovMatrix(model=model, observation=observation))()

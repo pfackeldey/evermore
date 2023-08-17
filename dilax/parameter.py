@@ -1,66 +1,200 @@
-import chex
+from __future__ import annotations
+
+import abc
+
+import equinox as eqx
+
 import jax
 import jax.numpy as jnp
 
 
-@chex.dataclass
-class Parameter:
-    strength: jax.Array
+class Parameter(eqx.Module):
+    value: jax.Array = eqx.field(converter=jax.numpy.asarray)
     bounds: tuple[jnp.array, jnp.array]
 
+    def __init__(
+        self,
+        value: jax.Array,
+        bounds: tuple[jnp.array, jnp.array],
+    ) -> None:
+        self.value = value
+        self.bounds = bounds
+
+    def update(self, value: jax.Array) -> Parameter:
+        return self.__class__(value=value, bounds=self.bounds)
+
     @property
-    def boundary_constraint(self) -> jax.Array:
+    def boundary_penalty(self) -> jax.Array:
         return jnp.where(
-            (self.strength < self.bounds[0]) | (self.strength > self.bounds[1]),
+            (self.value < self.bounds[0]) | (self.value > self.bounds[1]),
             jnp.inf,
             0,
         )
 
+    @eqx.filter_jit
+    def __call__(self, sumw: jax.Array, type: str, **kwargs) -> tuple[jax.Array, jax.Array]:
+        penalty = Penalty.getcls(type)(parameter=self, **kwargs)
+        return penalty(sumw=sumw), penalty.logpdf
+
+
+class Penalty(eqx.Module):
+    parameter: Parameter
+
+    def __init__(self, parameter: Parameter) -> None:
+        self.parameter = parameter
+
     @property
+    @abc.abstractmethod
+    def type(self) -> str:
+        ...
+
+    @classmethod
+    def gettypes(cls) -> list[str]:
+        return [sub_cls.type for sub_cls in cls.__subclassess__()]
+
+    @classmethod
+    def getcls(cls, type: str) -> Penalty:
+        for sub_cls in cls.__subclasses__():
+            if sub_cls.type == type:
+                return sub_cls
+        raise ValueError(f"Unknown penalty type: {type}, available: {cls.gettypes()}")
+
+    @property
+    @abc.abstractmethod
     def default_scan_points(self) -> jax.Array:
         ...
 
     @property
+    @abc.abstractmethod
     def logpdf(self) -> jax.Array:
         ...
 
-    def apply(self, sumw: jax.Array) -> jax.Array:
+    @abc.abstractmethod
+    def __call__(self, sumw: jax.Array) -> jax.Array:
         ...
 
 
-@chex.dataclass
-class FreeFloating(Parameter):
+class FreeFloating(Penalty):
+    type: str = "r"
+
     @property
     def default_scan_points(self) -> jax.Array:
-        return jnp.linspace(self.bounds[0], self.bounds[1], 100)
+        return jnp.linspace(self.parameter.bounds[0], self.parameter.bounds[1], 100)
 
     @property
     def logpdf(self) -> jax.Array:
         return jnp.array(0.0)
 
-    def apply(self, sumw: jax.Array) -> jax.Array:
-        return self.strength * sumw
+    def __call__(self, sumw: jax.Array) -> jax.Array:
+        return self.parameter.value * sumw
 
 
-@chex.dataclass
-class Normal(Parameter):
-    width: jax.Array
+class Normal(Penalty):
+    type: str = "gauss"
+
+    width: jax.Array = eqx.field(converter=jax.numpy.asarray)
+    logpdf_maximum: jax.Array = eqx.field(converter=jax.numpy.asarray)
+
+    def __init__(self, parameter: Parameter, width: jax.Array) -> None:
+        super().__init__(parameter=parameter)
+        self.width = width
+        self.logpdf_maximum = jax.scipy.stats.norm.logpdf(0, loc=0, scale=self.width)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(parameter={self.parameter}, width={self.width})"
 
     @property
     def default_scan_points(self) -> jax.Array:
-        return jnp.linspace(self.strength - 7 * self.width, self.strength + 7 * self.width, 100)
+        return jnp.linspace(self.value - 7 * self.width, self.parameter.value + 7 * self.width, 100)
 
     @property
     def logpdf(self) -> jax.Array:
-        return jax.scipy.stats.norm.logpdf(self.strength, loc=1, scale=self.width)
+        unnormalized = jax.scipy.stats.norm.logpdf(self.parameter.value, loc=0, scale=self.width)
+        return unnormalized - self.logpdf_maximum
 
-    def apply(self, sumw: jax.Array) -> jax.Array:
-        return self.strength * sumw
+    def __call__(self, sumw: jax.Array) -> jax.Array:
+        return (self.parameter.value + 1) * sumw
 
 
-@chex.dataclass
-class LogNormal(Parameter):
+class Shape(Penalty):
+    type: str = "shape"
+
+    up: jax.Array = eqx.field(converter=jax.numpy.asarray)
+    down: jax.Array = eqx.field(converter=jax.numpy.asarray)
+    logpdf_maximum: jax.Array = eqx.field(converter=jax.numpy.asarray)
+
+    def __init__(
+        self,
+        parameter: Parameter,
+        up: jax.Array,
+        down: jax.Array,
+    ) -> None:
+        super().__init__(parameter=parameter)
+        self.up = up  # +1 sigma
+        self.down = down  # -1 sigma
+        self.logpdf_maximum = jax.scipy.stats.norm.logpdf(0, loc=0, scale=self.width)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(parameter={self.parameter}, width={self.width})"
+
+    @property
+    def width(self):
+        return 1.0
+
+    @property
+    def default_scan_points(self) -> jax.Array:
+        return jnp.linspace(
+            self.parameter.value - 7 * self.width, self.parameter.value + 7 * self.width, 100
+        )
+
+    @eqx.filter_jit
+    def vshift(self, sumw: jax.Array) -> jax.Array:
+        factor = self.parameter.value + 1
+        dx_sum = self.up + self.down - 2 * sumw
+        dx_diff = self.up - self.down
+
+        # taken from https://github.com/nsmith-/jaxfit/blob/8479cd73e733ba35462287753fab44c0c560037b/src/jaxfit/roofit/combine.py#L173C6-L192
+        _asym_poly = jnp.array([3.0, -10.0, 15.0, 0.0]) / 8.0
+
+        abs_value = jnp.abs(factor)
+        morph = 0.5 * (
+            dx_diff * factor
+            + dx_sum
+            * jnp.where(
+                abs_value > 1.0,
+                abs_value,
+                jnp.polyval(_asym_poly, factor * factor),
+            )
+        )
+
+        return morph
+
+    @property
+    def logpdf(self) -> jax.Array:
+        unnormalized = jax.scipy.stats.norm.logpdf(self.parameter.value, loc=0, scale=self.width)
+        return unnormalized - self.logpdf_maximum
+
+    def __call__(self, sumw: jax.Array) -> jax.Array:
+        return jax.numpy.clip(sumw + self.vshift(sumw=sumw), a_min=0.0)
+
+
+class LogNormal(Penalty):
+    type: str = "lnN"
+
     width: jax.Array | tuple[jax.Array, jax.Array]
+    logpdf_maximum: jax.Array = eqx.field(converter=jax.numpy.asarray)
+
+    def __init__(
+        self,
+        parameter: Parameter,
+        width: jax.Array | tuple[jax.Array, jax.Array],
+    ) -> None:
+        super().__init__(parameter=parameter)
+        self.width = width
+        self.logpdf_maximum = jax.scipy.stats.norm.logpdf(0, loc=0, scale=self.scale)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(parameter={self.parameter}, width={self.width})"
 
     @property
     def default_scan_points(self) -> jax.Array:
@@ -68,50 +202,58 @@ class LogNormal(Parameter):
             down, up = self.width
         else:
             down = up = self.width
-        return jnp.linspace(self.strength - 7 * down, self.strength + 7 * up, 100)
+        return jnp.linspace(self.parameter.value - 7 * down, self.parameter.value + 7 * up, 100)
+
+    @property
+    def scale(self) -> jax.Array:
+        if isinstance(self.width, tuple):
+            down, up = self.width
+            scale = jnp.where(self.parameter.value > 0, up, down)
+        else:
+            scale = self.width
+        return scale
 
     @property
     def logpdf(self) -> jax.Array:
-        if isinstance(self.width, tuple):
-            down, up = self.width
-            scale = jnp.where(self.strength > 0, up, down)
-        else:
-            scale = self.width
-        return jax.scipy.stats.norm.logpdf(self.strength, loc=0, scale=scale)
+        unnormalized = jax.scipy.stats.norm.logpdf(self.parameter.value, loc=0, scale=self.scale)
+        return unnormalized - self.logpdf_maximum
 
-    def apply(self, sumw: jax.Array) -> jax.Array:
-        return jnp.exp(self.strength) * sumw
+    def __call__(self, sumw: jax.Array) -> jax.Array:
+        return jnp.exp(self.parameter.value) * sumw
 
 
-# shorthands
-from functools import partial
+class Poisson(Penalty):
+    type = "poisson"
 
-r = partial(FreeFloating, bounds=(jnp.array(-jnp.inf), jnp.array(jnp.inf)))
-lnN = partial(LogNormal, bounds=(jnp.array(-jnp.inf), jnp.array(jnp.inf)))
+    rate: jax.Array = eqx.field(converter=jax.numpy.asarray)
+    logpdf_maximum: jax.Array = eqx.field(converter=jax.numpy.asarray)
 
+    def __init__(
+        self,
+        parameter: Parameter,
+        rate: jax.Array,
+    ) -> None:
+        super().__init__(parameter=parameter)
+        self.rate = rate
+        self.logpdf_maximum = jax.scipy.stats.poisson.logpmf(self.rate, self.rate)
 
-def add_mc_stats(processes, treshold, prefix="mcstat"):
-    parameters = {}
-    templ_per_process = prefix + "_{}_{}"
-    templ_total = prefix + "_{}"
-    sumw_total = jnp.sum(jnp.array(list(p[0] for p in processes.values())), axis=0)
-    sumw2_total = jnp.sum(jnp.array(list(p[1] for p in processes.values())), axis=0)
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(parameter={self.parameter}, lambda={self.rate})"
 
-    for i in range(sumw_total.shape[0]):
-        if sumw_total[i] >= treshold:
-            param_name = templ_total.format(i)
-            parameters[param_name] = Normal(
-                strength=jnp.array(1.0),
-                width=jnp.sqrt(sumw2_total[i]) / sumw_total[i],
-                bounds=(jnp.array(0.0), jnp.array(jnp.inf)),
-            )
-        else:
-            # per process
-            for process, (sumw, sumw2) in processes.items():
-                param_name = templ_per_process.format(process, i)
-                parameters[param_name] = Normal(
-                    strength=jnp.array(1.0),
-                    width=jnp.sqrt(sumw2[i]) / sumw[i],
-                    bounds=(jnp.array(0.0), jnp.array(jnp.inf)),
-                )
-    return parameters
+    @property
+    def default_scan_points(self) -> jax.Array:
+        return jnp.linspace(
+            self.parameter.value - 7 * jnp.sqrt(self.rate),
+            self.parameter.value + 7 * jnp.sqrt(self.rate),
+            100,
+        )
+
+    @property
+    def logpdf(self) -> jax.Array:
+        unnormalized = jax.scipy.stats.poisson.logpmf(
+            self.rate, (self.parameter.value + 1) * self.rate
+        )
+        return unnormalized - self.logpdf_maximum
+
+    def __call__(self, sumw: jax.Array) -> jax.Array:
+        return (self.parameter.value + 1) * sumw
