@@ -131,7 +131,7 @@ class Model(eqx.Module):
     @property
     def parameter_values(self) -> dict[str, float]:
         # avoid 0-dim arrays
-        return {key: jnp.atleast_1d(param.value) for key, param in self.parameters.items()}
+        return {key: param.value for key, param in self.parameters.items()}
 
     def update(
         self,

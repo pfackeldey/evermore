@@ -180,7 +180,7 @@ class CovMatrix(Hessian):
 
     def __call__(self, values: dict[str, jax.Array] = {}) -> jax.Array:
         hessian = super().__call__(values=values)
-        hessian_inv = jnp.linalg.inv(hessian)
+        hessian_inv = jnp.linalg.inv(-hessian)
         return hessian_inv
 
 
