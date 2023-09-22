@@ -74,7 +74,7 @@ class NLL(BaseModule):
             self.logpdf(self.observation, res.expectation())
             - self.logpdf(self.observation, self.observation)
             + model.nll_boundary_penalty()
-            + res.penalty
+            + model.parameter_constraints()
         )
         return -jnp.sum(nll, axis=-1)
 

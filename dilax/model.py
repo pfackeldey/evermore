@@ -5,35 +5,29 @@ import abc
 import jax
 import jax.numpy as jnp
 
-from dilax.parameter import Parameter
+from dilax.util import HistDB
 
 import equinox as eqx
 
 
-class EvaluationResult(eqx.Module):
+class Result(eqx.Module):
     """
-    Result of the `expectation` method of a `Model`.
-
-    Returns:
+    Holds:
         dict[str, jax.Array]: The expected number of events in each bin for each process.
-        jax.Array: The penalty term for the NLL.
     """
 
     expectations: dict[str, jax.Array]
-    penalty: jax.Array
 
-    def __init__(
-        self,
-        expectations: dict[str, jax.Array],
-        penalty: jax.Array,
-    ):
+    def __init__(self, expectations: dict[str, jax.Array] = {}):
         self.expectations = expectations
-        self.penalty = penalty
 
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}(expectations={self.expectations}, penalty={self.penalty})"
-        )
+    def add(
+        self,
+        process: str,
+        expectation: jax.Array,
+    ) -> Result:
+        self.expectations[process] = expectation
+        return self
 
     def expectation(self) -> jax.Array:
         expectation = jnp.array(0.0)
@@ -89,62 +83,50 @@ class Model(eqx.Module):
     ```
     """
 
-    processes: dict[str, jax.Array]
-    parameters: dict[str, Parameter]
+    processes: HistDB
+    parameters: dict[str, jax.Array]
 
     def __init__(
         self,
-        processes: dict[str, jax.Array],
-        parameters: dict[str, Parameter],
+        processes: HistDB,
+        parameters: dict[str, jax.Array],
     ):
         self.processes = processes
         self.parameters = parameters
 
     @property
-    def n_processes(self) -> int:
-        return len(self.processes)
-
-    @property
-    def n_parameters(self) -> int:
-        return len(self.parameters)
-
-    def repr(self, detail_level: int = 0) -> str:
-        if detail_level <= 0:
-            args = f"({self.n_processes} processes, {self.n_parameters} parameters)"
-        if detail_level > 0:
-            args = f"(processes={list(self.processes.keys())}, parameters={list(self.parameters.keys())})"
-        repr = f"{self.__class__.__name__}{args}"
-        if detail_level > 1:
-            if self.processes:
-                repr += "\n\nProcesses:"
-                for name, sumw in self.processes.items():
-                    repr += f"\n  - {name}: sumw={sumw}"
-            if self.parameters:
-                repr += "\n\nParameters:"
-                for name, param in self.parameters.items():
-                    repr += f"\n  - {name}: {param}"
-        return repr
-
-    def __repr__(self) -> str:
-        return self.repr(detail_level=1)
-
-    @property
-    def parameter_values(self) -> dict[str, float]:
-        # avoid 0-dim arrays
+    def parameter_values(self) -> dict[str, jax.Array]:
         return {key: param.value for key, param in self.parameters.items()}
+
+    def parameter_constraints(self) -> jax.Array:
+        c = []
+        for param in self.parameters.values():
+            # skip if the parameter was not used / has no constraint
+            if not param.constraints:
+                continue
+            if not len(param.constraints) <= 1:
+                raise ValueError(
+                    f"More than one constraint per parameter is not allowed. Got: {param.constraint}"
+                )
+            constraint = tuple(param.constraints)[0]
+            c.append(constraint.logpdf(param.value))
+        return jnp.sum(jnp.array(c))
 
     def update(
         self,
-        processes: dict[str, jax.Array] = {},
+        processes: HistDB = HistDB({}),
         values: dict[str, jax.Array] = {},
     ) -> Model:
-        def _patch_processes(processes: dict[str, jax.Array]) -> dict[str, jax.Array]:
+        def _patch_processes(processes: HistDB) -> HistDB:
             # replace processes
-            new_processes = dict(self.processes)
+            if not isinstance(processes, HistDB):
+                processes = HistDB(processes)
+            assert isinstance(processes, HistDB)
+            new_processes = {k: v for k, v in self.processes.items()}
             for key, process in new_processes.items():
-                if key in processes:
+                if (key := HistDB.keyify(key)) in processes:
                     new_processes[key] = processes[key]
-            return new_processes
+            return HistDB(new_processes)
 
         def _patch_parameters(values: dict[str, jax.Array]) -> dict[str, jax.Array]:
             # replace parameters
@@ -155,12 +137,12 @@ class Model(eqx.Module):
             return new_parameters
 
         return self.__class__(
-            processes=_patch_processes(processes),
-            parameters=_patch_parameters(values),
+            processes=_patch_processes(processes) if processes else self.processes,
+            parameters=_patch_parameters(values) if values else self.parameters,
         )
 
     def nll_boundary_penalty(self) -> jax.Array:
-        penalty = jnp.array(0.0)
+        penalty = jnp.array([0.0])
 
         for param in self.parameters.values():
             penalty += param.boundary_penalty
@@ -168,5 +150,13 @@ class Model(eqx.Module):
         return penalty
 
     @abc.abstractmethod
-    def evaluate(self) -> EvaluationResult:
+    def __call__(
+        self,
+        processes: HistDB,
+        parameters: dict[str, jax.Array],
+    ) -> Result:
         ...
+
+    def evaluate(self) -> Result:
+        # evaluate the model with its current state
+        return self(self.processes, self.parameters)

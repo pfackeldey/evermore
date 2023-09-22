@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import collections
 import pprint
-from typing import Any, Mapping, TypeVar, Hashable
+from typing import Any, Mapping, TypeVar, Hashable, Callable
 
 import jax
+import jax.numpy as jnp
 
 
 class FrozenKeysView(collections.abc.KeysView):
@@ -112,7 +115,7 @@ class FrozenDB(Mapping[K, V]):
     def __iter__(self):
         return iter(self._dict)
 
-    def keys(self):
+    def keys(self) -> FrozenKeysView:
         return FrozenKeysView(self._dict)
 
     def values(self):
@@ -122,32 +125,41 @@ class FrozenDB(Mapping[K, V]):
         for key in self._dict:
             yield (key, self[key])
 
-    def only(self, *keys):
+    def only(self, *keys) -> FrozenDB:
         return self.__class__({key: self[key] for key in keys})
+
+    def subset(self, *keys) -> FrozenDB:
+        new = {}
+        for key in keys:
+            key = self.keyify(key)
+            new.update({k: v for k, v in self.items() if key <= k})
+        return self.__class__(new)
 
     def copy(self):
         return self.__class__(self)
 
     def __repr__(self):
-        return "{}({}), len={}".format(
+        return "{}({})".format(
             type(self).__name__,
             _pretty_dict(self._dict),
-            len(self),
         )
+
+    def as_compact_dict(self):
+        return {"/".join(sorted(map(str, k))): v for k, v in self.items()}
 
 
 def _flatten(tree):
     return (tuple(tree.values()), tuple(tree.keys()))
 
 
-def _make_unflatten(cls: FrozenDB):
+def _make_unflatten(cls: type[FrozenDB]) -> Callable:
     def _unflatten(keys, values):
         return cls({k: v for k, v in zip(keys, values)}, __unsafe_skip_copy__=True)
 
     return _unflatten
 
 
-def make_and_register(name: str) -> FrozenDB:
+def make_and_register(name: str) -> type[FrozenDB]:
     # first we create a new class
     cls = type(name, (FrozenDB,), {})
     # then we register it with jax as a PyTree
@@ -161,7 +173,11 @@ def make_and_register(name: str) -> FrozenDB:
 
 
 # for convenience
-HistDB: FrozenDB[tuple[Hashable, ...], jax.Array] = make_and_register("HistDB")
+HistDB: type[FrozenDB] = make_and_register("HistDB")
+
+
+def as1darray(x: jax.Array) -> jax.Array:
+    return jnp.atleast_1d(jnp.asarray(x))
 
 
 if __name__ == "__main__":
@@ -188,14 +204,14 @@ if __name__ == "__main__":
     #   ('DY', 'nominal'): Array([2, 2, 2, 2, 2], dtype=int32),
     #   ('DY', 'Up', 'JES'): Array([2.5, 2.5, 2.5, 2.5, 2.5], dtype=float32),
     #   ('DY', 'Down', 'JES'): Array([0.7, 0.7, 0.7, 0.7, 0.7], dtype=float32),
-    # }), len=6
+    # })
 
     print(hists["QCD"])
     # >> HistDB({
     #     'nominal': Array([1, 1, 1, 1, 1], dtype=int32),
     #     ('Up', 'JES'): Array([1.5, 1.5, 1.5, 1.5, 1.5], dtype=float32),
     #     ('Down', 'JES'): Array([0.5, 0.5, 0.5, 0.5, 0.5], dtype=float32),
-    # }), len=3
+    # })
 
     print(hists["JES"])
     # >> HistDB({
@@ -203,7 +219,7 @@ if __name__ == "__main__":
     #     ('QCD', 'Down'): Array([0.5, 0.5, 0.5, 0.5, 0.5], dtype=float32),
     #     ('DY', 'Up'): Array([2.5, 2.5, 2.5, 2.5, 2.5], dtype=float32),
     #     ('DY', 'Down'): Array([0.7, 0.7, 0.7, 0.7, 0.7], dtype=float32),
-    # }), len=4
+    # })
 
     # It's jit-compatible:
     def foo(hists):

@@ -1,36 +1,58 @@
+import jax
 import jax.numpy as jnp
+import equinox as eqx
 
-from dilax.parameter import Parameter
-from dilax.model import Model, EvaluationResult
+from dilax.parameter import Parameter, modifier, lnN, unconstrained
+from dilax.model import Model, Result
 from dilax.optimizer import JaxOptimizer
+from dilax.util import HistDB
 
 
 class SPlusBModel(Model):
-    def evaluate(self) -> EvaluationResult:
-        expectations = {}
+    def __call__(
+        self,
+        processes: HistDB,
+        parameters: dict[str, jax.Array],
+    ) -> Result:
+        res = Result()
 
-        expectations["signal"], mu_penalty = self.parameters["mu"](
-            self.processes["signal"], type="r"
+        res.add(
+            process="signal",
+            expectation=modifier(
+                name="mu",
+                parameter=parameters["mu"],
+                effect=unconstrained(),
+            )(processes["signal"]),
         )
-        expectations["background1"], norm1_penalty = self.parameters["norm1"](
-            self.processes["background1"], type="lnN", width=0.1
+        res.add(
+            process="background",
+            expectation=modifier(
+                name="lnN1",
+                parameter=parameters["norm1"],
+                effect=lnN(0.1),
+            )(processes["background1"]),
         )
-        expectations["background2"], norm2_penalty = self.parameters["norm2"](
-            self.processes["background2"], type="lnN", width=0.05
+        res.add(
+            process="background2",
+            expectation=modifier(
+                name="lnN2",
+                parameter=parameters["norm1"],
+                effect=lnN(0.05),
+            )(processes["background2"]),
         )
-
-        penalty = mu_penalty + norm1_penalty + norm2_penalty
-        return EvaluationResult(expectations=expectations, penalty=penalty)
+        return res
 
 
 def create_model():
-    processes = {
-        "signal": jnp.array([3]),
-        "background1": jnp.array([10]),
-        "background2": jnp.array([20]),
-    }
+    processes = HistDB(
+        {
+            "signal": jnp.array([3]),
+            "background1": jnp.array([10]),
+            "background2": jnp.array([20]),
+        }
+    )
     parameters = {
-        "mu": Parameter(value=jnp.array([1.0]), bounds=(-jnp.inf, jnp.inf)),
+        "mu": Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
         "norm1": Parameter(value=jnp.array([0.0]), bounds=(-jnp.inf, jnp.inf)),
         "norm2": Parameter(value=jnp.array([0.0]), bounds=(-jnp.inf, jnp.inf)),
     }
@@ -41,6 +63,7 @@ def create_model():
 
 model = create_model()
 
+eqx.tree_pprint(model)
 
 init_values = model.parameter_values
 observation = jnp.array([37])
