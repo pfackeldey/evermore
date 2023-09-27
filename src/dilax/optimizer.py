@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import Callable, Hashable
+from collections.abc import Hashable
+from typing import Callable
 
 import equinox as eqx
 import jax
 import jaxopt
-
-from dilax.model import Model
 
 
 class JaxOptimizer(eqx.Module):
@@ -44,7 +43,9 @@ class JaxOptimizer(eqx.Module):
         self._settings = _settings
 
     @classmethod
-    def make(cls: type[JaxOptimizer], name: str, settings: dict[str, Hashable]) -> JaxOptimizer:
+    def make(
+        cls: type[JaxOptimizer], name: str, settings: dict[str, Hashable]
+    ) -> JaxOptimizer:
         return cls(name=name, _settings=tuple(settings.items()))
 
     @property

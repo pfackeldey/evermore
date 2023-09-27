@@ -1,12 +1,13 @@
+from __future__ import annotations
 
 
 def test_example():
     import jax.numpy as jnp
-    from dilax.likelihood import NLL
-    from dilax.parameter import Parameter
-    from dilax.model import Model, EvaluationResult
-    from dilax.optimizer import JaxOptimizer
 
+    from dilax.likelihood import NLL
+    from dilax.model import EvaluationResult, Model
+    from dilax.optimizer import JaxOptimizer
+    from dilax.parameter import Parameter
 
     class SPlusBModel(Model):
         def evaluate(self) -> EvaluationResult:
@@ -25,7 +26,6 @@ def test_example():
             penalty = mu_penalty + norm1_penalty + norm2_penalty
             return EvaluationResult(expectations=expectations, penalty=penalty)
 
-
     def create_model():
         processes = {
             "signal": jnp.array([3]),
@@ -40,7 +40,6 @@ def test_example():
 
         # return model
         return SPlusBModel(processes=processes, parameters=parameters)
-
 
     model = create_model()
 
@@ -61,10 +60,12 @@ def test_example():
     values, state = optimizer.fit(fun=nll, init_values=init_values)
 
     assert jnp.allclose(
-        list(values.values()), 
-        list({
-            'mu': jnp.array([1.1638741], dtype=jnp.float32),
-            'norm1': jnp.array([0.01125314], dtype=jnp.float32),
-            'norm2': jnp.array([0.0052684], dtype=jnp.float32)
-        }.values())
+        list(values.values()),
+        list(
+            {
+                "mu": jnp.array([1.1638741], dtype=jnp.float32),
+                "norm1": jnp.array([0.01125314], dtype=jnp.float32),
+                "norm2": jnp.array([0.0052684], dtype=jnp.float32),
+            }.values()
+        ),
     )

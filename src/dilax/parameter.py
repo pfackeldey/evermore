@@ -3,12 +3,11 @@ from __future__ import annotations
 import abc
 
 import equinox as eqx
-
 import jax
 import jax.numpy as jnp
 
+from dilax.pdf import Flat, Gauss, HashablePDF, Poisson
 from dilax.util import as1darray
-from dilax.pdf import Flat, Gauss, Poisson, HashablePDF
 
 
 class Parameter(eqx.Module):
@@ -98,7 +97,7 @@ class shape(Effect):
         _asym_poly = jnp.array([3.0, -10.0, 15.0, 0.0]) / 8.0
 
         abs_value = jnp.abs(factor)
-        morph = 0.5 * (
+        return 0.5 * (
             dx_diff * factor
             + dx_sum
             * jnp.where(
@@ -107,8 +106,6 @@ class shape(Effect):
                 jnp.polyval(_asym_poly, factor * factor),
             )
         )
-
-        return morph
 
     @property
     def constraint(self) -> HashablePDF:
@@ -158,9 +155,10 @@ class poisson(Effect):
         return Gauss(mean=0.0, width=1.0)
 
     def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
-        gauss_cdf = jnp.broadcast_to(self.constraint.cdf(parameter.value), self.lamb.shape)
-        val = Poisson(self.lamb).inv_cdf(gauss_cdf)
-        return val
+        gauss_cdf = jnp.broadcast_to(
+            self.constraint.cdf(parameter.value), self.lamb.shape
+        )
+        return Poisson(self.lamb).inv_cdf(gauss_cdf)
 
 
 class ModifierBase(eqx.Module):
@@ -210,7 +208,9 @@ class modifier(ModifierBase):
     parameter: Parameter
     effect: Effect
 
-    def __init__(self, name: str, parameter: Parameter, effect: Effect = unconstrained()) -> None:
+    def __init__(
+        self, name: str, parameter: Parameter, effect: Effect = unconstrained()
+    ) -> None:
         self.name = name
         self.parameter = parameter
         self.effect = effect
@@ -264,7 +264,8 @@ class compose(ModifierBase):
         # check for duplicate names
         duplicates = [name for name in self.names if self.names.count(name) > 1]
         if duplicates:
-            raise ValueError(f"Modifier need to have unique names, got: {duplicates}")
+            msg = f"Modifier need to have unique names, got: {duplicates}"
+            raise ValueError(msg)
 
     @property
     def names(self) -> list[str]:

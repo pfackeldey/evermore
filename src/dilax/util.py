@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import collections
 import pprint
-from typing import Any, Mapping, TypeVar, Hashable, Callable
+from collections.abc import Hashable, Mapping
+from typing import Any, Callable, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -41,7 +42,7 @@ def _pretty_dict(x):
         return pprint.pformat(x)
     rep = ""
     for key, val in x.items():
-        rep += f"{repr(_pretty_key(key))}: {_pretty_dict(val)},\n"
+        rep += f"{_pretty_key(key)!r}: {_pretty_dict(val)},\n"
     if rep:
         return "{\n" + _indent(2, rep) + "\n}"
     else:
@@ -68,7 +69,8 @@ def _prepare_freeze(xs: Any) -> Any:
 def _check_no_duplicate_keys(keys: tuple[Hashable, ...]) -> None:
     keys = list(keys)
     if any(keys.count(x) > 1 for x in keys):
-        raise ValueError(f"Duplicate keys: {tuple(keys)}, this is not allowed!")
+        msg = f"Duplicate keys: {tuple(keys)}, this is not allowed!"
+        raise ValueError(msg)
 
 
 class FrozenDB(Mapping[K, V]):
@@ -103,7 +105,8 @@ class FrozenDB(Mapping[K, V]):
         return ret
 
     def __setitem__(self, key, value):
-        raise ValueError(f"{type(self).__name__} is immutable.")
+        msg = f"{type(self).__name__} is immutable."
+        raise ValueError(msg)
 
     def __contains__(self, key):
         key = self.keyify(key)
@@ -139,10 +142,7 @@ class FrozenDB(Mapping[K, V]):
         return self.__class__(self)
 
     def __repr__(self):
-        return "{}({})".format(
-            type(self).__name__,
-            _pretty_dict(self._dict),
-        )
+        return f"{type(self).__name__}({_pretty_dict(self._dict)})"
 
     def as_compact_dict(self):
         return {"/".join(sorted(map(str, k))): v for k, v in self.items()}
@@ -154,7 +154,7 @@ def _flatten(tree):
 
 def _make_unflatten(cls: type[FrozenDB]) -> Callable:
     def _unflatten(keys, values):
-        return cls({k: v for k, v in zip(keys, values)}, __unsafe_skip_copy__=True)
+        return cls(dict(zip(keys, values)), __unsafe_skip_copy__=True)
 
     return _unflatten
 
