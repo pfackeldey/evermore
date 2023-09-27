@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import collections
 import pprint
-from collections.abc import Hashable, Mapping
+from collections.abc import Hashable, Iterable, Mapping
 from typing import Any, Callable, TypeVar
 
 import jax
@@ -27,8 +27,7 @@ def _pretty_key(key):
         key = FrozenDB.keyify(key)
     if len(key) == 1:
         return next(iter(key))
-    else:
-        return tuple([_pretty_key(k) for k in key])
+    return tuple([_pretty_key(k) for k in key])
 
 
 def _indent(amount: int, s: str) -> str:
@@ -45,8 +44,7 @@ def _pretty_dict(x):
         rep += f"{_pretty_key(key)!r}: {_pretty_dict(val)},\n"
     if rep:
         return "{\n" + _indent(2, rep) + "\n}"
-    else:
-        return "{}"
+    return "{}"
 
 
 K = TypeVar("K")
@@ -66,7 +64,7 @@ def _prepare_freeze(xs: Any) -> Any:
     return {FrozenDB.keyify(key): _prepare_freeze(val) for key, val in xs.items()}
 
 
-def _check_no_duplicate_keys(keys: tuple[Hashable, ...]) -> None:
+def _check_no_duplicate_keys(keys: Iterable[Hashable]) -> None:
     keys = list(keys)
     if any(keys.count(x) > 1 for x in keys):
         msg = f"Duplicate keys: {tuple(keys)}, this is not allowed!"
@@ -134,8 +132,7 @@ class FrozenDB(Mapping[K, V]):
     def subset(self, *keys) -> FrozenDB:
         new = {}
         for key in keys:
-            key = self.keyify(key)
-            new.update({k: v for k, v in self.items() if key <= k})
+            new.update({k: v for k, v in self.items() if self.keyify(key) <= k})
         return self.__class__(new)
 
     def copy(self):
@@ -180,9 +177,16 @@ def as1darray(x: jax.Array) -> jax.Array:
     return jnp.atleast_1d(jnp.asarray(x))
 
 
-if __name__ == "__main__":
-    import jax.numpy as jnp
+def dump_jaxpr(fun: Callable, *args, **kwargs) -> str:
+    jaxpr = jax.make_jaxpr(fun)(*args, **kwargs)
+    return jaxpr.pretty_print(name_stack=True)
 
+
+def dump_hlo_graph(fun: Callable, *args, **kwargs) -> str:
+    return jax.xla_computation(fun)(*args, **kwargs).as_hlo_dot_graph()
+
+
+if __name__ == "__main__":
     hists = HistDB(
         {
             # QCD

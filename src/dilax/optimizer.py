@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Hashable
-from typing import Callable
+from typing import Any, Callable
 
 import equinox as eqx
 import jax
@@ -15,23 +15,10 @@ class JaxOptimizer(eqx.Module):
 
     Example:
     ```
-        optimizer = JaxOptimizer.make(
-            name="ScipyMinimize",
-            settings={"method": "trust-constr"},
-        )
+        optimizer = JaxOptimizer.make(name="GradientDescent", settings={"maxiter": 5})
+        # or, e.g.: optimizer = JaxOptimizer.make(name="LBFGS", settings={"maxiter": 10})
 
-        # or
-
-        optimizer = JaxOptimizer.make(
-            name="LBFGS",
-            settings={
-                "maxiter": 30,
-                "tol": 1e-6,
-                "jit": True,
-                "unroll": True,
-            },
-        )
-
+        optimizer.fit(fun=nll, init_values=init_values)
     ```
     """
 
@@ -55,6 +42,39 @@ class JaxOptimizer(eqx.Module):
     def solver_instance(self, fun: Callable) -> jaxopt._src.base.Solver:
         return getattr(jaxopt, self.name)(fun=fun, **self.settings)
 
-    def fit(self, fun: Callable, init_values: dict[str, float]) -> jax.Array:
+    def fit(
+        self, fun: Callable, init_values: dict[str, jax.Array]
+    ) -> tuple[dict[str, jax.Array], Any]:
         values, state = self.solver_instance(fun=fun).run(init_values)
+        return values, state
+
+
+class Chain(eqx.Module):
+    """
+    Chain multiple optimizers together.
+    They probably should have the `maxiter` setting set to a value,
+    in order to have a deterministic runtime behaviour.
+
+    Example:
+    ```
+        opt1 = JaxOptimizer.make(name="GradientDescent", settings={"maxiter": 5})
+        opt2 = JaxOptimizer.make(name="LBFGS", settings={"maxiter": 10})
+
+        chain = Chain(opt1, opt2)
+        # first 5 steps are minimized with GradientDescent, then 10 steps with LBFGS
+        chain.fit(fun=nll, init_values=init_values)
+    ```
+    """
+
+    optimizers: tuple[JaxOptimizer, ...]
+
+    def __init__(self, *optimizers: JaxOptimizer) -> None:
+        self.optimizers = optimizers
+
+    def fit(
+        self, fun: Callable, init_values: dict[str, jax.Array]
+    ) -> tuple[dict[str, jax.Array], Any]:
+        values = init_values
+        for optimizer in self.optimizers:
+            values, state = optimizer.fit(fun=fun, init_values=values)
         return values, state

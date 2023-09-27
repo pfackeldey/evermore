@@ -12,7 +12,7 @@ from dilax.util import as1darray
 
 class Parameter(eqx.Module):
     value: jax.Array = eqx.field(converter=as1darray)
-    bounds: tuple[jnp.array, jnp.array] = eqx.field(
+    bounds: tuple[jax.Array, jax.Array] = eqx.field(
         static=True, converter=lambda x: tuple(map(as1darray, x))
     )
     constraints: set[HashablePDF] = eqx.field(static=True)
@@ -20,7 +20,7 @@ class Parameter(eqx.Module):
     def __init__(
         self,
         value: jax.Array,
-        bounds: tuple[jnp.array, jnp.array],
+        bounds: tuple[jax.Array, jax.Array] = (-jnp.inf, jnp.inf),
     ) -> None:
         self.value = value
         self.bounds = bounds
@@ -48,9 +48,6 @@ class Effect(eqx.Module):
     def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
         ...
 
-    def __call__(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
-        return jnp.atleast_1d(self.scale_factor(parameter=parameter, sumw=sumw)) * sumw
-
 
 class unconstrained(Effect):
     @property
@@ -59,6 +56,9 @@ class unconstrained(Effect):
 
     def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
         return parameter.value
+
+
+DEFAULT_EFFECT = unconstrained()
 
 
 class gauss(Effect):
@@ -72,7 +72,9 @@ class gauss(Effect):
         return Gauss(mean=0.0, width=1.0)
 
     def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
-        return parameter.value * self.width + 1
+        gx = Gauss(mean=1.0, width=self.width)
+        g1 = Gauss(mean=1.0, width=1.0)
+        return gx.inv_cdf(g1.cdf(parameter.value + 1))
 
 
 class shape(Effect):
@@ -88,8 +90,8 @@ class shape(Effect):
         self.down = down  # -1 sigma
 
     @eqx.filter_jit
-    def vshift(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
-        factor = parameter.value
+    def vshift(self, sf: jax.Array, sumw: jax.Array) -> jax.Array:
+        factor = sf
         dx_sum = self.up + self.down - 2 * sumw
         dx_diff = self.up - self.down
 
@@ -112,10 +114,9 @@ class shape(Effect):
         return Gauss(mean=0.0, width=1.0)
 
     def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
-        return jax.numpy.clip(
-            (sumw + self.vshift(parameter=parameter, sumw=sumw)) / sumw,
-            a_min=1e-5,
-        )
+        sf = parameter.value + 1
+        # clip, no negative values are allowed
+        return jnp.maximum((sumw + self.vshift(sf=sf, sumw=sumw)) / sumw, 0.0)
 
 
 class lnN(Effect):
@@ -141,7 +142,9 @@ class lnN(Effect):
 
     def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
         width = self.scale(parameter=parameter)
-        return jnp.exp(parameter.value * width)
+        g1 = Gauss(mean=1.0, width=1.0)
+        gx = Gauss(mean=1.0, width=width)
+        return g1.inv_cdf(gx.cdf(jnp.exp(parameter.value)))
 
 
 class poisson(Effect):
@@ -209,7 +212,7 @@ class modifier(ModifierBase):
     effect: Effect
 
     def __init__(
-        self, name: str, parameter: Parameter, effect: Effect = unconstrained()
+        self, name: str, parameter: Parameter, effect: Effect = DEFAULT_EFFECT
     ) -> None:
         self.name = name
         self.parameter = parameter
@@ -255,10 +258,10 @@ class compose(ModifierBase):
     ```
     """
 
-    modifiers: tuple[modifier]
+    modifiers: tuple[modifier, ...]
     names: list[str] = eqx.field(static=True)
 
-    def __init__(self, *modifiers: tuple[modifier]) -> None:
+    def __init__(self, *modifiers: modifier) -> None:
         self.modifiers = modifiers
 
         # check for duplicate names
@@ -267,22 +270,20 @@ class compose(ModifierBase):
             msg = f"Modifier need to have unique names, got: {duplicates}"
             raise ValueError(msg)
 
-    @property
-    def names(self) -> list[str]:
-        names = []
+        # set names
+        self.names = []
         for m in range(self.n_modifiers):
             modifier = self.modifiers[m]
             if isinstance(modifier, compose):
-                names.extend(modifier.names)
+                self.names.extend(modifier.names)
             else:
-                names.append(modifier.name)
-        return list(names)
+                self.names.append(modifier.name)
 
     @property
     def n_modifiers(self) -> int:
         return len(self.modifiers)
 
-    def scale_factors(self, sumw: jax.Array) -> jax.Array:
+    def scale_factors(self, sumw: jax.Array) -> dict[str, jax.Array]:
         sfs = {}
         for m in range(self.n_modifiers):
             modifier = self.modifiers[m]
@@ -294,9 +295,9 @@ class compose(ModifierBase):
         return sfs
 
     def scale_factor(self, sumw: jax.Array) -> jax.Array:
-        return jnp.atleast_1d(
-            jnp.prod(jnp.stack(list(self.scale_factors(sumw=sumw).values())), axis=0)
-        )
+        sfs = jnp.stack(list(self.scale_factors(sumw=sumw).values()))
+        # calculate the product in log-space for numerical precision
+        return jnp.exp(jnp.sum(jnp.log(sfs), axis=0))
 
-    def __call__(self, sumw: jax.Array) -> tuple[jax.Array, jax.Array]:
+    def __call__(self, sumw: jax.Array) -> jax.Array:
         return jnp.atleast_1d(self.scale_factor(sumw=sumw)) * sumw

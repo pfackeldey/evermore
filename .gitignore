@@ -159,3 +159,6 @@ Thumbs.db
 
 # if examples are run
 examples/*.eqx
+
+test/
+.vscode/

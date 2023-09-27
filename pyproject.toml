@@ -86,6 +86,7 @@ disallow_untyped_defs = false
 disallow_incomplete_defs = false
 check_untyped_defs = true
 strict = false
+ignore_missing_imports = true
 
 
 [tool.ruff]
@@ -93,7 +94,6 @@ select = [
   "E", "F", "W", # flake8
   "B",           # flake8-bugbear
   "I",           # isort
-  "ARG",         # flake8-unused-arguments
   "C4",          # flake8-comprehensions
   "EM",          # flake8-errmsg
   "ICN",         # flake8-import-conventions
