@@ -53,3 +53,8 @@ jobs:
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v3.1.4
+
+      - name: Test examples
+        run: >-
+          cd examples
+          for f in *.py; do python "$f"; done

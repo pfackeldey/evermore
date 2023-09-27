@@ -10,7 +10,7 @@ from jax.config import config
 from dilax.likelihood import NLL
 from dilax.model import Model
 from dilax.optimizer import JaxOptimizer
-from examples.model import model, observation, optimizer
+from model import model, observation, optimizer
 
 config.update("jax_enable_x64", True)
 

@@ -4,7 +4,7 @@ import equinox as eqx
 from jax.config import config
 
 from dilax.likelihood import NLL, CovMatrix, Hessian
-from examples.model import init_values, model, observation, optimizer
+from model import init_values, model, observation, optimizer
 
 config.update("jax_enable_x64", True)
 
