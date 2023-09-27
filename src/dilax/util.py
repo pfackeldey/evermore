@@ -72,7 +72,57 @@ def _check_no_duplicate_keys(keys: Iterable[Hashable]) -> None:
 
 
 class FrozenDB(Mapping[K, V]):
-    """An immutable database-like custom dict."""
+    """An immutable database-like custom dict.
+
+    Example:
+    ```
+        hists = HistDB(
+            {
+                # QCD
+                ("QCD", "nominal"): jnp.array([1, 1, 1, 1, 1]),
+                ("QCD", "JES", "Up"): jnp.array([1.5, 1.5, 1.5, 1.5, 1.5]),
+                ("QCD", "JES", "Down"): jnp.array([0.5, 0.5, 0.5, 0.5, 0.5]),
+                # DY
+                ("DY", "nominal"): jnp.array([2, 2, 2, 2, 2]),
+                ("DY", "JES", "Up"): jnp.array([2.5, 2.5, 2.5, 2.5, 2.5]),
+                ("DY", "JES", "Down"): jnp.array([0.7, 0.7, 0.7, 0.7, 0.7]),
+            }
+        )
+
+        print(hists)
+        # >> HistDB({
+        #   ('QCD', 'nominal'): Array([1, 1, 1, 1, 1], dtype=int32),
+        #   ('QCD', 'Up', 'JES'): Array([1.5, 1.5, 1.5, 1.5, 1.5], dtype=float32),
+        #   ('QCD', 'Down', 'JES'): Array([0.5, 0.5, 0.5, 0.5, 0.5], dtype=float32),
+        #   ('DY', 'nominal'): Array([2, 2, 2, 2, 2], dtype=int32),
+        #   ('DY', 'Up', 'JES'): Array([2.5, 2.5, 2.5, 2.5, 2.5], dtype=float32),
+        #   ('DY', 'Down', 'JES'): Array([0.7, 0.7, 0.7, 0.7, 0.7], dtype=float32),
+        # })
+
+        print(hists["QCD"])
+        # >> HistDB({
+        #     'nominal': Array([1, 1, 1, 1, 1], dtype=int32),
+        #     ('Up', 'JES'): Array([1.5, 1.5, 1.5, 1.5, 1.5], dtype=float32),
+        #     ('Down', 'JES'): Array([0.5, 0.5, 0.5, 0.5, 0.5], dtype=float32),
+        # })
+
+        print(hists["JES"])
+        # >> HistDB({
+        #     ('QCD', 'Up'): Array([1.5, 1.5, 1.5, 1.5, 1.5], dtype=float32),
+        #     ('QCD', 'Down'): Array([0.5, 0.5, 0.5, 0.5, 0.5], dtype=float32),
+        #     ('DY', 'Up'): Array([2.5, 2.5, 2.5, 2.5, 2.5], dtype=float32),
+        #     ('DY', 'Down'): Array([0.7, 0.7, 0.7, 0.7, 0.7], dtype=float32),
+        # })
+
+        # It's jit-compatible:
+        def foo(hists):
+            return (hists["QCD", "nominal"] + 1.2) ** 2
+
+        print(jax.jit(foo)(hists))
+        # >> Array([4.84, 4.84, 4.84, 4.84, 4.84], dtype=float32, weak_type=True)
+    ```
+
+    """
 
     __slots__ = ("_dict",)
 
@@ -85,15 +135,17 @@ class FrozenDB(Mapping[K, V]):
         assert not any(isinstance(key, set) for key in keyish)
         return keyish
 
-    def __init__(self, *args, __unsafe_skip_copy__=False, **kwargs):
+    def __init__(
+        self, xs: dict | FrozenDB = {}, __unsafe_skip_copy__: bool = False
+    ) -> None:
         # make sure the dict is as
-        xs = dict(*args, **kwargs)
+        xs = dict(xs)
         if __unsafe_skip_copy__:
             self._dict = xs
         else:
             self._dict = _prepare_freeze(xs)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> Any:
         key = self.keyify(key)
         if key in self._dict:
             return self._dict[key]
@@ -102,15 +154,15 @@ class FrozenDB(Mapping[K, V]):
             raise KeyError(key)
         return ret
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value) -> None:
         msg = f"{type(self).__name__} is immutable."
         raise ValueError(msg)
 
-    def __contains__(self, key):
+    def __contains__(self, key) -> bool:
         key = self.keyify(key)
         return key in self._dict
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._dict)
 
     def __iter__(self):
@@ -135,10 +187,10 @@ class FrozenDB(Mapping[K, V]):
             new.update({k: v for k, v in self.items() if self.keyify(key) <= k})
         return self.__class__(new)
 
-    def copy(self):
+    def copy(self) -> FrozenDB:
         return self.__class__(self)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{type(self).__name__}({_pretty_dict(self._dict)})"
 
     def as_compact_dict(self):
@@ -156,78 +208,27 @@ def _make_unflatten(cls: type[FrozenDB]) -> Callable:
     return _unflatten
 
 
-def make_and_register(name: str) -> type[FrozenDB]:
-    # first we create a new class
-    cls = type(name, (FrozenDB,), {})
-    # then we register it with jax as a PyTree
-    _unflatten = _make_unflatten(cls)
+class HistDB(FrozenDB):
+    ...
+
+
+# then we register them with jax as a PyTree
+for cls in HistDB, FrozenDB:
     jax.tree_util.register_pytree_node(
         cls,
         _flatten,
-        _unflatten,
+        _make_unflatten(cls),
     )
-    return cls
-
-
-# for convenience
-HistDB: type[FrozenDB] = make_and_register("HistDB")
 
 
 def as1darray(x: jax.Array) -> jax.Array:
     return jnp.atleast_1d(jnp.asarray(x))
 
 
-def dump_jaxpr(fun: Callable, *args, **kwargs) -> str:
+def dump_jaxpr(fun: Callable, *args: Any, **kwargs: Any) -> str:
     jaxpr = jax.make_jaxpr(fun)(*args, **kwargs)
     return jaxpr.pretty_print(name_stack=True)
 
 
-def dump_hlo_graph(fun: Callable, *args, **kwargs) -> str:
+def dump_hlo_graph(fun: Callable, *args: Any, **kwargs: Any) -> str:
     return jax.xla_computation(fun)(*args, **kwargs).as_hlo_dot_graph()
-
-
-if __name__ == "__main__":
-    hists = HistDB(
-        {
-            # QCD
-            ("QCD", "nominal"): jnp.array([1, 1, 1, 1, 1]),
-            ("QCD", "JES", "Up"): jnp.array([1.5, 1.5, 1.5, 1.5, 1.5]),
-            ("QCD", "JES", "Down"): jnp.array([0.5, 0.5, 0.5, 0.5, 0.5]),
-            # DY
-            ("DY", "nominal"): jnp.array([2, 2, 2, 2, 2]),
-            ("DY", "JES", "Up"): jnp.array([2.5, 2.5, 2.5, 2.5, 2.5]),
-            ("DY", "JES", "Down"): jnp.array([0.7, 0.7, 0.7, 0.7, 0.7]),
-        }
-    )
-
-    print(hists)
-    # >> HistDB({
-    #   ('QCD', 'nominal'): Array([1, 1, 1, 1, 1], dtype=int32),
-    #   ('QCD', 'Up', 'JES'): Array([1.5, 1.5, 1.5, 1.5, 1.5], dtype=float32),
-    #   ('QCD', 'Down', 'JES'): Array([0.5, 0.5, 0.5, 0.5, 0.5], dtype=float32),
-    #   ('DY', 'nominal'): Array([2, 2, 2, 2, 2], dtype=int32),
-    #   ('DY', 'Up', 'JES'): Array([2.5, 2.5, 2.5, 2.5, 2.5], dtype=float32),
-    #   ('DY', 'Down', 'JES'): Array([0.7, 0.7, 0.7, 0.7, 0.7], dtype=float32),
-    # })
-
-    print(hists["QCD"])
-    # >> HistDB({
-    #     'nominal': Array([1, 1, 1, 1, 1], dtype=int32),
-    #     ('Up', 'JES'): Array([1.5, 1.5, 1.5, 1.5, 1.5], dtype=float32),
-    #     ('Down', 'JES'): Array([0.5, 0.5, 0.5, 0.5, 0.5], dtype=float32),
-    # })
-
-    print(hists["JES"])
-    # >> HistDB({
-    #     ('QCD', 'Up'): Array([1.5, 1.5, 1.5, 1.5, 1.5], dtype=float32),
-    #     ('QCD', 'Down'): Array([0.5, 0.5, 0.5, 0.5, 0.5], dtype=float32),
-    #     ('DY', 'Up'): Array([2.5, 2.5, 2.5, 2.5, 2.5], dtype=float32),
-    #     ('DY', 'Down'): Array([0.7, 0.7, 0.7, 0.7, 0.7], dtype=float32),
-    # })
-
-    # It's jit-compatible:
-    def foo(hists):
-        return (hists["QCD", "nominal"] + 1.2) ** 2
-
-    print(jax.jit(foo)(hists))
-    # >> Array([4.84, 4.84, 4.84, 4.84, 4.84], dtype=float32, weak_type=True)

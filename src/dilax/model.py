@@ -6,7 +6,8 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-from dilax.util import HistDB
+from dilax.parameter import Parameter
+from dilax.util import FrozenDB, HistDB
 
 
 class Result(eqx.Module):
@@ -17,16 +18,10 @@ class Result(eqx.Module):
 
     expectations: dict[str, jax.Array]
 
-    def __init__(self, expectations: dict[str, jax.Array] | None = None):
-        if expectations is None:
-            expectations = {}
+    def __init__(self, expectations: dict[str, jax.Array] = {}) -> None:
         self.expectations = expectations
 
-    def add(
-        self,
-        process: str,
-        expectation: jax.Array,
-    ) -> Result:
+    def add(self, process: str, expectation: jax.Array) -> Result:
         self.expectations[process] = expectation
         return self
 
@@ -85,13 +80,9 @@ class Model(eqx.Module):
     """
 
     processes: HistDB
-    parameters: dict[str, jax.Array]
+    parameters: dict[str, Parameter]
 
-    def __init__(
-        self,
-        processes: HistDB,
-        parameters: dict[str, jax.Array],
-    ):
+    def __init__(self, processes: HistDB, parameters: dict[str, Parameter]) -> None:
         self.processes = processes
         self.parameters = parameters
 
@@ -113,27 +104,22 @@ class Model(eqx.Module):
         return jnp.sum(jnp.array(c))
 
     def update(
-        self,
-        processes: HistDB = HistDB({}),
-        values: dict[str, jax.Array] | None = None,
+        self, processes: dict | HistDB = {}, values: dict[str, jax.Array] = {}
     ) -> Model:
-        if values is None:
-            values = {}
+        if not isinstance(processes, HistDB):
+            processes = HistDB(processes)
 
         def _patch_processes(processes: HistDB) -> HistDB:
-            # replace processes
-            if not isinstance(processes, HistDB):
-                processes = HistDB(processes)
             assert isinstance(processes, HistDB)
             new_processes = dict(self.processes.items())
             for key, _process in new_processes.items():
-                if (key := HistDB.keyify(key)) in processes:
+                if (key := FrozenDB.keyify(key)) in processes:
                     new_processes[key] = processes[key]
             return HistDB(new_processes)
 
-        def _patch_parameters(values: dict[str, jax.Array]) -> dict[str, jax.Array]:
+        def _patch_parameters(values: dict[str, jax.Array]) -> dict[str, Parameter]:
             # replace parameters
-            new_parameters = dict(self.parameters.items())
+            new_parameters = dict(self.parameters)
             for key, parameter in new_parameters.items():
                 if key in values:
                     new_parameters[key] = parameter.update(value=values[key])
@@ -153,11 +139,7 @@ class Model(eqx.Module):
         return penalty
 
     @abc.abstractmethod
-    def __call__(
-        self,
-        processes: HistDB,
-        parameters: dict[str, jax.Array],
-    ) -> Result:
+    def __call__(self, processes: HistDB, parameters: dict[str, Parameter]) -> Result:
         ...
 
     def evaluate(self) -> Result:

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Callable
-
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -17,11 +15,7 @@ class BaseModule(eqx.Module):
     model: Model
     observation: jax.Array = eqx.field(converter=jnp.asarray)
 
-    def __init__(
-        self,
-        model: Model,
-        observation: jax.Array,
-    ):
+    def __init__(self, model: Model, observation: jax.Array) -> None:
         self.model = model
         self.observation = observation
 
@@ -65,12 +59,10 @@ class NLL(BaseModule):
     ```
     """
 
-    def logpdf(self, *args, **kwargs) -> Callable:
+    def logpdf(self, *args, **kwargs) -> jax.Array:
         return jax.scipy.stats.poisson.logpmf(*args, **kwargs)
 
-    def __call__(self, values: dict[str, jax.Array] | None = None) -> jax.Array:
-        if values is None:
-            values = {}
+    def __call__(self, values: dict[str, jax.Array] = {}) -> jax.Array:
         model = self.model.update(values=values)
         res = model.evaluate()
         nll = (
@@ -123,17 +115,11 @@ class Hessian(BaseModule):
 
     NLL: NLL
 
-    def __init__(
-        self,
-        model: Model,
-        observation: jax.Array,
-    ):
+    def __init__(self, model: Model, observation: jax.Array) -> None:
         super().__init__(model=model, observation=observation)
         self.NLL = NLL(model=model, observation=observation)
 
-    def __call__(self, values: dict[str, jax.Array] | None = None) -> jax.Array:
-        if values is None:
-            values = {}
+    def __call__(self, values: dict[str, jax.Array] = {}) -> jax.Array:
         if not values:
             values = self.model.parameter_values
         hessian = jax.hessian(self.NLL, argnums=0)(values)
@@ -182,9 +168,7 @@ class CovMatrix(Hessian):
     ```
     """
 
-    def __call__(self, values: dict[str, jax.Array] | None = None) -> jax.Array:
-        if values is None:
-            values = {}
+    def __call__(self, values: dict[str, jax.Array] = {}) -> jax.Array:
         hessian = super().__call__(values=values)
         return jnp.linalg.inv(-hessian)
 
@@ -238,32 +222,26 @@ class SampleToy(BaseModule):
 
     CovMatrix: CovMatrix
 
-    def __init__(
-        self,
-        model: Model,
-        observation: jax.Array,
-    ):
+    def __init__(self, model: Model, observation: jax.Array) -> None:
         super().__init__(model=model, observation=observation)
         self.CovMatrix = CovMatrix(model=model, observation=observation)
 
     def __call__(
-        self,
-        values: dict[str, jax.Array] | None = None,
-        key: jax.random.PRNGKey = jax.random.PRNGKey(1234),
-    ) -> jax.Array:
-        if values is None:
-            values = {}
+        self, values: dict[str, jax.Array] = {}, key: jax.Array | None = None
+    ) -> dict[str, jax.Array]:
+        if key is None:
+            key = jax.random.PRNGKey(1234)
         if not values:
             values = self.model.parameter_values
         cov = self.CovMatrix(values=values)
-        values, tree_def = jax.tree_util.tree_flatten(
+        _values, tree_def = jax.tree_util.tree_flatten(
             self.model.update(values=values).parameter_values
         )
         sampled_values = jax.random.multivariate_normal(
             key=key,
-            mean=jnp.concatenate(values),
+            mean=jnp.concatenate(_values),
             cov=cov,
         )
-        sampled_values = jax.tree_util.tree_unflatten(tree_def, sampled_values)
-        model = self.model.update(values=sampled_values)
+        new_values = jax.tree_util.tree_unflatten(tree_def, sampled_values)
+        model = self.model.update(values=new_values)
         return model.evaluate().expectations

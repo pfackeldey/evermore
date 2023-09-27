@@ -3,9 +3,9 @@ from __future__ import annotations
 import equinox as eqx
 import jax
 from jax.config import config
+from model import init_values, model, observation, optimizer
 
 from dilax.likelihood import NLL, SampleToy
-from model import init_values, model, observation, optimizer
 
 config.update("jax_enable_x64", True)
 

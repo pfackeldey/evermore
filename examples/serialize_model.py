@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import equinox as eqx
-
 from model import model
 
 # see: https://docs.kidger.site/equinox/api/serialisation/

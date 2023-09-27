@@ -56,5 +56,4 @@ jobs:
 
       - name: Test examples
         run: >-
-          cd examples
-          for f in *.py; do python "$f"; done
+          cd examples for f in *.py; do python "$f"; done
