@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 
@@ -84,8 +83,6 @@ def create_model():
 
 
 model = create_model()
-
-eqx.tree_pprint(model)
 
 init_values = model.parameter_values
 observation = jnp.array([37])

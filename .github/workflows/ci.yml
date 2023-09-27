@@ -56,4 +56,4 @@ jobs:
 
       - name: Test examples
         run: >-
-          for f in examples/*.py; do python "$f"; done
+          for f in examples/*.py; do echo "run $f" && python "$f"; done

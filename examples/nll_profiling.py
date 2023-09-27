@@ -5,8 +5,8 @@ from functools import partial
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from examples.model import asimov, model, optimizer
 from jax.config import config
+from model import asimov, model, optimizer
 
 from dilax.likelihood import NLL
 from dilax.model import Model
