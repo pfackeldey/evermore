@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from abc import abstractmethod
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-
-import equinox as eqx
 
 
 class HashablePDF(eqx.Module):
@@ -44,7 +43,8 @@ class Flat(HashablePDF):
         return jnp.array([1.0])
 
     def inv_cdf(self, x: jax.Array) -> jax.Array:
-        raise ValueError("Flat distribution has no inverse CDF.")
+        msg = "Flat distribution has no inverse CDF."
+        raise ValueError(msg)
 
 
 class Gauss(HashablePDF):
@@ -59,7 +59,9 @@ class Gauss(HashablePDF):
         return hash(self.__class__) ^ hash((self.mean, self.width))
 
     def logpdf(self, x: jax.Array) -> jax.Array:
-        logpdf_max = jax.scipy.stats.norm.logpdf(self.mean, loc=self.mean, scale=self.width)
+        logpdf_max = jax.scipy.stats.norm.logpdf(
+            self.mean, loc=self.mean, scale=self.width
+        )
         unnormalized = jax.scipy.stats.norm.logpdf(x, loc=self.mean, scale=self.width)
         return unnormalized - logpdf_max
 

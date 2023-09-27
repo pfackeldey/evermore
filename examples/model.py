@@ -1,10 +1,12 @@
+from __future__ import annotations
+
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
 
-from dilax.parameter import Parameter, modifier, lnN, unconstrained
 from dilax.model import Model, Result
 from dilax.optimizer import JaxOptimizer
+from dilax.parameter import Parameter, lnN, modifier, unconstrained
 from dilax.util import HistDB
 
 

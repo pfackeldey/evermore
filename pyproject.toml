@@ -1,42 +1,125 @@
-[tool.poetry]
-name = "dilax"
-version = "0.1.0"
-description = "differentiable (binned) likelihoods with JAX"
-authors = ["Peter Fackeldey <peter.fackeldey@rwth-aachen.de>"]
-readme = "README.md"
-homepage = "https://github.com/pfackeldey/dilax/tree/main"
-repository = "https://github.com/pfackeldey/dilax/tree/main"
-keywords = ["fit", "likelihood", "hep", "jax", "differentiable", "binned"]
-classifiers = [
-    "Programming Language :: Python :: 3.10",
-    "Operating System :: OS Independent",
-    "License :: OSI Approved :: BSD License",
-    "Intended Audience :: Developers",
-    "Intended Audience :: Science/Research",
-]
-include = [
-    "LICENSE",
-]
-
-[tool.poetry.dependencies]
-python = "^3.10"
-chex = "^0.1.7"
-jax = "^0.4.7"
-jaxopt = "^0.6"
-tqdm = "^4.65.0"
-
-
-[tool.poetry.group.dev.dependencies]
-black = "^23.1.0"
-isort = "^5.12.0"
-
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+[project]
+name = "dilax"
+authors = [
+  { name = "Peter Fackeldey", email = "peter.fackeldey@rwth-aachen.de" },
+]
+description = "Differentiable (binned) likelihoods in JAX."
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+  "Development Status :: 1 - Planning",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: BSD License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering",
+  "Typing :: Typed",
+]
+dynamic = ["version"]  # version is set in src/dilax/__init__.py
+dependencies = [
+    "equinox>=0.10.6",  # eqx.field
+    "jaxopt >=0.6"      # jaxopt.LGBFGS
+]
 
-[tool.black]
-line-length = 100
+[project.optional-dependencies]
+test = [
+  "pytest >=6",
+  "pytest-cov >=3",
+]
+dev = [
+  "pytest >=6",
+  "pytest-cov >=3",
+]
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
+[project.urls]
+Homepage = "https://github.com/pfackeldey/dilax"
+"Bug Tracker" = "https://github.com/pfackeldey/dilax/issues"
+Discussions = "https://github.com/pfackeldey/dilax/discussions"
+Changelog = "https://github.com/pfackeldey/dilax/releases"
+
+
+[tool.hatch]
+version.path = "src/dilax/__init__.py"
+envs.default.dependencies = [
+  "pytest",
+  "pytest-cov",
+]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = [
+  "error",
+]
+log_cli_level = "INFO"
+testpaths = [
+  "tests",
+]
+
+
+[tool.coverage]
+run.source = ["dilax"]
+port.exclude_lines = [
+  'pragma: no cover',
+  '\.\.\.',
+  'if typing.TYPE_CHECKING:',
+]
+
+
+[tool.mypy]
+files = ["src", "tests"]
+python_version = "3.8"
+show_error_codes = true
+warn_unreachable = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+strict = false
+
+
+[tool.ruff]
+select = [
+  "E", "F", "W", # flake8
+  "B",           # flake8-bugbear
+  "I",           # isort
+  "ARG",         # flake8-unused-arguments
+  "C4",          # flake8-comprehensions
+  "EM",          # flake8-errmsg
+  "ICN",         # flake8-import-conventions
+  "ISC",         # flake8-implicit-str-concat
+  "G",           # flake8-logging-format
+  "PGH",         # pygrep-hooks
+  "PIE",         # flake8-pie
+  "PL",          # pylint
+  "PT",          # flake8-pytest-style
+  "PTH",         # flake8-use-pathlib
+  "RET",         # flake8-return
+  "RUF",         # Ruff-specific
+  "SIM",         # flake8-simplify
+  "UP",          # pyupgrade
+  "YTT",         # flake8-2020
+  "EXE",         # flake8-executable
+]
+extend-ignore = [
+  "PLR",    # Design related pylint codes
+  "E501",   # Line too long
+]
+
+src = ["src"]
+unfixable = [
+  "F841", # Would remove unused variables
+]
+exclude = []
+flake8-unused-arguments.ignore-variadic-names = true
+isort.required-imports = ["from __future__ import annotations"]

@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import abc
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 
 from dilax.util import HistDB
-
-import equinox as eqx
 
 
 class Result(eqx.Module):
@@ -18,7 +17,9 @@ class Result(eqx.Module):
 
     expectations: dict[str, jax.Array]
 
-    def __init__(self, expectations: dict[str, jax.Array] = {}):
+    def __init__(self, expectations: dict[str, jax.Array] | None = None):
+        if expectations is None:
+            expectations = {}
         self.expectations = expectations
 
     def add(
@@ -105,32 +106,34 @@ class Model(eqx.Module):
             if not param.constraints:
                 continue
             if not len(param.constraints) <= 1:
-                raise ValueError(
-                    f"More than one constraint per parameter is not allowed. Got: {param.constraint}"
-                )
-            constraint = tuple(param.constraints)[0]
+                msg = f"More than one constraint per parameter is not allowed. Got: {param.constraint}"
+                raise ValueError(msg)
+            constraint = next(iter(param.constraints))
             c.append(constraint.logpdf(param.value))
         return jnp.sum(jnp.array(c))
 
     def update(
         self,
         processes: HistDB = HistDB({}),
-        values: dict[str, jax.Array] = {},
+        values: dict[str, jax.Array] | None = None,
     ) -> Model:
+        if values is None:
+            values = {}
+
         def _patch_processes(processes: HistDB) -> HistDB:
             # replace processes
             if not isinstance(processes, HistDB):
                 processes = HistDB(processes)
             assert isinstance(processes, HistDB)
-            new_processes = {k: v for k, v in self.processes.items()}
-            for key, process in new_processes.items():
+            new_processes = dict(self.processes.items())
+            for key, _process in new_processes.items():
                 if (key := HistDB.keyify(key)) in processes:
                     new_processes[key] = processes[key]
             return HistDB(new_processes)
 
         def _patch_parameters(values: dict[str, jax.Array]) -> dict[str, jax.Array]:
             # replace parameters
-            new_parameters = {key: param for key, param in self.parameters.items()}
+            new_parameters = dict(self.parameters.items())
             for key, parameter in new_parameters.items():
                 if key in values:
                     new_parameters[key] = parameter.update(value=values[key])

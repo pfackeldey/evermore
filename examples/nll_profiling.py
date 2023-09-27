@@ -1,17 +1,16 @@
-import jax
-import jax.numpy as jnp
-import equinox as eqx
+from __future__ import annotations
 
 from functools import partial
+
+import equinox as eqx
+import jax
+import jax.numpy as jnp
+from jax.config import config
 
 from dilax.likelihood import NLL
 from dilax.model import Model
 from dilax.optimizer import JaxOptimizer
-
-
-from examples.model import model, observation, optimizer
-
-from jax.config import config
+from model import model, observation, optimizer
 
 config.update("jax_enable_x64", True)
 

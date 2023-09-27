@@ -1,8 +1,9 @@
-from dilax.likelihood import NLL
-
-from examples.model import model, init_values, observation, optimizer
+from __future__ import annotations
 
 from jax.config import config
+
+from dilax.likelihood import NLL
+from model import init_values, model, observation, optimizer
 
 config.update("jax_enable_x64", True)
 
