@@ -156,3 +156,6 @@ Thumbs.db
 # Common editor files
 *~
 *.swp
+
+# if examples are run
+examples/*.eqx
