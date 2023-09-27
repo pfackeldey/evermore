@@ -264,12 +264,6 @@ class compose(ModifierBase):
     def __init__(self, *modifiers: modifier) -> None:
         self.modifiers = modifiers
 
-        # check for duplicate names
-        duplicates = [name for name in self.names if self.names.count(name) > 1]
-        if duplicates:
-            msg = f"Modifier need to have unique names, got: {duplicates}"
-            raise ValueError(msg)
-
         # set names
         self.names = []
         for m in range(self.n_modifiers):
@@ -278,6 +272,12 @@ class compose(ModifierBase):
                 self.names.extend(modifier.names)
             else:
                 self.names.append(modifier.name)
+
+        # check for duplicate names
+        duplicates = [name for name in self.names if self.names.count(name) > 1]
+        if duplicates:
+            msg = f"Modifier need to have unique names, got: {duplicates}"
+            raise ValueError(msg)
 
     @property
     def n_modifiers(self) -> int:
