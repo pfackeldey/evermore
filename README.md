@@ -1,12 +1,28 @@
 # dilax
-**di**fferentiable (binned) **li**kelihoods with J**AX**
 
-**In development!**
+[![Actions Status][actions-badge]][actions-link]
+[![PyPI version][pypi-version]][pypi-link]
+[![PyPI platforms][pypi-platforms]][pypi-link]
 
+Differentiable (binned) likelihoods in JAX.
 
-## TL;DR
+## Installation
 
-```python
+```bash
+python -m pip install dilax
+```
+
+From source:
+
+```bash
+git clone https://github.com/pfackeldey/dilax
+cd dilax
+python -m pip install .
+```
+
+## Usage
+
+```python3
 import jax.numpy as jnp
 
 from dilax.likelihood import NLL
@@ -73,4 +89,18 @@ print(values)
  'norm2': Array([0.0052684], dtype=float32)}
 ```
 
-### See more in `examples/`
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on how to contribute.
+
+## License
+
+Distributed under the terms of the [BSD license](LICENSE).
+
+<!-- prettier-ignore-start -->
+[actions-badge]:            https://github.com/pfackeldey/dilax/workflows/CI/badge.svg
+[actions-link]:             https://github.com/pfackeldey/dilax/actions
+[pypi-link]:                https://pypi.org/project/dilax/
+[pypi-platforms]:           https://img.shields.io/pypi/pyversions/dilax
+[pypi-version]:             https://img.shields.io/pypi/v/dilax
+<!-- prettier-ignore-end -->

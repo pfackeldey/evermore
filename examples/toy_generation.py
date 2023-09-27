@@ -1,12 +1,11 @@
-import jax
-import jax.numpy as jnp
+from __future__ import annotations
+
 import equinox as eqx
+import jax
+from jax.config import config
 
 from dilax.likelihood import NLL, SampleToy
-
-from examples.model import model, init_values, observation, optimizer
-
-from jax.config import config
+from examples.model import init_values, model, observation, optimizer
 
 config.update("jax_enable_x64", True)
 

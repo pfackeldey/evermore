@@ -1,10 +1,10 @@
+from __future__ import annotations
+
 import equinox as eqx
-
-from dilax.likelihood import NLL, Hessian, CovMatrix
-
-from examples.model import model, init_values, observation, optimizer
-
 from jax.config import config
+
+from dilax.likelihood import NLL, CovMatrix, Hessian
+from examples.model import init_values, model, observation, optimizer
 
 config.update("jax_enable_x64", True)
 
