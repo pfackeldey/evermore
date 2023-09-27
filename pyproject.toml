@@ -27,8 +27,8 @@ classifiers = [
 ]
 dynamic = ["version"]  # version is set in src/dilax/__init__.py
 dependencies = [
-    "equinox",
-    "jaxopt = >=0.6",
+    "equinox>=0.10.6",  # eqx.field
+    "jaxopt >=0.6"      # jaxopt.LGBFGS
 ]
 
 [project.optional-dependencies]
