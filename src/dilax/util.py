@@ -221,7 +221,7 @@ for cls in HistDB, FrozenDB:
     )
 
 
-def as1darray(x: jax.Array) -> jax.Array:
+def as1darray(x: float | jax.Array) -> jax.Array:
     return jnp.atleast_1d(jnp.asarray(x))
 
 

@@ -266,7 +266,7 @@ class compose(ModifierBase):
 
         # set names
         self.names = []
-        for m in range(self.n_modifiers):
+        for m in range(len(self)):
             modifier = self.modifiers[m]
             if isinstance(modifier, compose):
                 self.names.extend(modifier.names)
@@ -279,13 +279,12 @@ class compose(ModifierBase):
             msg = f"Modifier need to have unique names, got: {duplicates}"
             raise ValueError(msg)
 
-    @property
-    def n_modifiers(self) -> int:
+    def __len__(self) -> int:
         return len(self.modifiers)
 
     def scale_factors(self, sumw: jax.Array) -> dict[str, jax.Array]:
         sfs = {}
-        for m in range(self.n_modifiers):
+        for m in range(len(self)):
             modifier = self.modifiers[m]
             if isinstance(modifier, compose):
                 sfs.update(modifier.scale_factors(sumw=sumw))
