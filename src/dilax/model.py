@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 import abc
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 
 from dilax.parameter import Parameter
-from dilax.util import FrozenDB, HistDB, Sentinel
-
-_MISSING = Sentinel("<MISSING>")
+from dilax.util import FrozenDB, HistDB, Sentinel, _NoValue
 
 
 class Result(eqx.Module):
@@ -108,18 +106,18 @@ class Model(eqx.Module):
 
     def update(
         self,
-        processes: dict | HistDB | Sentinel = _MISSING,
-        values: dict[str, jax.Array] | Sentinel = _MISSING,
+        processes: dict | HistDB | Sentinel = _NoValue,
+        values: dict[str, jax.Array] | Sentinel = _NoValue,
     ) -> Model:
-        if values is _MISSING:
+        if values is _NoValue:
             values = {}
-        if processes is _MISSING:
+        if processes is _NoValue:
             processes = {}
         if not isinstance(processes, HistDB):
             processes = HistDB(processes)
 
-        processes = cast(HistDB, processes)
-        values = cast(dict[str, jax.Array], values)
+        if TYPE_CHECKING:
+            values = cast(dict[str, jax.Array], values)
 
         def _patch_processes(processes: HistDB) -> HistDB:
             assert isinstance(processes, HistDB)

@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 
 from dilax.model import Model
-from dilax.util import Sentinel
-
-_MISSING = Sentinel("<MISSING>")
+from dilax.util import Sentinel, _NoValue
 
 
 class BaseModule(eqx.Module):
@@ -67,8 +65,8 @@ class NLL(BaseModule):
     def logpdf(self, *args, **kwargs) -> jax.Array:
         return jax.scipy.stats.poisson.logpmf(*args, **kwargs)
 
-    def __call__(self, values: dict[str, jax.Array] | Sentinel = _MISSING) -> jax.Array:
-        if values is _MISSING:
+    def __call__(self, values: dict[str, jax.Array] | Sentinel = _NoValue) -> jax.Array:
+        if values is _NoValue:
             values = {}
         model = self.model.update(values=values)
         res = model.evaluate()
@@ -126,12 +124,13 @@ class Hessian(BaseModule):
         super().__init__(model=model, observation=observation)
         self.NLL = NLL(model=model, observation=observation)
 
-    def __call__(self, values: dict[str, jax.Array] | Sentinel = _MISSING) -> jax.Array:
-        if values is _MISSING:
+    def __call__(self, values: dict[str, jax.Array] | Sentinel = _NoValue) -> jax.Array:
+        if values is _NoValue:
             values = {}
         if not values:
             values = self.model.parameter_values
-        values = cast(dict[str, jax.Array], values)
+        if TYPE_CHECKING:
+            values = cast(dict[str, jax.Array], values)
         hessian = jax.hessian(self.NLL, argnums=0)(values)
         hessian, _ = jax.tree_util.tree_flatten(hessian)
         hessian = jnp.array(hessian)
@@ -178,8 +177,8 @@ class CovMatrix(Hessian):
     ```
     """
 
-    def __call__(self, values: dict[str, jax.Array] | Sentinel = _MISSING) -> jax.Array:
-        if values is _MISSING:
+    def __call__(self, values: dict[str, jax.Array] | Sentinel = _NoValue) -> jax.Array:
+        if values is _NoValue:
             values = {}
         hessian = super().__call__(values=values)
         return jnp.linalg.inv(-hessian)
@@ -240,14 +239,15 @@ class SampleToy(BaseModule):
 
     def __call__(
         self,
-        values: dict[str, jax.Array] | Sentinel = _MISSING,
-        key: jax.Array | Sentinel = _MISSING,
+        values: dict[str, jax.Array] | Sentinel = _NoValue,
+        key: jax.Array | Sentinel = _NoValue,
     ) -> dict[str, jax.Array]:
-        if values is _MISSING:
+        if values is _NoValue:
             values = {}
-        if key is _MISSING:
+        if key is _NoValue:
             key = jax.random.PRNGKey(1234)
-        key = cast(jax.Array, key)
+        if TYPE_CHECKING:
+            key = cast(jax.Array, key)
         if not values:
             values = self.model.parameter_values
         cov = self.CovMatrix(values=values)

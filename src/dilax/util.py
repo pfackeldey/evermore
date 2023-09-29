@@ -3,7 +3,7 @@ from __future__ import annotations
 import collections
 import pprint
 from collections.abc import Hashable, Iterable, Mapping
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
 
 import jax
 import jax.numpy as jnp
@@ -12,31 +12,16 @@ import jax.numpy as jnp
 class Sentinel:
     __slots__ = ("repr",)
 
-    _instances: ClassVar[dict[tuple[type[Sentinel], str], Sentinel]] = {}
-
-    if TYPE_CHECKING:
-        repr: str
-
-    def __new__(cls, repr: str) -> Sentinel:
-        key = (cls, repr)
-        if key in cls._instances:
-            sentinel = cls._instances[key]
-        else:
-            sentinel = super().__new__(cls)
-            sentinel.repr = repr
-            cls._instances[key] = sentinel
-        return sentinel
+    def __init__(self, repr: str) -> None:
+        self.repr = repr
 
     def __repr__(self) -> str:
         return self.repr
 
-    def __reduce__(self) -> tuple[type[Sentinel], tuple[str]]:
-        return (self.__class__, (self.repr,))
-
     __str__ = __repr__
 
 
-_MISSING = Sentinel("<MISSING>")
+_NoValue: Sentinel = Sentinel("<NoValue>")
 
 
 class FrozenKeysView(collections.abc.KeysView):
@@ -170,11 +155,11 @@ class FrozenDB(Mapping[K, V]):
 
     def __init__(
         self,
-        xs: Mapping | Sentinel = _MISSING,
+        xs: Mapping | Sentinel = _NoValue,
         __unsafe_skip_copy__: bool = False,
     ) -> None:
         # make sure the dict is as
-        if xs is _MISSING:
+        if xs is _NoValue:
             xs = {}
         data = dict(cast(Mapping, xs))
         if __unsafe_skip_copy__:
