@@ -72,7 +72,7 @@ class gauss(Effect):
         return Gauss(mean=0.0, width=1.0)
 
     def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
-        gx = Gauss(mean=1.0, width=self.width)
+        gx = Gauss(mean=1.0, width=self.width)  # type: ignore[arg-type]
         g1 = Gauss(mean=1.0, width=1.0)
         return gx.inv_cdf(g1.cdf(parameter.value + 1))
 
@@ -143,7 +143,7 @@ class lnN(Effect):
     def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
         width = self.scale(parameter=parameter)
         g1 = Gauss(mean=1.0, width=1.0)
-        gx = Gauss(mean=1.0, width=width)
+        gx = Gauss(mean=1.0, width=width)  # type: ignore[arg-type]
         return g1.inv_cdf(gx.cdf(jnp.exp(parameter.value)))
 
 
@@ -161,7 +161,7 @@ class poisson(Effect):
         gauss_cdf = jnp.broadcast_to(
             self.constraint.cdf(parameter.value), self.lamb.shape
         )
-        return Poisson(self.lamb).inv_cdf(gauss_cdf)
+        return Poisson(self.lamb).inv_cdf(gauss_cdf)  # type: ignore[arg-type]
 
 
 class ModifierBase(eqx.Module):

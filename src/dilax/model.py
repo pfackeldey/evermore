@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import abc
+from typing import cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 
 from dilax.parameter import Parameter
-from dilax.util import FrozenDB, HistDB
+from dilax.util import FrozenDB, HistDB, Sentinel
+
+_MISSING = Sentinel("<MISSING>")
 
 
 class Result(eqx.Module):
@@ -18,8 +21,8 @@ class Result(eqx.Module):
 
     expectations: dict[str, jax.Array]
 
-    def __init__(self, expectations: dict[str, jax.Array] = {}) -> None:
-        self.expectations = expectations
+    def __init__(self) -> None:
+        self.expectations = {}
 
     def add(self, process: str, expectation: jax.Array) -> Result:
         self.expectations[process] = expectation
@@ -104,10 +107,19 @@ class Model(eqx.Module):
         return jnp.sum(jnp.array(c))
 
     def update(
-        self, processes: dict | HistDB = {}, values: dict[str, jax.Array] = {}
+        self,
+        processes: dict | HistDB | Sentinel = _MISSING,
+        values: dict[str, jax.Array] | Sentinel = _MISSING,
     ) -> Model:
+        if values is _MISSING:
+            values = {}
+        if processes is _MISSING:
+            processes = {}
         if not isinstance(processes, HistDB):
             processes = HistDB(processes)
+
+        processes = cast(HistDB, processes)
+        values = cast(dict[str, jax.Array], values)
 
         def _patch_processes(processes: HistDB) -> HistDB:
             assert isinstance(processes, HistDB)

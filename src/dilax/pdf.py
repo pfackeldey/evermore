@@ -48,10 +48,10 @@ class Flat(HashablePDF):
 
 
 class Gauss(HashablePDF):
-    mean: float | jax.Array = eqx.field(static=True)
-    width: float | jax.Array = eqx.field(static=True)
+    mean: float = eqx.field(static=True)
+    width: float = eqx.field(static=True)
 
-    def __init__(self, mean: float | jax.Array, width: float | jax.Array) -> None:
+    def __init__(self, mean: float, width: float) -> None:
         self.mean = mean
         self.width = width
 
@@ -76,9 +76,9 @@ class Gauss(HashablePDF):
 
 
 class Poisson(HashablePDF):
-    lamb: float | jax.Array = eqx.field(static=True)
+    lamb: int = eqx.field(static=True)
 
-    def __init__(self, lamb: float | jax.Array) -> None:
+    def __init__(self, lamb: int) -> None:
         self.lamb = lamb
 
     def __hash__(self):

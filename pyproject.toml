@@ -114,7 +114,7 @@ select = [
 extend-ignore = [
   "PLR",    # Design related pylint codes
   "E501",   # Line too long
-  "B006",   # converts default args to 'None'
+  # "B006",   # converts default args to 'None'
 ]
 
 src = ["src"]

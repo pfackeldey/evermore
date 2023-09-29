@@ -3,10 +3,40 @@ from __future__ import annotations
 import collections
 import pprint
 from collections.abc import Hashable, Iterable, Mapping
-from typing import Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, TypeVar, cast
 
 import jax
 import jax.numpy as jnp
+
+
+class Sentinel:
+    __slots__ = ("repr",)
+
+    _instances: ClassVar[dict[tuple[type[Sentinel], str], Sentinel]] = {}
+
+    if TYPE_CHECKING:
+        repr: str
+
+    def __new__(cls, repr: str) -> Sentinel:
+        key = (cls, repr)
+        if key in cls._instances:
+            sentinel = cls._instances[key]
+        else:
+            sentinel = super().__new__(cls)
+            sentinel.repr = repr
+            cls._instances[key] = sentinel
+        return sentinel
+
+    def __repr__(self) -> str:
+        return self.repr
+
+    def __reduce__(self) -> tuple[type[Sentinel], tuple[str]]:
+        return (self.__class__, (self.repr,))
+
+    __str__ = __repr__
+
+
+_MISSING = Sentinel("<MISSING>")
 
 
 class FrozenKeysView(collections.abc.KeysView):
@@ -126,6 +156,9 @@ class FrozenDB(Mapping[K, V]):
 
     __slots__ = ("_dict",)
 
+    if TYPE_CHECKING:
+        _dict: dict[frozenset, Any]
+
     @staticmethod
     def keyify(keyish: Any) -> frozenset:
         if not isinstance(keyish, (tuple, list, set, frozenset)):
@@ -136,14 +169,18 @@ class FrozenDB(Mapping[K, V]):
         return keyish
 
     def __init__(
-        self, xs: dict | FrozenDB = {}, __unsafe_skip_copy__: bool = False
+        self,
+        xs: Mapping | Sentinel = _MISSING,
+        __unsafe_skip_copy__: bool = False,
     ) -> None:
         # make sure the dict is as
-        xs = dict(xs)
+        if xs is _MISSING:
+            xs = {}
+        data = dict(cast(Mapping, xs))
         if __unsafe_skip_copy__:
-            self._dict = xs
+            self._dict = data
         else:
-            self._dict = _prepare_freeze(xs)
+            self._dict = _prepare_freeze(data)
 
     def __getitem__(self, key) -> Any:
         key = self.keyify(key)
