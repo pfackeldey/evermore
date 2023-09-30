@@ -14,12 +14,13 @@ class JaxOptimizer(eqx.Module):
     This allows to pass the optimizer as a parameter to a `jax.jit` function, and setup the optimizer therein.
 
     Example:
-    ```
+
+    .. code-block:: python
+
         optimizer = JaxOptimizer.make(name="GradientDescent", settings={"maxiter": 5})
         # or, e.g.: optimizer = JaxOptimizer.make(name="LBFGS", settings={"maxiter": 10})
 
         optimizer.fit(fun=nll, init_values=init_values)
-    ```
     """
 
     name: str
@@ -56,14 +57,15 @@ class Chain(eqx.Module):
     in order to have a deterministic runtime behaviour.
 
     Example:
-    ```
+
+    .. code-block:: python
+
         opt1 = JaxOptimizer.make(name="GradientDescent", settings={"maxiter": 5})
         opt2 = JaxOptimizer.make(name="LBFGS", settings={"maxiter": 10})
 
         chain = Chain(opt1, opt2)
         # first 5 steps are minimized with GradientDescent, then 10 steps with LBFGS
         chain.fit(fun=nll, init_values=init_values)
-    ```
     """
 
     optimizers: tuple[JaxOptimizer, ...]

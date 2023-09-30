@@ -90,7 +90,9 @@ class FrozenDB(Mapping[K, V]):
     """An immutable database-like custom dict.
 
     Example:
-    ```
+
+    .. code-block:: python
+
         hists = HistDB(
             {
                 # QCD
@@ -105,7 +107,7 @@ class FrozenDB(Mapping[K, V]):
         )
 
         print(hists)
-        # >> HistDB({
+        # -> HistDB({
         #   ('QCD', 'nominal'): Array([1, 1, 1, 1, 1], dtype=int32),
         #   ('QCD', 'Up', 'JES'): Array([1.5, 1.5, 1.5, 1.5, 1.5], dtype=float32),
         #   ('QCD', 'Down', 'JES'): Array([0.5, 0.5, 0.5, 0.5, 0.5], dtype=float32),
@@ -115,14 +117,14 @@ class FrozenDB(Mapping[K, V]):
         # })
 
         print(hists["QCD"])
-        # >> HistDB({
+        # -> HistDB({
         #     'nominal': Array([1, 1, 1, 1, 1], dtype=int32),
         #     ('Up', 'JES'): Array([1.5, 1.5, 1.5, 1.5, 1.5], dtype=float32),
         #     ('Down', 'JES'): Array([0.5, 0.5, 0.5, 0.5, 0.5], dtype=float32),
         # })
 
         print(hists["JES"])
-        # >> HistDB({
+        # -> HistDB({
         #     ('QCD', 'Up'): Array([1.5, 1.5, 1.5, 1.5, 1.5], dtype=float32),
         #     ('QCD', 'Down'): Array([0.5, 0.5, 0.5, 0.5, 0.5], dtype=float32),
         #     ('DY', 'Up'): Array([2.5, 2.5, 2.5, 2.5, 2.5], dtype=float32),
@@ -134,9 +136,7 @@ class FrozenDB(Mapping[K, V]):
             return (hists["QCD", "nominal"] + 1.2) ** 2
 
         print(jax.jit(foo)(hists))
-        # >> Array([4.84, 4.84, 4.84, 4.84, 4.84], dtype=float32, weak_type=True)
-    ```
-
+        # -> Array([4.84, 4.84, 4.84, 4.84, 4.84], dtype=float32, weak_type=True)
     """
 
     __slots__ = ("_dict",)

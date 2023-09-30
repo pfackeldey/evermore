@@ -175,7 +175,9 @@ class modifier(ModifierBase):
     Create a new modifier for a given parameter and penalty.
 
     Example:
-    ```
+
+    .. code-block:: python
+
         from dilax.parameter import modifier, Parameter, unconstrained
 
         mu = Parameter(value=1.1, bounds=(0, 100))
@@ -185,9 +187,7 @@ class modifier(ModifierBase):
 
         # apply the modifier
         modify(jnp.array([10, 20, 30]))
-        >> ('mu',
-            Array([11., 22., 33.], dtype=float32, weak_type=True),
-            Array([0.], dtype=float32))
+        # -> Array([11., 22., 33.], dtype=float32, weak_type=True),
 
         # lnN effect
         norm = Parameter(value=0.0, bounds=(-jnp.inf, jnp.inf))
@@ -204,7 +204,6 @@ class modifier(ModifierBase):
         down = jnp.array([8, 19, 26])
         modify = modifier(name="norm", parameter=norm, effect=shape(up, down))
         modify(jnp.array([10, 20, 30]))
-    ```
     """
 
     name: str
@@ -232,7 +231,9 @@ class compose(ModifierBase):
     It behaves like a single modifier, but it is composed of multiple modifiers; it can be arbitrarly nested.
 
     Example:
-    ```
+
+    .. code-block:: python
+
         from dilax.parameter import modifier, compose, Parameter, FreeFloating, LogNormal
 
         mu = Parameter(value=1.1, bounds=(0, 100))
@@ -255,7 +256,6 @@ class compose(ModifierBase):
 
         # jit
         eqx.filter_jit(composition)(jnp.array([10, 20, 30]))
-    ```
     """
 
     modifiers: tuple[modifier, ...]

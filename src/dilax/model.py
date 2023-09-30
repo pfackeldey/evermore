@@ -12,11 +12,6 @@ from dilax.util import FrozenDB, HistDB, Sentinel, _NoValue
 
 
 class Result(eqx.Module):
-    """
-    Holds:
-        dict[str, jax.Array]: The expected number of events in each bin for each process.
-    """
-
     expectations: dict[str, jax.Array]
 
     def __init__(self) -> None:
@@ -39,45 +34,60 @@ class Model(eqx.Module):
     It is requires to implement the `evaluate` method, which returns an `EvaluationResult` object.
 
     Example:
-    ```
-        # Simple model with two processes and two parameters
 
+    .. code-block:: python
+
+        import jax
+        import jax.numpy as jnp
+        import equinox as eqx
+
+        from dilax.model import Model, Result
+        from dilax.parameter import Parameter, lnN, modifier, unconstrained
+        from dilax.util import HistDB
+
+
+        # Define a simple model with two processes and two parameters
         class MyModel(Model):
-            def evaluate(self) -> EvaluationResult:
-                expectations = {}
+            def __call__(self, processes: HistDB, parameters: dict[str, Parameter]) -> Result:
+                res = Result()
                 # signal
-                signal, mu_penalty = self.parameters["mu"](self.processes["signal"], type="r")
-                expectations["signal"] = signal
+
+                mu_mod = modifier(name="mu", parameter=parameters["mu"], effect=unconstrained())
+                res.add(process="signal", expectation=mu_mod(self.processes["signal"]))
 
                 # background
-                background, sigma_penalty = self.parameters["sigma"](self.processes["background"], type="lnN", width=1.1)
-                expectations["background"] = background
-                return EvaluationResult(expectations=expectations, penalty=mu_penalty + sigma_penalty)
+                bkg_mod = modifier(name="sigma", parameter=parameters["sigma"], effect=lnN(1.1))
+                res.add(process="background", expectation=bkg_mod(self.processes["background"]))
+                return res
 
 
-        model = MyModel(
-            processes={"signal": jnp.array([10]), "background": jnp.array([50])},
-            parameters={"mu": Parameter(value=1.0, bounds=(0, 100)), "sigma": Parameter(value=0, bounds=(-100, 100))},
-        )
+        # Setup model
+        processes = HistDB({"signal": jnp.array([10]), "background": jnp.array([50])})
+        parameters = {
+            "mu": Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
+            "sigma": Parameter(value=jnp.array([0.0])),
+        }
+
+        model = MyModel(processes=processes, parameters=parameters)
 
         # evaluate the expectation
         model.evaluate().expectation()
-        >> Array([60.], dtype=float32, weak_type=True)
+        # -> Array([60.], dtype=float32)
 
         %timeit model.evaluate().expectation()
-        >> 245 µs ± 1.17 µs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
+        # -> 3.05 ms ± 29.3 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 
         # evaluate the expectation *fast*
+        @eqx.filter_jit
         def eval(model) -> jax.Array:
             res = model.evaluate()
             return res.expectation()
 
         eqx.filter_jit(eval)(model)
-        >> Array([60.], dtype=float32, weak_type=True)
+        # -> Array([60.], dtype=float32)
 
         %timeit eqx.filter_jit(eval)(model).block_until_ready()
-        >> 96.9 µs ± 778 ns per loop (mean ± std. dev. of 7 runs, 10,000 loops each)
-    ```
+        # -> 114 µs ± 327 ns per loop (mean ± std. dev. of 7 runs, 10,000 loops each)
     """
 
     processes: HistDB
