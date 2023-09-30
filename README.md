@@ -79,7 +79,7 @@ values, state = optimizer.fit(fun=fast_nll, init_values=init_values)
 
 print(values)
 # -> {'mu': Array([1.39171364], dtype=float64),
-      'sigma': Array([0.00867292], dtype=float64)}
+#     'sigma': Array([0.00867292], dtype=float64)}
 
 # eval model with fitted values/parameters
 print(model.update(values=values).evaluate().expectation())
