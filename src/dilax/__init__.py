@@ -3,8 +3,6 @@ dilax: Differentiable (binned) likelihoods in JAX.
 """
 from __future__ import annotations
 
-__all__ = ("__version__", "__author__")
-
 __author__ = "Peter Fackeldey"
 __email__ = "peter.fackeldey@rwth-aachen.de"
 __copyright__ = "Copyright 2023, Peter Fackeldey"
