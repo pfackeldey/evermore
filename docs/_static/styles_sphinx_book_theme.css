@@ -1,0 +1,12 @@
+/* sphinx_book_theme styles */
+/* taken from: https://github.com/cms-cat/order/blob/master/docs/_static/styles_sphinx_book_theme.css */
+
+div#site-navigation img.logo {
+  width: 240px !important;
+  height: 85px !important;
+  max-height: none !important;
+}
+
+div#site-navigation div.navbar_extra_footer {
+  display: none;
+}
