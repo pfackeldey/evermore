@@ -45,9 +45,9 @@ docs = [
   "myst_parser>=0.13",
   "sphinx_copybutton",
   "sphinx_autodoc_typehints",
-  "sphinx-book-theme~=0.3",
-  "autodocsumm~=0.2",
-  "sphinx_lfs_content~=1.1",
+  "sphinx-book-theme>=0.3",
+  "autodocsumm>=0.2",
+  "sphinx_lfs_content>=1.1",
 ]
 
 [project.urls]
