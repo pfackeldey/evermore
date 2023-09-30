@@ -56,7 +56,7 @@ class Model(eqx.Module):
                 res.add(process="signal", expectation=mu_mod(self.processes["signal"]))
 
                 # background
-                bkg_mod = modifier(name="sigma", parameter=parameters["sigma"], effect=lnN(1.1))
+                bkg_mod = modifier(name="sigma", parameter=parameters["sigma"], effect=lnN(0.2))
                 res.add(process="background", expectation=bkg_mod(self.processes["background"]))
                 return res
 
