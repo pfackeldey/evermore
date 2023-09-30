@@ -42,7 +42,7 @@ from dilax.util import HistDB
 jax.config.update("jax_enable_x64", True)
 
 
-# Define a simple model with two processes and two parameters
+# define a simple model with two processes and two parameters
 class MyModel(Model):
     def __call__(self, processes: HistDB, parameters: dict[str, Parameter]) -> Result:
         res = Result()
@@ -57,7 +57,7 @@ class MyModel(Model):
         return res
 
 
-# Setup model
+# setup model
 processes = HistDB({"signal": jnp.array([10.0]), "background": jnp.array([50.0])})
 parameters = {
     "mu": Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
@@ -65,7 +65,7 @@ parameters = {
 }
 model = MyModel(processes=processes, parameters=parameters)
 
-# Define negative log-likelihood with data (observation)
+# define negative log-likelihood with data (observation)
 nll = NLL(model=model, observation=jnp.array([64.0]))
 # jit it!
 fast_nll = eqx.filter_jit(nll)
@@ -86,12 +86,12 @@ print(model.update(values=values).evaluate().expectation())
 # -> Array([64.0038656], dtype=float64)
 
 
-# Gradients - of "prefit" model:
+# gradients - of "prefit" model:
 fast_grad_nll_prefit = eqx.filter_grad(nll)
 print(fast_grad_nll_prefit({"sigma": jnp.array([0.2])}))
 # -> {'sigma': Array([-0.12258065], dtype=float64)}
 
-# Gradients - of "postfit" model:
+# gradients - of "postfit" model:
 postfit_nll = NLL(model=model.update(values=values), observation=jnp.array([64.0]))
 fast_grad_nll_postfit = eqx.filter_grad(eqx.filter_jit(postfit_nll))
 print(fast_grad_nll_postfit({"sigma": jnp.array([0.2])}))
