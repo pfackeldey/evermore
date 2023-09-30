@@ -49,11 +49,11 @@ class MyModel(Model):
         # signal
 
         mu_mod = modifier(name="mu", parameter=parameters["mu"], effect=unconstrained())
-        res.add(process="signal", expectation=mu_mod(self.processes["signal"]))
+        res.add(process="signal", expectation=mu_mod(processes["signal"]))
 
         # background
         bkg_mod = modifier(name="sigma", parameter=parameters["sigma"], effect=gauss(0.2))
-        res.add(process="background", expectation=bkg_mod(self.processes["background"]))
+        res.add(process="background", expectation=bkg_mod(processes["background"]))
         return res
 
 
