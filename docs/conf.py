@@ -39,14 +39,14 @@ html_theme_options = {
 }
 
 extensions = [
-    "myst_parser",
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.viewcode",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
-    "sphinx.ext.viewcode",
     "sphinx.ext.autosectionlabel",
-    "sphinx_autodoc_typehints",
+    "autodocsumm",
+    "myst_parser",
     "sphinx_copybutton",
     "sphinx_lfs_content",
 ]
