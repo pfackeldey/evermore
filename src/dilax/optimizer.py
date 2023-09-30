@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Hashable
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 import equinox as eqx
 import jax
 import jaxopt
+
+from dilax.util import Sentinel, _NoValue
 
 
 class JaxOptimizer(eqx.Module):
@@ -32,8 +34,14 @@ class JaxOptimizer(eqx.Module):
 
     @classmethod
     def make(
-        cls: type[JaxOptimizer], name: str, settings: dict[str, Hashable]
+        cls: type[JaxOptimizer],
+        name: str,
+        settings: dict[str, Hashable] | Sentinel = _NoValue,
     ) -> JaxOptimizer:
+        if settings is _NoValue:
+            settings = {}
+        if TYPE_CHECKING:
+            settings = cast(dict[str, Hashable], settings)
         return cls(name=name, _settings=tuple(settings.items()))
 
     @property

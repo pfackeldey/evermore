@@ -70,20 +70,20 @@ nll = NLL(model=model, observation=jnp.array([64.0]))
 # jit it!
 fast_nll = eqx.filter_jit(nll)
 
-# setup fit
+# setup fit: initial values of parameters and a suitable optimizer
 init_values = model.parameter_values
-optimizer = JaxOptimizer.make(name="LBFGS", settings={"maxiter": 10})
+optimizer = JaxOptimizer.make(name="ScipyMinimize", settings={"method": "trust-constr"})
 
 # fit
 values, state = optimizer.fit(fun=fast_nll, init_values=init_values)
 
 print(values)
-# -> {'mu': Array([1.39171364], dtype=float64),
-#     'sigma': Array([0.00867292], dtype=float64)}
+# -> {'mu': Array([1.4], dtype=float64),
+#     'sigma': Array([4.04723836e-14], dtype=float64)}
 
 # eval model with fitted values/parameters
 print(model.update(values=values).evaluate().expectation())
-# -> Array([64.0038656], dtype=float64)
+# -> Array([64.], dtype=float64)
 
 
 # gradients - of "prefit" model:
@@ -95,7 +95,7 @@ print(fast_grad_nll_prefit({"sigma": jnp.array([0.2])}))
 postfit_nll = NLL(model=model.update(values=values), observation=jnp.array([64.0]))
 fast_grad_nll_postfit = eqx.filter_grad(eqx.filter_jit(postfit_nll))
 print(fast_grad_nll_postfit({"sigma": jnp.array([0.2])}))
-# -> {'sigma': Array([0.49084036], dtype=float64)}
+# -> {'sigma': Array([0.5030303], dtype=float64)}
 ```
 
 ## Contributing
