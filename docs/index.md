@@ -6,6 +6,13 @@
 
 ```
 
+```{toctree}
+:caption: Modules
+:hidden:
+
+api
+```
+
 ```{include} ../README.md
 :start-after: <!-- SPHINX-START -->
 ```
