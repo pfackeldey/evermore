@@ -7,17 +7,15 @@ copyright = dilax.__copyright__
 author = dilax.__author__
 version = release = dilax.__version__
 
-extensions = [
-    "myst_parser",
-    "sphinx.ext.autodoc",
-    "sphinx.ext.intersphinx",
-    "sphinx.ext.mathjax",
-    "sphinx.ext.napoleon",
-    "sphinx_autodoc_typehints",
-    "sphinx_copybutton",
-]
+language = "en"
 
-source_suffix = [".rst", ".md"]
+templates_path = ["_templates"]
+html_static_path = ["_static"]
+master_doc = "index"
+source_suffix = ".rst"
+pygments_style = "sphinx"
+add_module_names = False
+
 exclude_patterns = [
     "_build",
     "**.ipynb_checkpoints",
@@ -27,7 +25,32 @@ exclude_patterns = [
     ".venv",
 ]
 
-html_theme = "furo"
+html_title = f"{project} v{version}"
+html_theme = "sphinx_book_theme"
+html_theme_options = {
+    "logo_only": True,
+    "home_page_in_toc": True,
+    "show_navbar_depth": 2,
+    "show_toc_level": 2,
+    "repository_url": "https://github.com/pfackeldey/dilax",
+    "use_repository_button": True,
+    "use_issues_button": True,
+    "use_edit_page_button": True,
+}
+
+extensions = [
+    "myst_parser",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.mathjax",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.autosectionlabel",
+    "sphinx_autodoc_typehints",
+    "sphinx_copybutton",
+    "autodocsumm",
+    "sphinx_lfs_content",
+]
 
 myst_enable_extensions = [
     "colon_fence",
@@ -43,3 +66,9 @@ nitpick_ignore = [
 ]
 
 always_document_param_types = True
+
+autodoc_member_order = "bysource"
+
+
+def setup(app):
+    app.add_css_file("styles_sphinx_book_theme.css")
