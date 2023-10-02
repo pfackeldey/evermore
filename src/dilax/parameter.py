@@ -162,7 +162,7 @@ class poisson(Effect):
         gauss_cdf = jnp.broadcast_to(
             self.constraint.cdf(parameter.value), self.lamb.shape
         )
-        return Poisson(self.lamb).inv_cdf(gauss_cdf)  # type: ignore[arg-type]
+        return Poisson(self.lamb).inv_cdf(gauss_cdf) / sumw  # type: ignore[arg-type]
 
 
 class ModifierBase(eqx.Module):
