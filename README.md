@@ -46,8 +46,8 @@ jax.config.update("jax_enable_x64", True)
 class MyModel(Model):
     def __call__(self, processes: HistDB, parameters: dict[str, Parameter]) -> Result:
         res = Result()
-        # signal
 
+        # signal
         mu_mod = modifier(name="mu", parameter=parameters["mu"], effect=unconstrained())
         res.add(process="signal", expectation=mu_mod(processes["signal"]))
 
@@ -86,12 +86,12 @@ print(model.update(values=values).evaluate().expectation())
 # -> Array([64.], dtype=float64)
 
 
-# gradients - of "prefit" model:
+# gradients of "prefit" model:
 fast_grad_nll_prefit = eqx.filter_grad(nll)
 print(fast_grad_nll_prefit({"sigma": jnp.array([0.2])}))
 # -> {'sigma': Array([-0.12258065], dtype=float64)}
 
-# gradients - of "postfit" model:
+# gradients of "postfit" model:
 postfit_nll = NLL(model=model.update(values=values), observation=jnp.array([64.0]))
 fast_grad_nll_postfit = eqx.filter_grad(eqx.filter_jit(postfit_nll))
 print(fast_grad_nll_postfit({"sigma": jnp.array([0.2])}))

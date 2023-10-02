@@ -114,7 +114,7 @@ class shape(Effect):
         return Gauss(mean=0.0, width=1.0)
 
     def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
-        sf = parameter.value + 1
+        sf = parameter.value
         # clip, no negative values are allowed
         return jnp.maximum((sumw + self.vshift(sf=sf, sumw=sumw)) / sumw, 0.0)
 
@@ -141,10 +141,11 @@ class lnN(Effect):
         return Gauss(mean=0.0, width=1.0)
 
     def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
-        width = self.scale(parameter=parameter)
-        g1 = Gauss(mean=1.0, width=1.0)
-        gx = Gauss(mean=1.0, width=width)  # type: ignore[arg-type]
-        return g1.inv_cdf(gx.cdf(jnp.exp(parameter.value)))
+        # width = self.scale(parameter=parameter)
+        # g1 = Gauss(mean=1.0, width=1.0)
+        # gx = Gauss(mean=jnp.exp(parameter.value), width=width)  # type: ignore[arg-type]
+        # return gx.inv_cdf(g1.cdf(parameter.value + 1))
+        return jnp.exp(parameter.value * self.scale(parameter=parameter))
 
 
 class poisson(Effect):
@@ -178,9 +179,11 @@ class modifier(ModifierBase):
 
     .. code-block:: python
 
-        from dilax.parameter import modifier, Parameter, unconstrained
+        import jax.numpy as jnp
+        from dilax.parameter import modifier, Parameter, unconstrained, lnN, poisson, shape
 
         mu = Parameter(value=1.1, bounds=(0, 100))
+        norm = Parameter(value=0.0, bounds=(-jnp.inf, jnp.inf))
 
         # create a new parameter and a penalty
         modify = modifier(name="mu", parameter=mu, effect=unconstrained())
@@ -190,7 +193,6 @@ class modifier(ModifierBase):
         # -> Array([11., 22., 33.], dtype=float32, weak_type=True),
 
         # lnN effect
-        norm = Parameter(value=0.0, bounds=(-jnp.inf, jnp.inf))
         modify = modifier(name="norm", parameter=norm, effect=lnN(0.2))
         modify(jnp.array([10, 20, 30]))
 
@@ -234,7 +236,7 @@ class compose(ModifierBase):
 
     .. code-block:: python
 
-        from dilax.parameter import modifier, compose, Parameter, FreeFloating, LogNormal
+        from dilax.parameter import modifier, compose, Parameter, unconstrained, lnN
 
         mu = Parameter(value=1.1, bounds=(0, 100))
         sigma = Parameter(value=0.1, bounds=(-100, 100))
