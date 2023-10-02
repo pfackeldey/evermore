@@ -50,8 +50,8 @@ class Model(eqx.Module):
         class MyModel(Model):
             def __call__(self, processes: HistDB, parameters: dict[str, Parameter]) -> Result:
                 res = Result()
-                # signal
 
+                # signal
                 mu_mod = modifier(name="mu", parameter=parameters["mu"], effect=unconstrained())
                 res.add(process="signal", expectation=mu_mod(processes["signal"]))
 
