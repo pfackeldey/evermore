@@ -5,7 +5,6 @@ on:
 
 jobs:
   dist:
-    # needs: [pre-commit]
     name: Distribution build
     runs-on: ubuntu-latest
 
@@ -40,5 +39,3 @@ jobs:
         with:
           user: __token__
           password: ${{ secrets.PYPI_TOKEN }}
-          # Remove this line to publish to PyPI
-          repository-url: https://test.pypi.org/legacy/
