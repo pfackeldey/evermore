@@ -20,7 +20,7 @@ class Parameter(eqx.Module):
     def __init__(
         self,
         value: jax.Array,
-        bounds: tuple[jax.Array, jax.Array] = (-jnp.inf, jnp.inf),
+        bounds: tuple[jax.Array, jax.Array] = (as1darray(-jnp.inf), as1darray(jnp.inf)),
     ) -> None:
         self.value = value
         self.bounds = bounds
@@ -223,7 +223,7 @@ class modifier(ModifierBase):
     def scale_factor(self, sumw: jax.Array) -> jax.Array:
         return self.effect.scale_factor(parameter=self.parameter, sumw=sumw)
 
-    def __call__(self, sumw: jax.Array) -> tuple[jax.Array, jax.Array]:
+    def __call__(self, sumw: jax.Array) -> jax.Array:
         return jnp.atleast_1d(self.scale_factor(sumw=sumw)) * sumw
 
 
