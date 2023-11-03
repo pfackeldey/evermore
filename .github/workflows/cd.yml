@@ -2,13 +2,6 @@ name: CD
 
 on:
   workflow_dispatch:
-  pull_request:
-  push:
-    branches:
-      - main
-  release:
-    types:
-      - published
 
 jobs:
   dist:
@@ -35,10 +28,7 @@ jobs:
     needs: [dist]
     name: Publish to PyPI
     environment: pypi
-    permissions:
-      id-token: write
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published'
 
     steps:
       - uses: actions/download-artifact@v3
@@ -47,7 +37,8 @@ jobs:
           path: dist
 
       - uses: pypa/gh-action-pypi-publish@release/v1
-        if: github.event_name == 'release' && github.event.action == 'published'
         with:
+          user: __token__
+          password: ${{ secrets.PYPI_TOKEN }}
           # Remove this line to publish to PyPI
           repository-url: https://test.pypi.org/legacy/
