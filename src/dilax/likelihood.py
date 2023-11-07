@@ -33,7 +33,7 @@ class NLL(BaseModule):
 
     def __call__(self, values: dict[str, jax.Array] | Sentinel = _NoValue) -> jax.Array:
         if values is _NoValue:
-            values = {}
+            values = self.model.parameter_values
         model = self.model.update(values=values)
         res = model.evaluate()
         nll = (
@@ -58,8 +58,6 @@ class Hessian(BaseModule):
 
     def __call__(self, values: dict[str, jax.Array] | Sentinel = _NoValue) -> jax.Array:
         if values is _NoValue:
-            values = {}
-        if not values:
             values = self.model.parameter_values
         if TYPE_CHECKING:
             values = cast(dict[str, jax.Array], values)
@@ -77,9 +75,9 @@ class CovMatrix(Hessian):
 
     def __call__(self, values: dict[str, jax.Array] | Sentinel = _NoValue) -> jax.Array:
         if values is _NoValue:
-            values = {}
+            values = self.model.parameter_values
         hessian = super().__call__(values=values)
-        return jnp.linalg.inv(-hessian)
+        return jnp.linalg.inv(hessian)
 
 
 class SampleToy(BaseModule):
@@ -99,13 +97,11 @@ class SampleToy(BaseModule):
         key: jax.Array | Sentinel = _NoValue,
     ) -> dict[str, jax.Array]:
         if values is _NoValue:
-            values = {}
+            values = self.model.parameter_values
         if key is _NoValue:
             key = jax.random.PRNGKey(1234)
         if TYPE_CHECKING:
             key = cast(jax.Array, key)
-        if not values:
-            values = self.model.parameter_values
         cov = self.CovMatrix(values=values)
         _values, tree_def = jax.tree_util.tree_flatten(
             self.model.update(values=values).parameter_values
