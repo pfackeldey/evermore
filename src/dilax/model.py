@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 
 from dilax.parameter import Parameter
-from dilax.util import FrozenDB, HistDB, Sentinel, _NoValue
+from dilax.util import Sentinel, _NoValue
 
 
 class Result(eqx.Module):
@@ -22,10 +22,7 @@ class Result(eqx.Module):
         return self
 
     def expectation(self) -> jax.Array:
-        expectation = jnp.array(0.0)
-        for _, sumw in self.expectations.items():
-            expectation += sumw
-        return expectation
+        return cast(jax.Array, sum(jax.tree_util.tree_leaves(self.expectations)))
 
 
 class Model(eqx.Module):
@@ -43,12 +40,11 @@ class Model(eqx.Module):
 
         from dilax.model import Model, Result
         from dilax.parameter import Parameter, lnN, modifier, unconstrained
-        from dilax.util import HistDB
 
 
         # Define a simple model with two processes and two parameters
         class MyModel(Model):
-            def __call__(self, processes: HistDB, parameters: dict[str, Parameter]) -> Result:
+            def __call__(self, processes: dict, parameters: dict[str, Parameter]) -> Result:
                 res = Result()
 
                 # signal
@@ -62,7 +58,7 @@ class Model(eqx.Module):
 
 
         # Setup model
-        processes = HistDB({"signal": jnp.array([10]), "background": jnp.array([50])})
+        processes = {"signal": jnp.array([10]), "background": jnp.array([50])}
         parameters = {
             "mu": Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
             "sigma": Parameter(value=jnp.array([0.0])),
@@ -90,10 +86,10 @@ class Model(eqx.Module):
         # -> 114 µs ± 327 ns per loop (mean ± std. dev. of 7 runs, 10,000 loops each)
     """
 
-    processes: HistDB
+    processes: dict
     parameters: dict[str, Parameter]
 
-    def __init__(self, processes: HistDB, parameters: dict[str, Parameter]) -> None:
+    def __init__(self, processes: dict, parameters: dict[str, Parameter]) -> None:
         self.processes = processes
         self.parameters = parameters
 
@@ -101,9 +97,9 @@ class Model(eqx.Module):
     def parameter_values(self) -> dict[str, jax.Array]:
         return {key: param.value for key, param in self.parameters.items()}
 
-    def parameter_constraints(self) -> jax.Array:
-        c = []
-        for param in self.parameters.values():
+    def parameter_constraints(self) -> dict[str, jax.Array]:
+        constraints = {}
+        for name, param in self.parameters.items():
             # skip if the parameter was not used / has no constraint
             if not param.constraints:
                 continue
@@ -111,43 +107,43 @@ class Model(eqx.Module):
                 msg = f"More than one constraint per parameter is not allowed. Got: {param.constraint}"
                 raise ValueError(msg)
             constraint = next(iter(param.constraints))
-            c.append(constraint.logpdf(param.value))
-        return jnp.sum(jnp.array(c))
+            constraints[name] = constraint.logpdf(param.value)
+        return constraints
 
     def update(
         self,
-        processes: dict | HistDB | Sentinel = _NoValue,
+        processes: dict | Sentinel = _NoValue,
         values: dict[str, jax.Array] | Sentinel = _NoValue,
     ) -> Model:
         if values is _NoValue:
             values = {}
         if processes is _NoValue:
             processes = {}
-        if not isinstance(processes, HistDB):
-            processes = HistDB(processes)
 
         if TYPE_CHECKING:
             values = cast(dict[str, jax.Array], values)
+            processes = cast(dict, processes)
 
-        def _patch_processes(processes: HistDB) -> HistDB:
-            assert isinstance(processes, HistDB)
-            new_processes = dict(self.processes.items())
-            for key, _process in new_processes.items():
-                if (key := FrozenDB.keyify(key)) in processes:
-                    new_processes[key] = processes[key]
-            return HistDB(new_processes)
+        # patch original processes with new ones
+        new_processes = {}
+        for key, old_process in self.processes.items():
+            if key in processes:
+                new_process = processes[key]
+                new_processes[key] = new_process
+            else:
+                new_processes[key] = old_process
 
-        def _patch_parameters(values: dict[str, jax.Array]) -> dict[str, Parameter]:
-            # replace parameters
-            new_parameters = dict(self.parameters)
-            for key, parameter in new_parameters.items():
-                if key in values:
-                    new_parameters[key] = parameter.update(value=values[key])
-            return new_parameters
+        # patch original parameters with new ones
+        new_parameters = {}
+        for key, old_parameter in self.parameters.items():
+            if key in values:
+                new_parameter = old_parameter.update(value=values[key])
+                new_parameters[key] = new_parameter
+            else:
+                new_parameters[key] = old_parameter
 
-        return self.__class__(
-            processes=_patch_processes(processes) if processes else self.processes,
-            parameters=_patch_parameters(values) if values else self.parameters,
+        return eqx.tree_at(
+            lambda t: (t.processes, t.parameters), self, (new_processes, new_parameters)
         )
 
     def nll_boundary_penalty(self) -> jax.Array:
@@ -159,7 +155,7 @@ class Model(eqx.Module):
         return penalty
 
     @abc.abstractmethod
-    def __call__(self, processes: HistDB, parameters: dict[str, Parameter]) -> Result:
+    def __call__(self, processes: dict, parameters: dict[str, Parameter]) -> Result:
         ...
 
     def evaluate(self) -> Result:

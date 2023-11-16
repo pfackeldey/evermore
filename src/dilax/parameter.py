@@ -27,7 +27,7 @@ class Parameter(eqx.Module):
         self.constraints: set[HashablePDF] = set()
 
     def update(self, value: jax.Array) -> Parameter:
-        return self.__class__(value=value, bounds=self.bounds)
+        return eqx.tree_at(lambda t: t.value, self, value)
 
     @property
     def boundary_penalty(self) -> jax.Array:

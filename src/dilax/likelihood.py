@@ -36,12 +36,13 @@ class NLL(BaseModule):
             values = self.model.parameter_values
         model = self.model.update(values=values)
         res = model.evaluate()
-        nll = (
-            self.logpdf(self.observation, res.expectation())
-            - self.logpdf(self.observation, self.observation)
-            + model.nll_boundary_penalty()
-            + model.parameter_constraints()
+        nll = self.logpdf(self.observation, res.expectation()) - self.logpdf(
+            self.observation, self.observation
         )
+        # add constraints
+        constraints = jax.tree_util.tree_leaves(model.parameter_constraints())
+        nll += sum(constraints)
+        nll += model.nll_boundary_penalty()
         return -jnp.sum(nll, axis=-1)
 
 

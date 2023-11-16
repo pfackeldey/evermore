@@ -36,7 +36,6 @@ from dilax.likelihood import NLL
 from dilax.model import Model, Result
 from dilax.optimizer import JaxOptimizer
 from dilax.parameter import Parameter, gauss, modifier, unconstrained
-from dilax.util import HistDB
 
 
 jax.config.update("jax_enable_x64", True)
@@ -44,7 +43,7 @@ jax.config.update("jax_enable_x64", True)
 
 # define a simple model with two processes and two parameters
 class MyModel(Model):
-    def __call__(self, processes: HistDB, parameters: dict[str, Parameter]) -> Result:
+    def __call__(self, processes: dict, parameters: dict[str, Parameter]) -> Result:
         res = Result()
 
         # signal
@@ -58,7 +57,7 @@ class MyModel(Model):
 
 
 # setup model
-processes = HistDB({"signal": jnp.array([10.0]), "background": jnp.array([50.0])})
+processes = {"signal": jnp.array([10.0]), "background": jnp.array([50.0])}
 parameters = {
     "mu": Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
     "sigma": Parameter(value=jnp.array([0.0])),
