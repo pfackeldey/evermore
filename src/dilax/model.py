@@ -10,6 +10,12 @@ import jax.numpy as jnp
 from dilax.parameter import Parameter
 from dilax.util import Sentinel, _NoValue
 
+__all__ = ["Result", "Model"]
+
+
+def __dir__():
+    return __all__
+
 
 class Result(eqx.Module):
     expectations: dict[str, jax.Array]

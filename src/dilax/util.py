@@ -8,6 +8,18 @@ from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
 import jax
 import jax.numpy as jnp
 
+__all__ = [
+    "HistDB",
+    "FrozenDB",
+    "as1darray",
+    "dump_hlo_graph",
+    "dump_jaxpr",
+]
+
+
+def __dir__():
+    return __all__
+
 
 class Sentinel:
     __slots__ = ("repr",)

@@ -7,6 +7,12 @@ import jax.numpy as jnp
 
 from dilax.model import Model
 
+__all__ = ["interactive"]
+
+
+def __dir__():
+    return __all__
+
 
 def interactive(model: Model) -> None:
     import ipywidgets as widgets

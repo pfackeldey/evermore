@@ -9,6 +9,12 @@ import jax.numpy as jnp
 from dilax.model import Model
 from dilax.util import Sentinel, _NoValue
 
+__all__ = ["NLL", "Hessian", "CovMatrix", "SampleToy"]
+
+
+def __dir__():
+    return __all__
+
 
 class BaseModule(eqx.Module):
     """

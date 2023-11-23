@@ -76,24 +76,24 @@ class Gauss(HashablePDF):
 
 
 class Poisson(HashablePDF):
-    lamb: int = eqx.field(static=True)
+    lamb: jax.Array = eqx.field(static=True)
 
-    def __init__(self, lamb: int) -> None:
+    def __init__(self, lamb: jax.Array) -> None:
         self.lamb = lamb
 
     def __hash__(self):
-        return hash(self.__class__) ^ hash(self.lamb)
+        return hash(self.__class__) ^ hash(str(self.lamb))  # is this a safe hash??
 
     def logpdf(self, x: jax.Array) -> jax.Array:
         logpdf_max = jax.scipy.stats.poisson.logpmf(self.lamb, mu=self.lamb)
-        unnormalized = jax.scipy.stats.poisson.logpmf(x, mu=self.lamb)
+        unnormalized = jax.scipy.stats.poisson.logpmf((x + 1) * self.lamb, mu=self.lamb)
         return unnormalized - logpdf_max
 
     def pdf(self, x: jax.Array) -> jax.Array:
-        return jax.scipy.stats.poisson.pmf(x, mu=self.lamb)
+        return jax.scipy.stats.poisson.pmf((x + 1) * self.lamb, mu=self.lamb)
 
     def cdf(self, x: jax.Array) -> jax.Array:
-        return jax.scipy.stats.poisson.cdf(x, mu=self.lamb)
+        return jax.scipy.stats.poisson.cdf((x + 1) * self.lamb, mu=self.lamb)
 
     def inv_cdf(self, x: jax.Array) -> jax.Array:
         # see: https://num.pyro.ai/en/stable/tutorials/truncated_distributions.html?highlight=poisson%20inverse#5.3-Example:-Left-truncated-Poisson

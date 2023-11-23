@@ -9,6 +9,23 @@ import jax.numpy as jnp
 from dilax.pdf import Flat, Gauss, HashablePDF, Poisson
 from dilax.util import as1darray
 
+__all__ = [
+    "Parameter",
+    "Effect",
+    "unconstrained",
+    "gauss",
+    "lnN",
+    "poisson",
+    "shape",
+    "modifier",
+    "staterror",
+    "compose",
+]
+
+
+def __dir__():
+    return __all__
+
 
 class Parameter(eqx.Module):
     value: jax.Array = eqx.field(converter=as1darray)
@@ -72,9 +89,10 @@ class gauss(Effect):
         return Gauss(mean=0.0, width=1.0)
 
     def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
-        gx = Gauss(mean=1.0, width=self.width)  # type: ignore[arg-type]
-        g1 = Gauss(mean=1.0, width=1.0)
-        return gx.inv_cdf(g1.cdf(parameter.value + 1))
+        # gx = Gauss(mean=1.0, width=self.width)  # type: ignore[arg-type]
+        # g1 = Gauss(mean=1.0, width=1.0)
+        # return gx.inv_cdf(g1.cdf(parameter.value + 1))
+        return (parameter.value * self.width) + 1  # fast analytical solution
 
 
 class shape(Effect):
@@ -145,7 +163,9 @@ class lnN(Effect):
         # g1 = Gauss(mean=1.0, width=1.0)
         # gx = Gauss(mean=jnp.exp(parameter.value), width=width)  # type: ignore[arg-type]
         # return gx.inv_cdf(g1.cdf(parameter.value + 1))
-        return jnp.exp(parameter.value * self.scale(parameter=parameter))
+        return jnp.exp(
+            parameter.value * self.scale(parameter=parameter)
+        )  # fast analytical solution
 
 
 class poisson(Effect):
@@ -156,19 +176,19 @@ class poisson(Effect):
 
     @property
     def constraint(self) -> HashablePDF:
-        return Gauss(mean=0.0, width=1.0)
+        return Poisson(lamb=self.lamb)
 
     def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
-        gauss_cdf = jnp.broadcast_to(
-            self.constraint.cdf(parameter.value), self.lamb.shape
-        )
-        return Poisson(self.lamb).inv_cdf(gauss_cdf) / sumw  # type: ignore[arg-type]
+        return parameter.value + 1
 
 
 class ModifierBase(eqx.Module):
     @abc.abstractmethod
     def scale_factor(self, sumw: jax.Array) -> jax.Array:
         ...
+
+    def __call__(self, sumw: jax.Array) -> jax.Array:
+        return jnp.atleast_1d(self.scale_factor(sumw=sumw)) * sumw
 
 
 class modifier(ModifierBase):
@@ -223,8 +243,102 @@ class modifier(ModifierBase):
     def scale_factor(self, sumw: jax.Array) -> jax.Array:
         return self.effect.scale_factor(parameter=self.parameter, sumw=sumw)
 
-    def __call__(self, sumw: jax.Array) -> jax.Array:
-        return jnp.atleast_1d(self.scale_factor(sumw=sumw)) * sumw
+
+class staterror(ModifierBase):
+    """
+    Create a staterror (barlow-beeston) modifier which acts on each bin with a different _underlying_ modifier.
+
+    Example:
+
+    .. code-block:: python
+
+        import jax.numpy as jnp
+        from dilax.parameter import modifier, Parameter, unconstrained, lnN, poisson, shape
+
+        hist = jnp.array([10, 20, 30])
+
+        p1 = Parameter(value=1.0)
+        p2 = Parameter(value=0.0)
+        p3 = Parameter(value=0.0)
+
+        # all bins with bin content below 10 (threshold) are treated as poisson, else gauss
+        modify = staterror(
+            parameters=[p1, p2, p3],
+            sumw=hist,
+            sumw2=hist,
+            threshold=10.0,
+        )
+        modify(hist)
+        # -> Array([13.162277, 20.      , 30.      ], dtype=float32)
+
+        fast_modify = eqx.filter_jit(modify)
+    """
+
+    name: str = "staterror"
+    parameters: list[Parameter]
+    sumw: jax.Array
+    sumw2: jax.Array
+    sumw2sqrt: jax.Array
+    widths: jax.Array
+    mask: jax.Array
+    threshold: float
+
+    def __init__(
+        self,
+        parameters: list[Parameter],
+        sumw: jax.Array,
+        sumw2: jax.Array,
+        threshold: float,
+    ) -> None:
+        assert len(parameters) == len(sumw2) == len(sumw)
+
+        self.parameters = parameters
+        self.sumw = sumw
+        self.sumw2 = sumw2
+        self.sumw2sqrt = jnp.sqrt(sumw2)
+        self.threshold = threshold
+
+        # calculate width
+        self.widths = self.sumw2sqrt / self.sumw
+
+        # store if sumw is below threshold
+        self.mask = self.sumw < self.threshold
+
+        for i, param in enumerate(self.parameters):
+            effect = poisson(self.sumw[i]) if self.mask[i] else gauss(self.widths[i])
+            param.constraints.add(effect.constraint)
+
+    def scale_factor(self, sumw: jax.Array) -> jax.Array:
+        from functools import partial
+
+        assert len(sumw) == len(self.parameters) == len(self.sumw2)
+
+        values = jnp.concatenate([param.value for param in self.parameters])
+        idxs = jnp.arange(len(sumw))
+
+        # sumw where mask (poisson) else widths (gauss)
+        _widths = jnp.where(self.mask, self.sumw, self.widths)
+
+        def _mod(
+            value: jax.Array,
+            width: jax.Array,
+            idx: jax.Array,
+            effect: Effect,
+        ) -> jax.Array:
+            return effect(width).scale_factor(
+                parameter=Parameter(value=value),
+                sumw=sumw[idx],
+            )[0]
+
+        _poisson_mod = partial(_mod, effect=poisson)
+        _gauss_mod = partial(_mod, effect=gauss)
+
+        # where mask use poisson else gauss
+        return jnp.where(
+            self.mask,
+            jax.vmap(_poisson_mod)(values, _widths, idxs),
+            jax.vmap(_gauss_mod)(values, _widths, idxs),
+        )
 
 
 class compose(ModifierBase):
@@ -299,6 +413,3 @@ class compose(ModifierBase):
         sfs = jnp.stack(list(self.scale_factors(sumw=sumw).values()))
         # calculate the product in log-space for numerical precision
         return jnp.exp(jnp.sum(jnp.log(sfs), axis=0))
-
-    def __call__(self, sumw: jax.Array) -> jax.Array:
-        return jnp.atleast_1d(self.scale_factor(sumw=sumw)) * sumw

@@ -12,7 +12,7 @@ from dilax.parameter import (
     poisson,
     unconstrained,
 )
-from dilax.pdf import Flat, Gauss
+from dilax.pdf import Flat, Gauss, Poisson
 
 
 def test_parameter():
@@ -61,7 +61,7 @@ def test_poisson():
     # p = Parameter(value=jnp.array(0.0))
     po = poisson(lamb=jnp.array(10))
 
-    assert po.constraint == Gauss(mean=0.0, width=1.0)
+    assert po.constraint == Poisson(lamb=jnp.array(10))
     # assert po.scale_factor(p, jnp.array(1.0)) == pytest.approx(1.0) # FIXME
     # assert po.scale_factor(p.update(jnp.array(2.0)), jnp.array(1.0)) == pytest.approx(1.1) # FIXME
 

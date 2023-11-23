@@ -10,4 +10,33 @@ __credits__ = ["Peter Fackeldey"]
 __contact__ = "https://github.com/pfackeldey/dilax"
 __license__ = "BSD-3-Clause"
 __status__ = "Development"
-__version__ = "0.1.4"
+__version__ = "0.1.5"
+
+
+# expose public API
+
+__all__ = [
+    "ipy_util",
+    "likelihood",
+    "model",
+    "optimizer",
+    "parameter",
+    # "pdf", # this should not be needed in public API
+    "util",
+    "__version__",
+]
+
+
+def __dir__():
+    return __all__
+
+
+from dilax import (  # noqa: E402
+    ipy_util,
+    likelihood,
+    model,
+    optimizer,
+    parameter,
+    # pdf,  # this should not be needed in public API
+    util,
+)

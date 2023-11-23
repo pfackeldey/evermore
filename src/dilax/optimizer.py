@@ -9,6 +9,12 @@ import jaxopt
 
 from dilax.util import Sentinel, _NoValue
 
+__all__ = ["JaxOptimizer", "Chain"]
+
+
+def __dir__():
+    return __all__
+
 
 class JaxOptimizer(eqx.Module):
     """
