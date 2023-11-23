@@ -28,30 +28,32 @@ See more in `examples/`
 _dilax_ in a nutshell:
 
 ```python3
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
 
-from dilax.likelihood import NLL
-from dilax.model import Model, Result
-from dilax.optimizer import JaxOptimizer
-from dilax.parameter import Parameter, gauss, modifier, unconstrained
-
+import dilax as dlx
 
 jax.config.update("jax_enable_x64", True)
 
 
 # define a simple model with two processes and two parameters
-class MyModel(Model):
-    def __call__(self, processes: dict, parameters: dict[str, Parameter]) -> Result:
-        res = Result()
+class MyModel(dlx.model.Model):
+    def __call__(
+        self, processes: dict, parameters: dict[str, dlx.parameter.Parameter]
+    ) -> dlx.model.Result:
+        res = dlx.model.Result()
 
         # signal
-        mu_mod = modifier(name="mu", parameter=parameters["mu"], effect=unconstrained())
+        mu_mod = dlx.parameter.modifier(
+            name="mu", parameter=parameters["mu"], effect=dlx.parameter.unconstrained()
+        )
         res.add(process="signal", expectation=mu_mod(processes["signal"]))
 
         # background
-        bkg_mod = modifier(name="sigma", parameter=parameters["sigma"], effect=gauss(0.2))
+        bkg_mod = dlx.parameter.modifier(
+            name="sigma", parameter=parameters["sigma"], effect=dlx.parameter.gauss(0.2)
+        )
         res.add(process="background", expectation=bkg_mod(processes["background"]))
         return res
 
@@ -59,19 +61,21 @@ class MyModel(Model):
 # setup model
 processes = {"signal": jnp.array([10.0]), "background": jnp.array([50.0])}
 parameters = {
-    "mu": Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
-    "sigma": Parameter(value=jnp.array([0.0])),
+    "mu": dlx.parameter.Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
+    "sigma": dlx.parameter.Parameter(value=jnp.array([0.0])),
 }
 model = MyModel(processes=processes, parameters=parameters)
 
 # define negative log-likelihood with data (observation)
-nll = NLL(model=model, observation=jnp.array([64.0]))
+nll = dlx.likelihood.NLL(model=model, observation=jnp.array([64.0]))
 # jit it!
 fast_nll = eqx.filter_jit(nll)
 
 # setup fit: initial values of parameters and a suitable optimizer
 init_values = model.parameter_values
-optimizer = JaxOptimizer.make(name="ScipyMinimize", settings={"method": "trust-constr"})
+optimizer = dlx.optimizer.JaxOptimizer.make(
+    name="ScipyMinimize", settings={"method": "trust-constr"}
+)
 
 # fit
 values, state = optimizer.fit(fun=fast_nll, init_values=init_values)
@@ -80,20 +84,27 @@ print(values)
 # -> {'mu': Array([1.4], dtype=float64),
 #     'sigma': Array([4.04723836e-14], dtype=float64)}
 
-# eval model with fitted values/parameters
+# eval model with fitted values
 print(model.update(values=values).evaluate().expectation())
 # -> Array([64.], dtype=float64)
 
 
 # gradients of "prefit" model:
-fast_grad_nll_prefit = eqx.filter_grad(nll)
-print(fast_grad_nll_prefit({"sigma": jnp.array([0.2])}))
+print(eqx.filter_grad(nll)({"sigma": jnp.array([0.2])}))
 # -> {'sigma': Array([-0.12258065], dtype=float64)}
 
+
 # gradients of "postfit" model:
-postfit_nll = NLL(model=model.update(values=values), observation=jnp.array([64.0]))
-fast_grad_nll_postfit = eqx.filter_grad(eqx.filter_jit(postfit_nll))
-print(fast_grad_nll_postfit({"sigma": jnp.array([0.2])}))
+@eqx.filter_grad
+@eqx.filter_jit
+def grad_postfit_nll(where: dict[str, jax.Array]) -> dict[str, jax.Array]:
+    nll = dlx.likelihood.NLL(
+        model=model.update(values=values), observation=jnp.array([64.0])
+    )
+    return nll(where)
+
+
+print(grad_postfit_nll({"sigma": jnp.array([0.2])}))
 # -> {'sigma': Array([0.5030303], dtype=float64)}
 ```
 
