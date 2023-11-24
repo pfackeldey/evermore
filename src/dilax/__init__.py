@@ -16,14 +16,20 @@ __version__ = "0.1.5"
 # expose public API
 
 __all__ = [
+    "effect",
     "ipy_util",
     "likelihood",
-    "model",
     "optimizer",
-    "parameter",
     # "pdf", # this should not be needed in public API
     "util",
     "__version__",
+    # explicitely expose some classes
+    "Model",
+    "Result",
+    "Parameter",
+    "modifier",
+    "staterror",
+    "compose",
 ]
 
 
@@ -32,11 +38,12 @@ def __dir__():
 
 
 from dilax import (  # noqa: E402
+    effect,
     ipy_util,
     likelihood,
-    model,
     optimizer,
-    parameter,
     # pdf,  # this should not be needed in public API
     util,
 )
+from dilax.model import Model, Result  # noqa: E402
+from dilax.parameter import Parameter, compose, modifier, staterror  # noqa: E402

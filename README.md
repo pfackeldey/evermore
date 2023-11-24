@@ -38,21 +38,21 @@ jax.config.update("jax_enable_x64", True)
 
 
 # define a simple model with two processes and two parameters
-class MyModel(dlx.model.Model):
+class MyModel(dlx.Model):
     def __call__(
-        self, processes: dict, parameters: dict[str, dlx.parameter.Parameter]
-    ) -> dlx.model.Result:
-        res = dlx.model.Result()
+        self, processes: dict, parameters: dict[str, dlx.Parameter]
+    ) -> dlx.Result:
+        res = dlx.Result()
 
         # signal
-        mu_mod = dlx.parameter.modifier(
-            name="mu", parameter=parameters["mu"], effect=dlx.parameter.unconstrained()
+        mu_mod = dlx.modifier(
+            name="mu", parameter=parameters["mu"], effect=dlx.effect.unconstrained()
         )
         res.add(process="signal", expectation=mu_mod(processes["signal"]))
 
         # background
-        bkg_mod = dlx.parameter.modifier(
-            name="sigma", parameter=parameters["sigma"], effect=dlx.parameter.gauss(0.2)
+        bkg_mod = dlx.modifier(
+            name="sigma", parameter=parameters["sigma"], effect=dlx.effect.gauss(0.2)
         )
         res.add(process="background", expectation=bkg_mod(processes["background"]))
         return res
@@ -61,8 +61,8 @@ class MyModel(dlx.model.Model):
 # setup model
 processes = {"signal": jnp.array([10.0]), "background": jnp.array([50.0])}
 parameters = {
-    "mu": dlx.parameter.Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
-    "sigma": dlx.parameter.Parameter(value=jnp.array([0.0])),
+    "mu": dlx.Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
+    "sigma": dlx.Parameter(value=jnp.array([0.0])),
 }
 model = MyModel(processes=processes, parameters=parameters)
 

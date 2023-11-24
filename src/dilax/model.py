@@ -34,31 +34,30 @@ class Result(eqx.Module):
 class Model(eqx.Module):
     """
     A model describing nuisance parameters, templates (histograms), and how they interact.
-    It is requires to implement the `evaluate` method, which returns an `EvaluationResult` object.
+    It is requires to implement the `evaluate` method, which returns an `Result` object.
 
     Example:
 
     .. code-block:: python
 
+        import equinox as eqx
         import jax
         import jax.numpy as jnp
-        import equinox as eqx
 
-        from dilax.model import Model, Result
-        from dilax.parameter import Parameter, lnN, modifier, unconstrained
+        import dilax as dlx
 
 
         # Define a simple model with two processes and two parameters
-        class MyModel(Model):
-            def __call__(self, processes: dict, parameters: dict[str, Parameter]) -> Result:
-                res = Result()
+        class MyModel(dlx.Model):
+            def __call__(self, processes: dict, parameters: dict[str, dlx.Parameter]) -> dlx.Result:
+                res = dlx.Result()
 
                 # signal
-                mu_mod = modifier(name="mu", parameter=parameters["mu"], effect=unconstrained())
+                mu_mod = dlx.modifier(name="mu", parameter=parameters["mu"], effect=dlx.effect.unconstrained())
                 res.add(process="signal", expectation=mu_mod(processes["signal"]))
 
                 # background
-                bkg_mod = modifier(name="sigma", parameter=parameters["sigma"], effect=lnN(0.2))
+                bkg_mod = dlx.modifier(name="sigma", parameter=parameters["sigma"], effect=dlx.effect.lnN(0.2))
                 res.add(process="background", expectation=bkg_mod(processes["background"]))
                 return res
 
@@ -66,8 +65,8 @@ class Model(eqx.Module):
         # Setup model
         processes = {"signal": jnp.array([10]), "background": jnp.array([50])}
         parameters = {
-            "mu": Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
-            "sigma": Parameter(value=jnp.array([0.0])),
+            "mu": dlx.Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
+            "sigma": dlx.Parameter(value=jnp.array([0.0])),
         }
 
         model = MyModel(processes=processes, parameters=parameters)
@@ -77,7 +76,7 @@ class Model(eqx.Module):
         # -> Array([60.], dtype=float32)
 
         %timeit model.evaluate().expectation()
-        # -> 3.05 ms ± 29.3 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+        # -> 485 µs ± 1.49 µs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
 
         # evaluate the expectation *fast*
         @eqx.filter_jit
@@ -89,7 +88,7 @@ class Model(eqx.Module):
         # -> Array([60.], dtype=float32)
 
         %timeit eqx.filter_jit(eval)(model).block_until_ready()
-        # -> 114 µs ± 327 ns per loop (mean ± std. dev. of 7 runs, 10,000 loops each)
+        # -> 202 µs ± 4.87 µs per loop (mean ± std. dev. of 7 runs, 10,000 loops each)
     """
 
     processes: dict
