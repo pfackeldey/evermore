@@ -396,7 +396,7 @@ class autostaterrors(eqx.Module):
                 if self.mode == self.Mode.barlow_beeston_lite and not mask[i]:
                     # we merge all processes into one parameter
                     # for the barlow-beeston-lite approach where
-                    # the bin content is above a certain treshold
+                    # the bin content is above a certain threshold
                     pkey = f"{i}"
                 process_parameters[pkey] = Parameter(value=jnp.array(0.0))
             # prepare staterror
