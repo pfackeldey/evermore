@@ -297,9 +297,9 @@ class autostaterrors(eqx.Module):
     sumw: dict[str, jax.Array]
     sumw2: dict[str, jax.Array]
     masks: dict[str, jax.Array]
-    threshold: float = 10.0
-    mode: str = Mode.barlow_beeston_lite
-    key_template: str = "__staterror_{process}__"
+    threshold: float
+    mode: str = eqx.field(static=True)
+    key_template: str = eqx.field(static=True)
 
     def __init__(
         self,
