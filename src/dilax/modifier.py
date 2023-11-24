@@ -243,6 +243,9 @@ class staterror(ModifierBase):
                 "must be the same."
             )
             raise ValueError(msg)
+        if not self.threshold > 0.0:
+            msg = f"Threshold must be >= 0.0, got: {self.threshold}"
+            raise ValueError(msg)
 
     def scale_factor(self, sumw: jax.Array) -> jax.Array:
         from functools import partial
@@ -293,9 +296,42 @@ class autostaterrors(eqx.Module):
 
     sumw: dict[str, jax.Array]
     sumw2: dict[str, jax.Array]
+    masks: dict[str, jax.Array]
     threshold: float = 10.0
     mode: str = Mode.barlow_beeston_lite
     key_template: str = "__staterror_{process}__"
+
+    def __init__(
+        self,
+        sumw: dict[str, jax.Array],
+        sumw2: dict[str, jax.Array],
+        threshold: float = 10.0,
+        mode: str = Mode.barlow_beeston_lite,
+        key_template: str = "__staterror_{process}__",
+    ) -> None:
+        self.sumw = sumw
+        self.sumw2 = sumw2
+        self.masks = {p: _sumw < threshold for p, _sumw in sumw.items()}
+        self.threshold = threshold
+        self.mode = mode
+        self.key_template = key_template
+
+    def __check_init__(self):
+        if jax.tree_util.tree_structure(self.sumw) != jax.tree_util.tree_structure(
+            self.sumw2
+        ):  # type: ignore[operator]
+            msg = (
+                "The structure of `sumw` and `sumw2` needs to be identical, got "
+                f"`sumw`: {jax.tree_util.tree_structure(self.sumw)}) and "
+                f"`sumw2`: {jax.tree_util.tree_structure(self.sumw2)})"
+            )
+            raise ValueError(msg)
+        if not self.threshold > 0.0:
+            msg = f"Threshold must be >= 0.0, got: {self.threshold}"
+            raise ValueError(msg)
+        if not isinstance(self.mode, self.Mode):
+            msg = f"Mode must be of type {self.Mode}, got: {self.mode}"
+            raise ValueError(msg)
 
     def prepare(
         self
@@ -354,7 +390,7 @@ class autostaterrors(eqx.Module):
         for process, _sumw in self.sumw.items():
             key = self.key_template.format(process=process)
             process_parameters = parameters[key] = {}
-            mask = _sumw < self.threshold
+            mask = self.masks[process]
             for i in range(len(_sumw)):
                 pkey = f"{process}_{i}"
                 if self.mode == self.Mode.barlow_beeston_lite and not mask[i]:
