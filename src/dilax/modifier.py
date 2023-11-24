@@ -349,18 +349,15 @@ class autostaterrors(eqx.Module):
         """
         import equinox as eqx
 
-        # create parameters
         parameters: dict[str, dict[str, Parameter]] = {}
         staterrors: dict[str, dict[str, eqx.Partial]] = {}
         for process, _sumw in self.sumw.items():
             key = self.key_template.format(process=process)
             process_parameters = parameters[key] = {}
+            mask = _sumw < self.threshold
             for i in range(len(_sumw)):
                 pkey = f"{process}_{i}"
-                if (
-                    self.mode == self.Mode.barlow_beeston_lite
-                    and _sumw[i] > self.threshold
-                ):
+                if self.mode == self.Mode.barlow_beeston_lite and not mask[i]:
                     # we merge all processes into one parameter
                     # for the barlow-beeston-lite approach where
                     # the bin content is above a certain treshold
@@ -375,8 +372,6 @@ class autostaterrors(eqx.Module):
             if self.mode == self.Mode.poisson:
                 kwargs["threshold"] = jnp.inf  # inf -> always poisson
             elif self.mode == self.Mode.barlow_beeston_lite:
-                mask = _sumw < self.threshold
-
                 kwargs["sumw"] = jnp.where(
                     mask, _sumw, sum(jax.tree_util.tree_leaves(self.sumw))
                 )
@@ -385,6 +380,5 @@ class autostaterrors(eqx.Module):
                     self.sumw2[process],
                     sum(jax.tree_util.tree_leaves(self.sumw2)),
                 )
-
             staterrors[key] = eqx.Partial(staterror, **kwargs)
         return parameters, staterrors
