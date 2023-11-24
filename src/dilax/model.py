@@ -10,7 +10,10 @@ import jax.numpy as jnp
 from dilax.parameter import Parameter
 from dilax.util import Sentinel, _NoValue
 
-__all__ = ["Result", "Model"]
+__all__ = [
+    "Result",
+    "Model",
+]
 
 
 def __dir__():

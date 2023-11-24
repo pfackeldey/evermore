@@ -29,6 +29,7 @@ __all__ = [
     "Parameter",
     "modifier",
     "staterror",
+    "autostaterrors",
     "compose",
 ]
 
@@ -46,4 +47,10 @@ from dilax import (  # noqa: E402
     util,
 )
 from dilax.model import Model, Result  # noqa: E402
-from dilax.parameter import Parameter, compose, modifier, staterror  # noqa: E402
+from dilax.modifier import (  # noqa: E402
+    autostaterrors,
+    compose,
+    modifier,
+    staterror,
+)
+from dilax.parameter import Parameter  # noqa: E402

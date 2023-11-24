@@ -9,7 +9,10 @@ import jaxopt
 
 from dilax.util import Sentinel, _NoValue
 
-__all__ = ["JaxOptimizer", "Chain"]
+__all__ = [
+    "JaxOptimizer",
+    "Chain",
+]
 
 
 def __dir__():
