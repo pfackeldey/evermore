@@ -16,13 +16,13 @@ __version__ = "0.1.5"
 # expose public API
 
 __all__ = [
+    "__version__",
     "effect",
     "ipy_util",
     "likelihood",
     "optimizer",
-    # "pdf", # this should not be needed in public API
+    "pdf",
     "util",
-    "__version__",
     # explicitely expose some classes
     "Model",
     "Result",
@@ -42,7 +42,7 @@ from dilax import (  # noqa: E402
     ipy_util,
     likelihood,
     optimizer,
-    # pdf,  # this should not be needed in public API
+    pdf,
     util,
 )
 from dilax.model import Model, Result  # noqa: E402

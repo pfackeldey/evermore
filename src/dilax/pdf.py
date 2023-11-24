@@ -6,6 +6,17 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
+__all__ = [
+    "HashablePDF",
+    "Flat",
+    "Gauss",
+    "Poisson",
+]
+
+
+def __dir__():
+    return __all__
+
 
 class HashablePDF(eqx.Module):
     @abstractmethod

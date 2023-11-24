@@ -4,12 +4,12 @@ import equinox as eqx
 from jax.config import config
 from model import init_values, model, observation, optimizer
 
-from dilax.likelihood import NLL, CovMatrix, Hessian
+import dilax as dlx
 
 config.update("jax_enable_x64", True)
 
 # create negative log likelihood
-nll = NLL(model=model, observation=observation)
+nll = dlx.likelihood.NLL(model=model, observation=observation)
 
 # fit
 params, state = optimizer.fit(fun=nll, init_values=init_values)
@@ -23,7 +23,9 @@ params_ = {k: v for k, v in params.items() if k == "mu"}
 grad_mu = fast_grad_nll(params_)
 
 # hessian + cov_matrix of nll of fitted model
-hessian = eqx.filter_jit(Hessian(model=model, observation=observation))()
+hessian = eqx.filter_jit(dlx.likelihood.Hessian(model=model, observation=observation))()
 
 # covariance matrix of fitted model
-covmatrix = eqx.filter_jit(CovMatrix(model=model, observation=observation))()
+covmatrix = eqx.filter_jit(
+    dlx.likelihood.CovMatrix(model=model, observation=observation)
+)()

@@ -8,8 +8,8 @@ import jax.numpy as jnp
 from jax.config import config
 from model import asimov, model, optimizer
 
+from dilax import Model
 from dilax.likelihood import NLL
-from dilax.model import Model
 from dilax.optimizer import JaxOptimizer
 
 config.update("jax_enable_x64", True)

@@ -3,33 +3,33 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 
-from dilax.model import Model, Result
-from dilax.optimizer import JaxOptimizer
-from dilax.parameter import Parameter, compose, lnN, modifier, shape, unconstrained
+import dilax as dlx
 
 
-class SPlusBModel(Model):
+class SPlusBModel(dlx.Model):
     def __call__(
         self,
         processes: dict,
         parameters: dict[str, jax.Array],
-    ) -> Result:
-        res = Result()
+    ) -> dlx.Result:
+        res = dlx.Result()
 
-        mu_modifier = modifier(
-            name="mu", parameter=parameters["mu"], effect=unconstrained()
+        mu_modifier = dlx.modifier(
+            name="mu", parameter=parameters["mu"], effect=dlx.effect.unconstrained()
         )
         res.add(
             process="signal",
             expectation=mu_modifier(processes[("signal", "nominal")]),
         )
 
-        bkg1_modifier = compose(
-            modifier(name="lnN1", parameter=parameters["norm1"], effect=lnN(0.1)),
-            modifier(
+        bkg1_modifier = dlx.compose(
+            dlx.modifier(
+                name="lnN1", parameter=parameters["norm1"], effect=dlx.effect.lnN(0.1)
+            ),
+            dlx.modifier(
                 name="shape1_bkg1",
                 parameter=parameters["shape1"],
-                effect=shape(
+                effect=dlx.effect.shape(
                     up=processes[("background1", "shape_up")],
                     down=processes[("background1", "shape_down")],
                 ),
@@ -40,12 +40,14 @@ class SPlusBModel(Model):
             expectation=bkg1_modifier(processes[("background1", "nominal")]),
         )
 
-        bkg2_modifier = compose(
-            modifier(name="lnN2", parameter=parameters["norm2"], effect=lnN(0.05)),
-            modifier(
+        bkg2_modifier = dlx.compose(
+            dlx.modifier(
+                name="lnN2", parameter=parameters["norm2"], effect=dlx.effect.lnN(0.05)
+            ),
+            dlx.modifier(
                 name="shape1_bkg2",
                 parameter=parameters["shape1"],
-                effect=shape(
+                effect=dlx.effect.shape(
                     up=processes[("background2", "shape_up")],
                     down=processes[("background2", "shape_down")],
                 ),
@@ -69,10 +71,10 @@ def create_model():
         ("background2", "shape_down"): jnp.array([19]),
     }
     parameters = {
-        "mu": Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
-        "norm1": Parameter(value=jnp.array([0.0])),
-        "norm2": Parameter(value=jnp.array([0.0])),
-        "shape1": Parameter(value=jnp.array([0.0])),
+        "mu": dlx.Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
+        "norm1": dlx.Parameter(value=jnp.array([0.0])),
+        "norm2": dlx.Parameter(value=jnp.array([0.0])),
+        "shape1": dlx.Parameter(value=jnp.array([0.0])),
     }
 
     # return model
@@ -87,7 +89,7 @@ asimov = model.evaluate().expectation()
 
 
 # create optimizer (from `jaxopt`)
-optimizer = JaxOptimizer.make(
+optimizer = dlx.optimizer.JaxOptimizer.make(
     name="LBFGS",
     settings={"maxiter": 5, "jit": True, "unroll": True},
 )
