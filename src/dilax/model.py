@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import equinox as eqx
 import jax
@@ -96,10 +96,19 @@ class Model(eqx.Module):
 
     processes: dict
     parameters: dict[str, Parameter]
+    auxiliary: Any
 
-    def __init__(self, processes: dict, parameters: dict[str, Parameter]) -> None:
+    def __init__(
+        self,
+        processes: dict,
+        parameters: dict[str, Parameter],
+        auxiliary: Any | Sentinel = _NoValue,
+    ) -> None:
         self.processes = processes
         self.parameters = parameters
+        if auxiliary is _NoValue:
+            auxiliary = {}
+        self.auxiliary = auxiliary
 
     @property
     def parameter_values(self) -> dict[str, jax.Array]:
