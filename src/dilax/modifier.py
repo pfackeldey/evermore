@@ -286,7 +286,7 @@ class staterror(ModifierBase):
 
 
 class autostaterrors(eqx.Module):
-    class Mode(str, eqx.Enumeration):
+    class Mode(eqx.Enumeration):
         poisson = "Poisson per process and bin"
         poisson_gauss = "Poisson (Gauss) per process and bin if sumw < (>) threshold"
         barlow_beeston_lite = "Barlow-Beeston (lite) approach"
@@ -325,19 +325,25 @@ class autostaterrors(eqx.Module):
 
 
                 auto = dlx.autostaterrors(
-                    sumw=sumw, sumw2=sumw2, threshold=10.0, mode=dlx.autostaterrors.Mode.poisson,
+                    sumw=sumw,
+                    sumw2=sumw2,
+                    threshold=10.0,
+                    mode=dlx.autostaterrors.Mode.poisson,
                 )
                 parameters, staterrors = auto.prepare()
 
                 # barlow-beeston-lite
                 auto2 = dlx.autostaterrors(
-                    sumw=sumw, sumw2=sumw2, threshold=10.0, mode=dlx.autostaterrors.Mode.barlow_beeston_lite,
+                    sumw=sumw,
+                    sumw2=sumw2,
+                    threshold=10.0,
+                    mode=dlx.autostaterrors.Mode.barlow_beeston_lite,
                 )
                 parameters2, staterrors2 = auto2.prepare()
 
                 # materialize:
                 process = "signal"
-                pkey = auto.key_template.format(process="signal")
+                pkey = auto.key_template.format(process=process)
                 modify = staterrors[pkey](parameters[pkey])
                 modified_process = modify(sumw[process])
         """
