@@ -14,6 +14,7 @@ __all__ = [
     "as1darray",
     "dump_hlo_graph",
     "dump_jaxpr",
+    "deep_update",
 ]
 
 
@@ -328,3 +329,20 @@ def dump_hlo_graph(fun: Callable, *args: Any, **kwargs: Any) -> str:
         filepath.write_text(dump_hlo_graph(f, x), encoding='ascii')
     """
     return jax.xla_computation(fun)(*args, **kwargs).as_hlo_dot_graph()
+
+
+def deep_update(
+    mapping: dict[K, Any],
+    new_mapping: dict[K, Any],
+) -> dict[K, Any]:
+    updated_mapping = mapping.copy()
+    for k, v in new_mapping.items():
+        if (
+            k in updated_mapping
+            and isinstance(updated_mapping[k], dict)
+            and isinstance(v, dict)
+        ):
+            updated_mapping[k] = deep_update(updated_mapping[k], v)
+        else:
+            updated_mapping[k] = v
+    return updated_mapping

@@ -42,7 +42,7 @@ class NLL(BaseModule):
     def logpdf(self, *args, **kwargs) -> jax.Array:
         return jax.scipy.stats.poisson.logpmf(*args, **kwargs)
 
-    def __call__(self, values: dict[str, jax.Array] | Sentinel = _NoValue) -> jax.Array:
+    def __call__(self, values: dict | Sentinel = _NoValue) -> jax.Array:
         if values is _NoValue:
             values = self.model.parameter_values
         model = self.model.update(values=values)
@@ -68,11 +68,11 @@ class Hessian(BaseModule):
         super().__init__(model=model, observation=observation)
         self.NLL = NLL(model=model, observation=observation)
 
-    def __call__(self, values: dict[str, jax.Array] | Sentinel = _NoValue) -> jax.Array:
+    def __call__(self, values: dict | Sentinel = _NoValue) -> jax.Array:
         if values is _NoValue:
             values = self.model.parameter_values
         if TYPE_CHECKING:
-            values = cast(dict[str, jax.Array], values)
+            values = cast(dict, values)
         hessian = jax.hessian(self.NLL, argnums=0)(values)
         hessian, _ = jax.tree_util.tree_flatten(hessian)
         hessian = jnp.array(hessian)
@@ -85,7 +85,7 @@ class CovMatrix(Hessian):
     Covariance matrix.
     """
 
-    def __call__(self, values: dict[str, jax.Array] | Sentinel = _NoValue) -> jax.Array:
+    def __call__(self, values: dict | Sentinel = _NoValue) -> jax.Array:
         if values is _NoValue:
             values = self.model.parameter_values
         hessian = super().__call__(values=values)
@@ -105,7 +105,7 @@ class SampleToy(BaseModule):
 
     def __call__(
         self,
-        values: dict[str, jax.Array] | Sentinel = _NoValue,
+        values: dict | Sentinel = _NoValue,
         key: jax.Array | Sentinel = _NoValue,
     ) -> dict[str, jax.Array]:
         if values is _NoValue:

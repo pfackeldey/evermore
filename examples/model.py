@@ -1,17 +1,12 @@
 from __future__ import annotations
 
-import jax
 import jax.numpy as jnp
 
 import dilax as dlx
 
 
 class SPlusBModel(dlx.Model):
-    def __call__(
-        self,
-        processes: dict,
-        parameters: dict[str, jax.Array],
-    ) -> dlx.Result:
+    def __call__(self, processes: dict, parameters: dict) -> dlx.Result:
         res = dlx.Result()
 
         mu_modifier = dlx.modifier(

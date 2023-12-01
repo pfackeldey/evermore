@@ -39,9 +39,7 @@ jax.config.update("jax_enable_x64", True)
 
 # define a simple model with two processes and two parameters
 class MyModel(dlx.Model):
-    def __call__(
-        self, processes: dict, parameters: dict[str, dlx.Parameter]
-    ) -> dlx.Result:
+    def __call__(self, processes: dict, parameters: dict) -> dlx.Result:
         res = dlx.Result()
 
         # signal

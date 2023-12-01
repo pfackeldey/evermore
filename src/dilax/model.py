@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 
 from dilax.parameter import Parameter
-from dilax.util import Sentinel, _NoValue
+from dilax.util import Sentinel, _NoValue, deep_update
 
 __all__ = [
     "Result",
@@ -34,6 +34,14 @@ class Result(eqx.Module):
         return cast(jax.Array, sum(jax.tree_util.tree_leaves(self.expectations)))
 
 
+def _is_parameter(leaf: Any) -> bool:
+    return isinstance(leaf, Parameter)
+
+
+def _is_none_or_is_parameter(leaf: Any) -> bool:
+    return leaf is None or _is_parameter(leaf)
+
+
 class Model(eqx.Module):
     """
     A model describing nuisance parameters, templates (histograms), and how they interact.
@@ -52,7 +60,7 @@ class Model(eqx.Module):
 
         # Define a simple model with two processes and two parameters
         class MyModel(dlx.Model):
-            def __call__(self, processes: dict, parameters: dict[str, dlx.Parameter]) -> dlx.Result:
+            def __call__(self, processes: dict, parameters: dict) -> dlx.Result:
                 res = dlx.Result()
 
                 # signal
@@ -101,7 +109,7 @@ class Model(eqx.Module):
     def __init__(
         self,
         processes: dict,
-        parameters: dict[str, Parameter],
+        parameters: dict,
         auxiliary: Any | Sentinel = _NoValue,
     ) -> None:
         self.processes = processes
@@ -111,26 +119,32 @@ class Model(eqx.Module):
         self.auxiliary = auxiliary
 
     @property
-    def parameter_values(self) -> dict[str, jax.Array]:
-        return {key: param.value for key, param in self.parameters.items()}
+    def parameter_values(self) -> dict:
+        return jax.tree_util.tree_map(
+            lambda l: l.value,  # noqa: E741
+            self.parameters,
+            is_leaf=_is_parameter,
+        )
 
-    def parameter_constraints(self) -> dict[str, jax.Array]:
-        constraints = {}
-        for name, param in self.parameters.items():
-            # skip if the parameter was not used / has no constraint
-            if not param.constraints:
-                continue
-            if not len(param.constraints) <= 1:
-                msg = f"More than one constraint per parameter is not allowed. Got: {param.constraint}"
-                raise ValueError(msg)
-            constraint = next(iter(param.constraints))
-            constraints[name] = constraint.logpdf(param.value)
-        return constraints
+    def parameter_constraints(self) -> dict:
+        def _constraint(param: Parameter) -> jax.Array:
+            if param.constraints:
+                if len(param.constraints) > 1:
+                    msg = f"More than one constraint per parameter is not allowed. Got: {param.constraint}"
+                    raise ValueError(msg)
+                return next(iter(param.constraints)).logpdf(param.value)
+            return jnp.array([0.0])
+
+        return jax.tree_util.tree_map(
+            _constraint,
+            self.parameters,
+            is_leaf=_is_parameter,
+        )
 
     def update(
         self,
         processes: dict | Sentinel = _NoValue,
-        values: dict[str, jax.Array] | Sentinel = _NoValue,
+        values: dict | Sentinel = _NoValue,
     ) -> Model:
         if values is _NoValue:
             values = {}
@@ -138,41 +152,47 @@ class Model(eqx.Module):
             processes = {}
 
         if TYPE_CHECKING:
-            values = cast(dict[str, jax.Array], values)
+            values = cast(dict, values)
             processes = cast(dict, processes)
 
         # patch original processes with new ones
-        new_processes = {}
-        for key, old_process in self.processes.items():
-            if key in processes:
-                new_process = processes[key]
-                new_processes[key] = new_process
-            else:
-                new_processes[key] = old_process
+        new_processes = deep_update(self.processes, processes)
 
         # patch original parameters with new ones
-        new_parameters = {}
-        for key, old_parameter in self.parameters.items():
-            if key in values:
-                new_parameter = old_parameter.update(value=values[key])
-                new_parameters[key] = new_parameter
-            else:
-                new_parameters[key] = old_parameter
+        _updates = deep_update(
+            jax.tree_util.tree_map(
+                lambda _: None, self.parameters, is_leaf=_is_parameter
+            ),
+            values,
+        )
+
+        def _update_params(update: jax.Array | None, param: Parameter) -> Parameter:
+            if update is None:
+                return param
+            return param.update(value=update)
+
+        new_parameters = jax.tree_util.tree_map(
+            _update_params,
+            _updates,
+            self.parameters,
+            is_leaf=_is_none_or_is_parameter,
+        )
 
         return eqx.tree_at(
             lambda t: (t.processes, t.parameters), self, (new_processes, new_parameters)
         )
 
     def nll_boundary_penalty(self) -> jax.Array:
-        penalty = jnp.array([0.0])
+        params = jax.tree_util.tree_leaves(self.parameters, is_leaf=_is_parameter)
 
-        for param in self.parameters.values():
-            penalty += param.boundary_penalty
-
-        return penalty
+        return sum(
+            jax.tree_util.tree_map(
+                lambda p: p.boundary_penalty, params, is_leaf=_is_parameter
+            )
+        )
 
     @abc.abstractmethod
-    def __call__(self, processes: dict, parameters: dict[str, Parameter]) -> Result:
+    def __call__(self, processes: dict, parameters: dict) -> Result:
         ...
 
     def evaluate(self) -> Result:
