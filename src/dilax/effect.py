@@ -10,6 +10,8 @@ import jax.numpy as jnp
 from dilax.pdf import Flat, Gauss, HashablePDF, Poisson
 from dilax.util import as1darray
 
+ArrayLike = jax.typing.ArrayLike
+
 if TYPE_CHECKING:
     from dilax.parameter import Parameter
 
@@ -51,9 +53,9 @@ DEFAULT_EFFECT = unconstrained()
 
 
 class gauss(Effect):
-    width: jax.Array = eqx.field(static=True, converter=as1darray)
+    width: ArrayLike = eqx.field(static=True, converter=as1darray)
 
-    def __init__(self, width: jax.Array) -> None:
+    def __init__(self, width: ArrayLike) -> None:
         self.width = width
 
     @property
@@ -124,21 +126,29 @@ class shape(Effect):
 
 
 class lnN(Effect):
-    width: jax.Array | tuple[jax.Array, jax.Array] = eqx.field(static=True)
+    width: tuple[ArrayLike, ArrayLike] = eqx.field(static=True)
 
     def __init__(
         self,
-        width: jax.Array | tuple[jax.Array, jax.Array],
+        width: tuple[ArrayLike, ArrayLike],
     ) -> None:
         self.width = width
 
-    def scale(self, parameter: Parameter) -> jax.Array:
-        if isinstance(self.width, tuple):
-            down, up = self.width
-            scale = jnp.where(parameter.value > 0, up, down)
-        else:
-            scale = self.width
-        return scale
+    def interpolate(self, parameter: Parameter) -> jax.Array:
+        # https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/be488af288361ef101859a398ae618131373cad7/src/ProcessNormalization.cc#L112-L129
+        x = parameter.value
+        lo, hi = self.width
+        hi = jnp.log(hi)
+        lo = jnp.log(lo)
+        lo = -lo
+        avg = 0.5 * (hi + lo)
+        halfdiff = 0.5 * (hi - lo)
+        twox = x + x
+        twox2 = twox * twox
+        alpha = 0.125 * twox * (twox2 * (3 * twox2 - 10.0) + 15.0)
+        return jnp.where(
+            jnp.abs(x) >= 0.5, jnp.where(x >= 0, hi, lo), avg + alpha * halfdiff
+        )
 
     @property
     def constraint(self) -> HashablePDF:
@@ -159,10 +169,10 @@ class lnN(Effect):
 
             .. code-block:: python
 
-                return jnp.exp(parameter.value * self.scale(parameter=parameter))
+                return jnp.exp(parameter.value * self.interpolate(parameter=parameter))
 
         """
-        return jnp.exp(parameter.value * self.scale(parameter=parameter))
+        return jnp.exp(parameter.value * self.interpolate(parameter=parameter))
 
 
 class poisson(Effect):

@@ -19,7 +19,9 @@ class SPlusBModel(dlx.Model):
 
         bkg1_modifier = dlx.compose(
             dlx.modifier(
-                name="lnN1", parameter=parameters["norm1"], effect=dlx.effect.lnN(0.1)
+                name="lnN1",
+                parameter=parameters["norm1"],
+                effect=dlx.effect.lnN((0.9, 1.1)),
             ),
             dlx.modifier(
                 name="shape1_bkg1",
@@ -37,7 +39,9 @@ class SPlusBModel(dlx.Model):
 
         bkg2_modifier = dlx.compose(
             dlx.modifier(
-                name="lnN2", parameter=parameters["norm2"], effect=dlx.effect.lnN(0.05)
+                name="lnN2",
+                parameter=parameters["norm2"],
+                effect=dlx.effect.lnN((0.95, 1.05)),
             ),
             dlx.modifier(
                 name="shape1_bkg2",

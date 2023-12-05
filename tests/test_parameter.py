@@ -42,7 +42,7 @@ def test_gauss():
 
 def test_lnN():
     p = dlx.Parameter(value=jnp.array(0.0))
-    ln = dlx.effect.lnN(width=jnp.array(0.1))
+    ln = dlx.effect.lnN(width=(0.9, 1.1))
 
     assert ln.constraint == Gauss(mean=0.0, width=1.0)
     assert ln.scale_factor(p, jnp.array(1.0)) == pytest.approx(1.0)
@@ -80,7 +80,7 @@ def test_modifier():
 
     # lnN effect
     m_lnN = dlx.modifier(
-        name="norm", parameter=norm, effect=dlx.effect.lnN(jnp.array(0.1))
+        name="norm", parameter=norm, effect=dlx.effect.lnN(width=(0.9, 1.1))
     )
     assert m_lnN(jnp.array(10)) == pytest.approx(10)
 

@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
 import jax
 import jax.numpy as jnp
 
+ArrayLike = jax.typing.ArrayLike
+
 __all__ = [
     "HistDB",
     "FrozenDB",
@@ -256,7 +258,7 @@ for cls in HistDB, FrozenDB:
     )
 
 
-def as1darray(x: float | jax.Array) -> jax.Array:
+def as1darray(x: ArrayLike) -> jax.Array:
     """
     Converts `x` to a 1d array.
 
