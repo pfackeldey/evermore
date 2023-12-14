@@ -95,7 +95,6 @@ class shape(Effect):
         self.up = up  # +1 sigma
         self.down = down  # -1 sigma
 
-    @eqx.filter_jit
     def vshift(self, sf: jax.Array, sumw: jax.Array) -> jax.Array:
         factor = sf
         dx_sum = self.up + self.down - 2 * sumw
@@ -121,8 +120,10 @@ class shape(Effect):
 
     def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
         sf = parameter.value
-        # clip, no negative values are allowed
-        return jnp.maximum((sumw + self.vshift(sf=sf, sumw=sumw)) / sumw, 0.0)
+        shift = self.vshift(sf=sf, sumw=sumw)
+        # handle zeros, see: https://github.com/google/jax/issues/5039
+        x = jnp.where(sumw == 0.0, 1.0, sumw)
+        return jnp.where(sumw == 0.0, 1.0, (x + shift) / x)
 
 
 class lnN(Effect):
