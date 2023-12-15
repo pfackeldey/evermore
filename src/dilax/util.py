@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import collections
 import pprint
-from collections.abc import Hashable, Iterable, Mapping
-from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
+from collections.abc import Callable, Hashable, Iterable, Mapping
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import jax
 import jax.numpy as jnp
@@ -146,7 +146,7 @@ class FrozenDB(Mapping[K, V]):
 
     @staticmethod
     def keyify(keyish: Any) -> frozenset:
-        if not isinstance(keyish, (tuple, list, set, frozenset)):
+        if not isinstance(keyish, tuple | list | set | frozenset):
             keyish = (keyish,)
         _check_no_duplicate_keys(keyish)
         keyish = frozenset(keyish)
@@ -225,7 +225,7 @@ def _flatten(tree):
 
 def _make_unflatten(cls: type[FrozenDB]) -> Callable:
     def _unflatten(keys, values):
-        return cls(dict(zip(keys, values)), __unsafe_skip_copy__=True)
+        return cls(dict(zip(keys, values, strict=True)), __unsafe_skip_copy__=True)
 
     return _unflatten
 

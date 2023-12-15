@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Hashable
-from typing import TYPE_CHECKING, Any, Callable, cast
+from collections.abc import Callable, Hashable
+from typing import TYPE_CHECKING, Any, cast
 
 import equinox as eqx
 import jax
