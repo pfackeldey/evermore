@@ -1,13 +1,11 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 
+from dilax.custom_types import Sentinel, _NoValue
 from dilax.model import Model
-from dilax.util import Sentinel, _NoValue
 
 __all__ = [
     "NLL",

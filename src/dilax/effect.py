@@ -1,19 +1,21 @@
-from __future__ import annotations
-
 import abc
-from typing import TYPE_CHECKING
+import operator
+from typing import TYPE_CHECKING, ClassVar
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 
+from dilax.custom_types import AddOrMul, ArrayLike
+from dilax.parameter import Parameter
 from dilax.pdf import Flat, Gauss, HashablePDF, Poisson
 from dilax.util import as1darray
 
-ArrayLike = jax.typing.ArrayLike
-
 if TYPE_CHECKING:
-    from dilax.parameter import Parameter
+    from typing import ClassVar as AbstractClassVar
+else:
+    from equinox import AbstractClassVar
+
 
 __all__ = [
     "Effect",
@@ -30,6 +32,8 @@ def __dir__():
 
 
 class Effect(eqx.Module):
+    apply_op: AbstractClassVar[AddOrMul]
+
     @property
     @abc.abstractmethod
     def constraint(self) -> HashablePDF:
@@ -41,6 +45,8 @@ class Effect(eqx.Module):
 
 
 class unconstrained(Effect):
+    apply_op: ClassVar[AddOrMul] = operator.mul
+
     @property
     def constraint(self) -> HashablePDF:
         return Flat()
@@ -54,6 +60,8 @@ DEFAULT_EFFECT = unconstrained()
 
 class gauss(Effect):
     width: ArrayLike = eqx.field(static=True, converter=as1darray)
+
+    apply_op: ClassVar[AddOrMul] = operator.mul
 
     def __init__(self, width: ArrayLike) -> None:
         self.width = width
@@ -86,6 +94,8 @@ class gauss(Effect):
 class shape(Effect):
     up: jax.Array = eqx.field(converter=as1darray)
     down: jax.Array = eqx.field(converter=as1darray)
+
+    apply_op: ClassVar[AddOrMul] = operator.add
 
     def __init__(
         self,
@@ -120,19 +130,25 @@ class shape(Effect):
 
     def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
         sf = parameter.value
-        shift = self.vshift(sf=sf, sumw=sumw)
-        # handle zeros, see: https://github.com/google/jax/issues/5039
-        x = jnp.where(sumw == 0.0, 1.0, sumw)
-        return jnp.where(sumw == 0.0, 1.0, (x + shift) / x)
+        return self.vshift(sf=sf, sumw=sumw)
+        # shift = self.vshift(sf=sf, sumw=sumw)
+        # # handle zeros, see: https://github.com/google/jax/issues/5039
+        # x = jnp.where(sumw == 0.0, 1.0, sumw)
+        # return jnp.where(sumw == 0.0, shift, (x + shift) / x)
 
 
 class lnN(Effect):
     width: tuple[ArrayLike, ArrayLike] = eqx.field(static=True)
 
+    apply_op: ClassVar[AddOrMul] = operator.mul
+
     def __init__(
         self,
         width: tuple[ArrayLike, ArrayLike],
     ) -> None:
+        # given as (down, up)
+        assert isinstance(width, tuple)
+        assert len(width) == 2
         self.width = width
 
     def interpolate(self, parameter: Parameter) -> jax.Array:
@@ -178,6 +194,8 @@ class lnN(Effect):
 
 class poisson(Effect):
     lamb: jax.Array = eqx.field(static=True, converter=as1darray)
+
+    apply_op: ClassVar[AddOrMul] = operator.mul
 
     def __init__(self, lamb: jax.Array) -> None:
         self.lamb = lamb

@@ -8,8 +8,9 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
+from dilax.custom_types import Sentinel, _NoValue
 from dilax.parameter import Parameter
-from dilax.util import Sentinel, _NoValue, deep_update
+from dilax.util import deep_update
 
 __all__ = [
     "Result",

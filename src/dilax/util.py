@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
 import jax
 import jax.numpy as jnp
 
-ArrayLike = jax.typing.ArrayLike
+from dilax.custom_types import ArrayLike, Sentinel, _NoValue
 
 __all__ = [
     "HistDB",
@@ -22,21 +22,6 @@ __all__ = [
 
 def __dir__():
     return __all__
-
-
-class Sentinel:
-    __slots__ = ("repr",)
-
-    def __init__(self, repr: str) -> None:
-        self.repr = repr
-
-    def __repr__(self) -> str:
-        return self.repr
-
-    __str__ = __repr__
-
-
-_NoValue: Sentinel = Sentinel("<NoValue>")
 
 
 class FrozenKeysView(collections.abc.KeysView):

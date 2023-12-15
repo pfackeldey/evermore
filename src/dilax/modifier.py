@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import abc
+import operator
+from functools import reduce
 from typing import TYPE_CHECKING
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 
+from dilax.custom_types import AddOrMul
 from dilax.effect import (
     DEFAULT_EFFECT,
     gauss,
@@ -31,11 +34,8 @@ def __dir__():
 
 class ModifierBase(eqx.Module):
     @abc.abstractmethod
-    def scale_factor(self, sumw: jax.Array) -> jax.Array:
-        ...
-
     def __call__(self, sumw: jax.Array) -> jax.Array:
-        return jnp.atleast_1d(self.scale_factor(sumw=sumw)) * sumw
+        ...
 
 
 class modifier(ModifierBase):
@@ -90,6 +90,12 @@ class modifier(ModifierBase):
     def scale_factor(self, sumw: jax.Array) -> jax.Array:
         return self.effect.scale_factor(parameter=self.parameter, sumw=sumw)
 
+    def __call__(self, sumw: jax.Array) -> jax.Array:
+        op = self.effect.apply_op
+        shift = jnp.atleast_1d(self.scale_factor(sumw=sumw))
+        shift = jnp.broadcast_to(shift, sumw.shape)
+        return op(shift, sumw)  # type: ignore[call-arg]
+
 
 class compose(ModifierBase):
     """
@@ -109,7 +115,7 @@ class compose(ModifierBase):
         # create a new parameter and a composition of modifiers
         composition = dlx.compose(
             dlx.modifier(name="mu", parameter=mu),
-            dlx.modifier(name="sigma1", parameter=sigma, effect=dlx.effect.lnN(0.1)),
+            dlx.modifier(name="sigma1", parameter=sigma, effect=dlx.effect.lnN((0.9, 1.1))),
         )
 
         # apply the composition
@@ -118,7 +124,7 @@ class compose(ModifierBase):
         # nest compositions
         composition = dlx.compose(
             composition,
-            dlx.modifier(name="sigma2", parameter=sigma, effect=dlx.effect.lnN(0.2)),
+            dlx.modifier(name="sigma2", parameter=sigma, effect=dlx.effect.lnN((0.8, 1.2))),
         )
 
         # jit
@@ -127,24 +133,24 @@ class compose(ModifierBase):
         eqx.filter_jit(composition)(jnp.array([10, 20, 30]))
     """
 
-    modifiers: tuple[modifier, ...]
-    names: list[str] = eqx.field(static=True)
+    modifiers: list[ModifierBase]
 
     def __init__(self, *modifiers: modifier) -> None:
-        self.modifiers = modifiers
-
-        # set names
-        self.names = []
-        for m in range(len(self)):
-            modifier = self.modifiers[m]
-            if isinstance(modifier, compose):
-                self.names.extend(modifier.names)
+        self.modifiers = list(modifiers)
+        # unroll nested compositions
+        _modifiers = []
+        for mod in self.modifiers:
+            if isinstance(mod, compose):
+                _modifiers.extend(mod.modifiers)
             else:
-                self.names.append(modifier.name)
+                assert isinstance(mod, modifier)
+                _modifiers.append(mod)
+        self.modifiers = _modifiers
 
     def __check_init__(self):
         # check for duplicate names
-        duplicates = [name for name in self.names if self.names.count(name) > 1]
+        names = [m.name for m in self.modifiers]
+        duplicates = {name for name in names if names.count(name) > 1}
         if duplicates:
             msg = f"Modifiers need to have unique names, got: {duplicates}"
             raise ValueError(msg)
@@ -152,21 +158,27 @@ class compose(ModifierBase):
     def __len__(self) -> int:
         return len(self.modifiers)
 
-    def scale_factors(self, sumw: jax.Array) -> dict[str, jax.Array]:
-        sfs = {}
+    def __call__(self, sumw: jax.Array) -> jax.Array:
+        def _prep_shift(modifier: ModifierBase, sumw: jax.Array) -> jax.Array:
+            shift = modifier.scale_factor(sumw=sumw)
+            shift = jnp.atleast_1d(shift)
+            return jnp.broadcast_to(shift, sumw.shape)
+
+        # collect all multiplicative and additive shifts
+        shifts: dict[AddOrMul, list] = {operator.mul: [], operator.add: []}
         for m in range(len(self)):
             modifier = self.modifiers[m]
-            if isinstance(modifier, compose):
-                sfs.update(modifier.scale_factors(sumw=sumw))
-            else:
-                sf = jnp.atleast_1d(modifier.scale_factor(sumw=sumw))
-                sfs[modifier.name] = jnp.broadcast_to(sf, sumw.shape)
-        return sfs
+            if modifier.effect.apply_op is operator.mul:
+                shifts[operator.mul].append(_prep_shift(modifier, sumw))
+            elif modifier.effect.apply_op is operator.add:
+                shifts[operator.add].append(_prep_shift(modifier, sumw))
 
-    def scale_factor(self, sumw: jax.Array) -> jax.Array:
-        sfs = jnp.stack(list(self.scale_factors(sumw=sumw).values()))
-        # calculate the product in log-space for numerical precision
-        return jnp.exp(jnp.sum(jnp.log(sfs), axis=0))
+        # calculate the product with for operator.mul
+        _mult_fact = reduce(operator.mul, shifts[operator.mul], 1.0)
+        # calculate the sum for operator.add
+        _add_shift = reduce(operator.add, shifts[operator.add], 0.0)
+        # apply
+        return _mult_fact * (sumw + _add_shift)
 
 
 class staterror(ModifierBase):
@@ -280,6 +292,12 @@ class staterror(ModifierBase):
             jax.vmap(_poisson_mod)(values, _widths, idxs),
             jax.vmap(_gauss_mod)(values, _widths, idxs),
         )
+
+    def __call__(self, sumw: jax.Array) -> jax.Array:
+        # both gauss and poisson behave multiplicative
+        op = operator.mul
+        sf = self.scale_factor(sumw=sumw)
+        return op(jnp.atleast_1d(sf), sumw)
 
 
 class autostaterrors(eqx.Module):

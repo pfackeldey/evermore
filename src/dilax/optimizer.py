@@ -7,7 +7,7 @@ import equinox as eqx
 import jax
 import jaxopt
 
-from dilax.util import Sentinel, _NoValue
+from dilax.custom_types import Sentinel, _NoValue
 
 __all__ = [
     "JaxOptimizer",

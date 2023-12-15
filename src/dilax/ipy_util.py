@@ -1,10 +1,8 @@
-from __future__ import annotations
-
 from typing import Any
 
-import jax
 import jax.numpy as jnp
 
+from dilax.custom_types import ArrayLike
 from dilax.model import Model
 
 __all__ = ["interactive"]
@@ -18,7 +16,7 @@ def interactive(model: Model) -> None:
     import ipywidgets as widgets
     import matplotlib.pyplot as plt
 
-    def slider(v: float | jax.Array) -> widgets.FloatSlider:
+    def slider(v: ArrayLike) -> widgets.FloatSlider:
         return widgets.FloatSlider(min=v - 2, max=v + 2, step=0.01, value=v)
 
     fig, ax = plt.subplots()

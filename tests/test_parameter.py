@@ -70,19 +70,19 @@ def test_modifier():
     m_unconstrained = dlx.modifier(
         name="mu", parameter=mu, effect=dlx.effect.unconstrained()
     )
-    assert m_unconstrained(jnp.array(10)) == pytest.approx(11)
+    assert m_unconstrained(jnp.array([10])) == pytest.approx(11)
 
     # gauss effect
     m_gauss = dlx.modifier(
         name="norm", parameter=norm, effect=dlx.effect.gauss(jnp.array(0.1))
     )
-    assert m_gauss(jnp.array(10)) == pytest.approx(10)
+    assert m_gauss(jnp.array([10])) == pytest.approx(10)
 
     # lnN effect
     m_lnN = dlx.modifier(
         name="norm", parameter=norm, effect=dlx.effect.lnN(width=(0.9, 1.1))
     )
-    assert m_lnN(jnp.array(10)) == pytest.approx(10)
+    assert m_lnN(jnp.array([10])) == pytest.approx(10)
 
     # poisson effect # FIXME
     # m_poisson = modifier(name="norm", parameter=norm, effect=poisson(jnp.array(10)))
@@ -110,6 +110,5 @@ def test_compose():
     # compose
     m = dlx.compose(m_unconstrained, m_gauss)
 
-    assert m.names == ["mu", "norm"]
     assert len(m) == 2
     assert m(jnp.array([10])) == pytest.approx(11)
