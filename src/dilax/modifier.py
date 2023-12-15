@@ -60,7 +60,7 @@ class modifier(ModifierBase):
         # -> Array([11., 22., 33.], dtype=float32, weak_type=True),
 
         # lnN effect
-        modify = dlx.modifier(name="norm", parameter=norm, effect=dlx.effect.lnN(0.2))
+        modify = dlx.modifier(name="norm", parameter=norm, effect=dlx.effect.lnN((0.8, 1.2)))
         modify(jnp.array([10, 20, 30]))
 
         # poisson effect
