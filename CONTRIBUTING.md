@@ -1,53 +1,38 @@
-See the [Scientific Python Developer Guide][spc-dev-intro] for a detailed
-description of best practices for developing scientific packages.
+# Contributing
 
-[spc-dev-intro]: https://scientific-python-cookie.readthedocs.io/guide/intro
+We welcome contributions to the project. Please follow the guidelines below.
 
-# Setting up a development environment manually
+## Development environment
 
-You can set up a development environment by running:
+We use [pixi](https://pixi.sh/latest/) to manage the development environment.
 
-```zsh
-python3 -m venv venv          # create a virtualenv called venv
-source ./.venv/bin/activate   # now `python` points to the virtualenv python
-pip install -v -e ".[dev]"    # -v for verbose, -e for editable, [dev] for dev dependencies
+```shell
+pixi install
+pixi shell
+pixi run postinstall
 ```
 
-# Post setup
-
-You should prepare pre-commit, which will help you by checking that commits pass
-required checks:
-
-```bash
-pip install pre-commit # or brew install pre-commit on macOS
-pre-commit install # this will install a pre-commit hook into the git repo
-```
-
-You can also/alternatively run `pre-commit run` (changes only) or
-`pre-commit run --all-files` to check even without installing the hook.
-
-# Testing
+### Testing
 
 Use pytest to run the unit checks:
 
 ```bash
-pytest
+pixi run test
 ```
 
-# Coverage
+### Linting
 
-Use pytest-cov to generate coverage reports:
+We use `ruff` to lint the code. Run the following command to check the code:
 
 ```bash
-pytest --cov=dilax
+pixi run lint
 ```
 
-# Pre-commit
+### Check all files
 
-This project uses pre-commit for all style checking. Install pre-commit and run:
+**Recommended before creating a commit**: to run all checks against all files,
+run the following command:
 
 ```bash
-pre-commit run -a
+pixi run checkall
 ```
-
-to check all files.

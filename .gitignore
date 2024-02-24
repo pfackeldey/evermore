@@ -163,3 +163,4 @@ examples/*.eqx
 test/
 .vscode/
 .zed/
+.pixi/
