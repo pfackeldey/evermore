@@ -348,7 +348,7 @@ class autostaterrors(eqx.Module):
             raise ValueError(msg)
 
     def prepare(
-        self
+        self,
     ) -> tuple[dict[str, dict[str, Parameter]], dict[str, dict[str, eqx.Partial]]]:
         """
         Helper to automatically create parameters used by `staterror`

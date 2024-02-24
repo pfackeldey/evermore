@@ -107,7 +107,8 @@ extend-ignore = [
     "PLR",  # Design related pylint codes
     "E501", # Line too long
     # "B006",   # converts default args to 'None'
-    "I002", # isort: "from __future__ import annotations"
+    "I002",   # isort: "from __future__ import annotations"
+    "ISC001", # flake8-implicit-str-concat: Implicit string concatenation"
 ]
 unfixable = [
     "F841", # Would remove unused variables
