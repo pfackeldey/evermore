@@ -34,7 +34,7 @@ dependencies = [
 test = ["pytest >=6", "pytest-cov >=3"]
 dev = ["pytest >=6", "pytest-cov >=3"]
 docs = [
-    "sphinx~=4.3",
+    "sphinx>=5.0",
     "sphinx-book-theme~=0.3",
     "autodocsumm~=0.2",
     "myst-parser~=0.18",
