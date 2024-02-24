@@ -4,48 +4,42 @@ build-backend = "hatchling.build"
 [project]
 name = "dilax"
 authors = [
-  { name = "Peter Fackeldey", email = "peter.fackeldey@rwth-aachen.de" },
+    { name = "Peter Fackeldey", email = "peter.fackeldey@rwth-aachen.de" },
 ]
 description = "Differentiable (binned) likelihoods in JAX."
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
-  "Development Status :: 1 - Planning",
-  "Intended Audience :: Science/Research",
-  "Intended Audience :: Developers",
-  "License :: OSI Approved :: BSD License",
-  "Operating System :: OS Independent",
-  "Programming Language :: Python",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Topic :: Scientific/Engineering",
-  "Typing :: Typed",
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
 ]
-dynamic = ["version"]  # version is set in src/dilax/__init__.py
+dynamic = ["version"] # version is set in src/dilax/__init__.py
 dependencies = [
-    "equinox>=0.10.6",  # eqx.field
-    "jaxopt >=0.6"      # jaxopt.LGBFGS
+    "equinox>=0.10.6", # eqx.field
+    "jaxopt >=0.6",    # jaxopt.LGBFGS
 ]
 
 [project.optional-dependencies]
-test = [
-  "pytest >=6",
-  "pytest-cov >=3",
-]
-dev = [
-  "pytest >=6",
-  "pytest-cov >=3",
-]
+test = ["pytest >=6", "pytest-cov >=3"]
+dev = ["pytest >=6", "pytest-cov >=3"]
 docs = [
-  "sphinx~=4.3",
-  "sphinx-book-theme~=0.3",
-  "autodocsumm~=0.2",
-  "myst-parser~=0.18",
-  "sphinx_lfs_content~=1.1",
-  "sphinx_copybutton",
+    "sphinx~=4.3",
+    "sphinx-book-theme~=0.3",
+    "autodocsumm~=0.2",
+    "myst-parser~=0.18",
+    "sphinx_lfs_content~=1.1",
+    "sphinx_copybutton",
 ]
 
 [project.urls]
@@ -57,31 +51,20 @@ Changelog = "https://github.com/pfackeldey/dilax/releases"
 
 [tool.hatch]
 version.path = "src/dilax/__init__.py"
-envs.default.dependencies = [
-  "pytest",
-  "pytest-cov",
-]
+envs.default.dependencies = ["pytest", "pytest-cov"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
 xfail_strict = true
-filterwarnings = [
-  "error",
-]
+filterwarnings = ["error"]
 log_cli_level = "INFO"
-testpaths = [
-  "tests",
-]
+testpaths = ["tests"]
 
 
 [tool.coverage]
 run.source = ["dilax"]
-port.exclude_lines = [
-  'pragma: no cover',
-  '\.\.\.',
-  'if typing.TYPE_CHECKING:',
-]
+port.exclude_lines = ['pragma: no cover', '\.\.\.', 'if typing.TYPE_CHECKING:']
 
 
 [tool.mypy]
@@ -96,39 +79,42 @@ strict = false
 ignore_missing_imports = true
 
 
-[tool.ruff]
+[tool.ruff.lint]
 select = [
-  "E", "F", "W", # flake8
-  "B",           # flake8-bugbear
-  "I",           # isort
-  "C4",          # flake8-comprehensions
-  "EM",          # flake8-errmsg
-  "ICN",         # flake8-import-conventions
-  "ISC",         # flake8-implicit-str-concat
-  "G",           # flake8-logging-format
-  "PGH",         # pygrep-hooks
-  "PIE",         # flake8-pie
-  "PL",          # pylint
-  "PT",          # flake8-pytest-style
-  "PTH",         # flake8-use-pathlib
-  "RET",         # flake8-return
-  "RUF",         # Ruff-specific
-  "SIM",         # flake8-simplify
-  "UP",          # pyupgrade
-  "YTT",         # flake8-2020
-  "EXE",         # flake8-executable
+    "E",
+    "F",
+    "W",   # flake8
+    "B",   # flake8-bugbear
+    "I",   # isort
+    "C4",  # flake8-comprehensions
+    "EM",  # flake8-errmsg
+    "ICN", # flake8-import-conventions
+    "ISC", # flake8-implicit-str-concat
+    "G",   # flake8-logging-format
+    "PGH", # pygrep-hooks
+    "PIE", # flake8-pie
+    "PL",  # pylint
+    "PT",  # flake8-pytest-style
+    "PTH", # flake8-use-pathlib
+    "RET", # flake8-return
+    "RUF", # Ruff-specific
+    "SIM", # flake8-simplify
+    "UP",  # pyupgrade
+    "YTT", # flake8-2020
+    "EXE", # flake8-executable
 ]
 extend-ignore = [
-  "PLR",    # Design related pylint codes
-  "E501",   # Line too long
-  # "B006",   # converts default args to 'None'
-  "I002",  # isort: "from __future__ import annotations"
+    "PLR",  # Design related pylint codes
+    "E501", # Line too long
+    # "B006",   # converts default args to 'None'
+    "I002", # isort: "from __future__ import annotations"
 ]
-
-src = ["src"]
 unfixable = [
-  "F841", # Would remove unused variables
+    "F841", # Would remove unused variables
 ]
-exclude = []
 flake8-unused-arguments.ignore-variadic-names = true
 isort.required-imports = ["from __future__ import annotations"]
+
+[tool.ruff]
+src = ["src"]
+exclude = []
