@@ -132,7 +132,7 @@ class Model(eqx.Module):
         def _constraint(param: Parameter) -> jax.Array:
             if param.constraints:
                 if len(param.constraints) > 1:
-                    msg = f"More than one constraint per parameter is not allowed. Got: {param.constraint}"
+                    msg = f"More than one constraint per parameter is not allowed. Got: {param.constraints}"
                     raise ValueError(msg)
                 return next(iter(param.constraints)).logpdf(param.value)
             return jnp.array([0.0])
