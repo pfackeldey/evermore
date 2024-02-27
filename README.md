@@ -1,3 +1,7 @@
+<div align="center" style="width:250px">
+<img src="https://raw.githubusercontent.com/pfackeldey/evermore/main/assets/logo.png" alt="logo"></img>
+</div>
+
 # evermore
 
 [![Documentation Status](https://readthedocs.org/projects/dilax/badge/?version=latest)](https://dilax.readthedocs.io/en/latest/?badge=latest)
