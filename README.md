@@ -1,4 +1,4 @@
-<div align="center" style="width:250px">
+<div align="center" style="height:250px;width:250px">
 <img src="https://raw.githubusercontent.com/pfackeldey/evermore/main/assets/logo.png" alt="logo"></img>
 </div>
 
