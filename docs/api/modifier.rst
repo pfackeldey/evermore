@@ -1,6 +1,6 @@
-dilax.modifier
+evermore.modifier
 ================
 
-.. automodule:: dilax.modifier
+.. automodule:: evermore.modifier
     :show-inheritance:
     :members:

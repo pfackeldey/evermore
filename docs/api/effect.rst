@@ -1,6 +1,6 @@
-dilax.effect
+evermore.effect
 ================
 
-.. automodule:: dilax.effect
+.. automodule:: evermore.effect
     :show-inheritance:
     :members:

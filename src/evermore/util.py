@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 import jax
 import jax.numpy as jnp
 
-from dilax.custom_types import ArrayLike, Sentinel, _NoValue
+from evermore.custom_types import ArrayLike, Sentinel, _NoValue
 
 __all__ = [
     "HistDB",

@@ -2,8 +2,8 @@ from typing import Any
 
 import jax.numpy as jnp
 
-from dilax.custom_types import ArrayLike
-from dilax.model import Model
+from evermore.custom_types import ArrayLike
+from evermore.model import Model
 
 __all__ = ["interactive"]
 

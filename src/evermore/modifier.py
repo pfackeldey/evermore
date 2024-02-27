@@ -9,16 +9,16 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-from dilax.custom_types import AddOrMul
-from dilax.effect import (
+from evermore.custom_types import AddOrMul
+from evermore.effect import (
     DEFAULT_EFFECT,
     gauss,
     poisson,
 )
-from dilax.parameter import Parameter
+from evermore.parameter import Parameter
 
 if TYPE_CHECKING:
-    from dilax.effect import Effect
+    from evermore.effect import Effect
 
 __all__ = [
     "modifier",
@@ -47,31 +47,31 @@ class modifier(ModifierBase):
     .. code-block:: python
 
         import jax.numpy as jnp
-        import dilax as dlx
+        import evermore as evm
 
-        mu = dlx.Parameter(value=1.1, bounds=(0, 100))
-        norm = dlx.Parameter(value=0.0, bounds=(-jnp.inf, jnp.inf))
+        mu = evm.Parameter(value=1.1, bounds=(0, 100))
+        norm = evm.Parameter(value=0.0, bounds=(-jnp.inf, jnp.inf))
 
         # create a new parameter and a penalty
-        modify = dlx.modifier(name="mu", parameter=mu, effect=dlx.effect.unconstrained())
+        modify = evm.modifier(name="mu", parameter=mu, effect=evm.effect.unconstrained())
 
         # apply the modifier
         modify(jnp.array([10, 20, 30]))
         # -> Array([11., 22., 33.], dtype=float32, weak_type=True),
 
         # lnN effect
-        modify = dlx.modifier(name="norm", parameter=norm, effect=dlx.effect.lnN((0.8, 1.2)))
+        modify = evm.modifier(name="norm", parameter=norm, effect=evm.effect.lnN((0.8, 1.2)))
         modify(jnp.array([10, 20, 30]))
 
         # poisson effect
         hist = jnp.array([10, 20, 30])
-        modify = dlx.modifier(name="norm", parameter=norm, effect=dlx.effect.poisson(hist))
+        modify = evm.modifier(name="norm", parameter=norm, effect=evm.effect.poisson(hist))
         modify(jnp.array([10, 20, 30]))
 
         # shape effect
         up = jnp.array([12, 23, 35])
         down = jnp.array([8, 19, 26])
-        modify = dlx.modifier(name="norm", parameter=norm, effect=dlx.effect.shape(up, down))
+        modify = evm.modifier(name="norm", parameter=norm, effect=evm.effect.shape(up, down))
         modify(jnp.array([10, 20, 30]))
     """
 
@@ -107,24 +107,24 @@ class compose(ModifierBase):
     .. code-block:: python
 
         import jax.numpy as jnp
-        import dilax as dlx
+        import evermore as evm
 
-        mu = dlx.Parameter(value=1.1, bounds=(0, 100))
-        sigma = dlx.Parameter(value=0.1, bounds=(-100, 100))
+        mu = evm.Parameter(value=1.1, bounds=(0, 100))
+        sigma = evm.Parameter(value=0.1, bounds=(-100, 100))
 
         # create a new parameter and a composition of modifiers
-        composition = dlx.compose(
-            dlx.modifier(name="mu", parameter=mu),
-            dlx.modifier(name="sigma1", parameter=sigma, effect=dlx.effect.lnN((0.9, 1.1))),
+        composition = evm.compose(
+            evm.modifier(name="mu", parameter=mu),
+            evm.modifier(name="sigma1", parameter=sigma, effect=evm.effect.lnN((0.9, 1.1))),
         )
 
         # apply the composition
         composition(jnp.array([10, 20, 30]))
 
         # nest compositions
-        composition = dlx.compose(
+        composition = evm.compose(
             composition,
-            dlx.modifier(name="sigma2", parameter=sigma, effect=dlx.effect.lnN((0.8, 1.2))),
+            evm.modifier(name="sigma2", parameter=sigma, effect=evm.effect.lnN((0.8, 1.2))),
         )
 
         # jit
@@ -192,16 +192,16 @@ class staterror(ModifierBase):
     .. code-block:: python
 
         import jax.numpy as jnp
-        import dilax as dlx
+        import evermore as evm
 
         hist = jnp.array([10, 20, 30])
 
-        p1 = dlx.Parameter(value=1.0)
-        p2 = dlx.Parameter(value=0.0)
-        p3 = dlx.Parameter(value=0.0)
+        p1 = evm.Parameter(value=1.0)
+        p2 = evm.Parameter(value=0.0)
+        p3 = evm.Parameter(value=0.0)
 
         # all bins with bin content below 10 (threshold) are treated as poisson, else gauss
-        modify = dlx.staterror(
+        modify = evm.staterror(
             parameters={1: p1, 2: p2, 3: p3},
             sumw=hist,
             sumw2=hist,
@@ -352,7 +352,7 @@ class autostaterrors(eqx.Module):
     ) -> tuple[dict[str, dict[str, Parameter]], dict[str, dict[str, eqx.Partial]]]:
         """
         Helper to automatically create parameters used by `staterror`
-        for the initialisation of a `dlx.Model`.
+        for the initialisation of a `evm.Model`.
 
         *Caution*: This function is not compatible with JAX-transformations (e.g. `jax.jit`)!
 
@@ -361,7 +361,7 @@ class autostaterrors(eqx.Module):
             .. code-block:: python
 
                 import jax.numpy as jnp
-                import dilax as dlx
+                import evermore as evm
 
                 sumw = {
                     "signal": jnp.array([5, 20, 30]),
@@ -374,20 +374,20 @@ class autostaterrors(eqx.Module):
                 }
 
 
-                auto = dlx.autostaterrors(
+                auto = evm.autostaterrors(
                     sumw=sumw,
                     sumw2=sumw2,
                     threshold=10.0,
-                    mode=dlx.autostaterrors.Mode.barlow_beeston_full,
+                    mode=evm.autostaterrors.Mode.barlow_beeston_full,
                 )
                 parameters, staterrors = auto.prepare()
 
                 # barlow-beeston-lite
-                auto2 = dlx.autostaterrors(
+                auto2 = evm.autostaterrors(
                     sumw=sumw,
                     sumw2=sumw2,
                     threshold=10.0,
-                    mode=dlx.autostaterrors.Mode.barlow_beeston_lite,
+                    mode=evm.autostaterrors.Mode.barlow_beeston_lite,
                 )
                 parameters2, staterrors2 = auto2.prepare()
 

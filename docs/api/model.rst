@@ -1,6 +1,6 @@
-dilax.model
+evermore.model
 ================
 
-.. automodule:: dilax.model
+.. automodule:: evermore.model
     :show-inheritance:
     :members:

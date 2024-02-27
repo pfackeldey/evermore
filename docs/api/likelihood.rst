@@ -1,6 +1,6 @@
-dilax.likelihood
+evermore.likelihood
 ================
 
-.. automodule:: dilax.likelihood
+.. automodule:: evermore.likelihood
     :show-inheritance:
     :members:

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from jax.config import config
+from jax import config
 from model import init_values, model, observation, optimizer
 
-from dilax.likelihood import NLL
+from evermore.likelihood import NLL
 
 config.update("jax_enable_x64", True)
 

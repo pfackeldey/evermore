@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import equinox as eqx
-from jax.config import config
+from jax import config
 from model import init_values, model, observation, optimizer
 
-import dilax as dlx
+import evermore as evm
 
 config.update("jax_enable_x64", True)
 
 # create negative log likelihood
-nll = dlx.likelihood.NLL(model=model, observation=observation)
+nll = evm.likelihood.NLL(model=model, observation=observation)
 
 # fit
 params, state = optimizer.fit(fun=nll, init_values=init_values)
@@ -23,9 +23,9 @@ params_ = {k: v for k, v in params.items() if k == "mu"}
 grad_mu = fast_grad_nll(params_)
 
 # hessian + cov_matrix of nll of fitted model
-hessian = eqx.filter_jit(dlx.likelihood.Hessian(model=model, observation=observation))()
+hessian = eqx.filter_jit(evm.likelihood.Hessian(model=model, observation=observation))()
 
 # covariance matrix of fitted model
 covmatrix = eqx.filter_jit(
-    dlx.likelihood.CovMatrix(model=model, observation=observation)
+    evm.likelihood.CovMatrix(model=model, observation=observation)
 )()

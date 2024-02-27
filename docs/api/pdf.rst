@@ -1,6 +1,6 @@
-dilax.pdf
+evermore.pdf
 ================
 
-.. automodule:: dilax.pdf
+.. automodule:: evermore.pdf
     :show-inheritance:
     :members:

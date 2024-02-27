@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import jax
 
-from dilax.util import FrozenDB, as1darray
+from evermore.util import FrozenDB, as1darray
 
 
 def get_frozendb():

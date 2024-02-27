@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import dilax
+import evermore
 
-project = dilax.__name__
-copyright = dilax.__copyright__
-author = dilax.__author__
-version = release = dilax.__version__
+project = evermore.__name__
+copyright = evermore.__copyright__
+author = evermore.__author__
+version = release = evermore.__version__
 
 language = "en"
 
@@ -32,7 +32,7 @@ html_theme_options = {
     "home_page_in_toc": True,
     "show_navbar_depth": 2,
     "show_toc_level": 2,
-    "repository_url": "https://github.com/pfackeldey/dilax",
+    "repository_url": "https://github.com/pfackeldey/evermore",
     "use_repository_button": True,
     "use_issues_button": True,
     "use_edit_page_button": True,

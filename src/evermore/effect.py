@@ -6,10 +6,10 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-from dilax.custom_types import AddOrMul, ArrayLike
-from dilax.parameter import Parameter
-from dilax.pdf import Flat, Gauss, HashablePDF, Poisson
-from dilax.util import as1darray
+from evermore.custom_types import AddOrMul, ArrayLike
+from evermore.parameter import Parameter
+from evermore.pdf import Flat, Gauss, HashablePDF, Poisson
+from evermore.util import as1darray
 
 if TYPE_CHECKING:
     from typing import ClassVar as AbstractClassVar

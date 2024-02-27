@@ -5,12 +5,12 @@ from functools import partial
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jax.config import config
+from jax import config
 from model import asimov, model, optimizer
 
-from dilax import Model
-from dilax.likelihood import NLL
-from dilax.optimizer import JaxOptimizer
+from evermore import Model
+from evermore.likelihood import NLL
+from evermore.optimizer import JaxOptimizer
 
 config.update("jax_enable_x64", True)
 

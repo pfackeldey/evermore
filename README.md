@@ -1,6 +1,6 @@
-# dilax
+# evermore
 
-[![Documentation Status](https://readthedocs.org/projects/dilax/badge/?version=latest)](https://dilax.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/evermore/badge/?version=latest)](https://evermore.readthedocs.io/en/latest/?badge=latest)
 [![Actions Status][actions-badge]][actions-link]
 [![PyPI version][pypi-version]][pypi-link]
 [![PyPI platforms][pypi-platforms]][pypi-link]
@@ -10,14 +10,14 @@ Differentiable (binned) likelihoods in JAX.
 ## Installation
 
 ```bash
-python -m pip install dilax
+python -m pip install evermore
 ```
 
 From source:
 
 ```bash
-git clone https://github.com/pfackeldey/dilax
-cd dilax
+git clone https://github.com/pfackeldey/evermore
+cd evermore
 python -m pip install .
 ```
 
@@ -25,32 +25,32 @@ python -m pip install .
 
 See more in `examples/`
 
-_dilax_ in a nutshell:
+_evermore_ in a nutshell:
 
 ```python3
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-import dilax as dlx
+import evermore as evm
 
 jax.config.update("jax_enable_x64", True)
 
 
 # define a simple model with two processes and two parameters
-class MyModel(dlx.Model):
-    def __call__(self, processes: dict, parameters: dict) -> dlx.Result:
-        res = dlx.Result()
+class MyModel(evm.Model):
+    def __call__(self, processes: dict, parameters: dict) -> evm.Result:
+        res = evm.Result()
 
         # signal
-        mu_mod = dlx.modifier(
-            name="mu", parameter=parameters["mu"], effect=dlx.effect.unconstrained()
+        mu_mod = evm.modifier(
+            name="mu", parameter=parameters["mu"], effect=evm.effect.unconstrained()
         )
         res.add(process="signal", expectation=mu_mod(processes["signal"]))
 
         # background
-        bkg_mod = dlx.modifier(
-            name="sigma", parameter=parameters["sigma"], effect=dlx.effect.gauss(0.2)
+        bkg_mod = evm.modifier(
+            name="sigma", parameter=parameters["sigma"], effect=evm.effect.gauss(0.2)
         )
         res.add(process="background", expectation=bkg_mod(processes["background"]))
         return res
@@ -59,19 +59,19 @@ class MyModel(dlx.Model):
 # setup model
 processes = {"signal": jnp.array([10.0]), "background": jnp.array([50.0])}
 parameters = {
-    "mu": dlx.Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
-    "sigma": dlx.Parameter(value=jnp.array([0.0])),
+    "mu": evm.Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
+    "sigma": evm.Parameter(value=jnp.array([0.0])),
 }
 model = MyModel(processes=processes, parameters=parameters)
 
 # define negative log-likelihood with data (observation)
-nll = dlx.likelihood.NLL(model=model, observation=jnp.array([64.0]))
+nll = evm.likelihood.NLL(model=model, observation=jnp.array([64.0]))
 # jit it!
 fast_nll = eqx.filter_jit(nll)
 
 # setup fit: initial values of parameters and a suitable optimizer
 init_values = model.parameter_values
-optimizer = dlx.optimizer.JaxOptimizer.make(
+optimizer = evm.optimizer.JaxOptimizer.make(
     name="ScipyMinimize", settings={"method": "trust-constr"}
 )
 
@@ -96,7 +96,7 @@ print(eqx.filter_grad(nll)({"sigma": jnp.array([0.2])}))
 @eqx.filter_grad
 @eqx.filter_jit
 def grad_postfit_nll(where: dict[str, jax.Array]) -> dict[str, jax.Array]:
-    nll = dlx.likelihood.NLL(
+    nll = evm.likelihood.NLL(
         model=model.update(values=values), observation=jnp.array([64.0])
     )
     return nll(where)
@@ -115,9 +115,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on how to contribute.
 Distributed under the terms of the [BSD license](LICENSE).
 
 <!-- prettier-ignore-start -->
-[actions-badge]:            https://github.com/pfackeldey/dilax/workflows/CI/badge.svg
-[actions-link]:             https://github.com/pfackeldey/dilax/actions
-[pypi-link]:                https://pypi.org/project/dilax/
-[pypi-platforms]:           https://img.shields.io/pypi/pyversions/dilax
-[pypi-version]:             https://img.shields.io/pypi/v/dilax
+[actions-badge]:            https://github.com/pfackeldey/evermore/workflows/CI/badge.svg
+[actions-link]:             https://github.com/pfackeldey/evermore/actions
+[pypi-link]:                https://pypi.org/project/evermore/
+[pypi-platforms]:           https://img.shields.io/pypi/pyversions/evermore
+[pypi-version]:             https://img.shields.io/pypi/v/evermore
 <!-- prettier-ignore-end -->

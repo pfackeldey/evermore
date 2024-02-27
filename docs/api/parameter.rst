@@ -1,6 +1,6 @@
-dilax.parameter
+evermore.parameter
 ================
 
-.. automodule:: dilax.parameter
+.. automodule:: evermore.parameter
     :show-inheritance:
     :members:

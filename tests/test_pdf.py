@@ -3,7 +3,7 @@ from __future__ import annotations
 import jax.numpy as jnp
 import pytest
 
-from dilax.pdf import Flat, Gauss, Poisson
+from evermore.pdf import Flat, Gauss, Poisson
 
 
 def test_flat():

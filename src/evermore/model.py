@@ -8,9 +8,9 @@ import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 
-from dilax.custom_types import Sentinel, _NoValue
-from dilax.parameter import Parameter
-from dilax.util import deep_update
+from evermore.custom_types import Sentinel, _NoValue
+from evermore.parameter import Parameter
+from evermore.util import deep_update
 
 __all__ = [
     "Result",
@@ -57,20 +57,20 @@ class Model(eqx.Module):
         import jax
         import jax.numpy as jnp
 
-        import dilax as dlx
+        import evermore as evm
 
 
         # Define a simple model with two processes and two parameters
-        class MyModel(dlx.Model):
-            def __call__(self, processes: dict, parameters: dict) -> dlx.Result:
-                res = dlx.Result()
+        class MyModel(evm.Model):
+            def __call__(self, processes: dict, parameters: dict) -> evm.Result:
+                res = evm.Result()
 
                 # signal
-                mu_mod = dlx.modifier(name="mu", parameter=parameters["mu"], effect=dlx.effect.unconstrained())
+                mu_mod = evm.modifier(name="mu", parameter=parameters["mu"], effect=evm.effect.unconstrained())
                 res.add(process="signal", expectation=mu_mod(processes["signal"]))
 
                 # background
-                bkg_mod = dlx.modifier(name="sigma", parameter=parameters["sigma"], effect=dlx.effect.lnN(0.2))
+                bkg_mod = evm.modifier(name="sigma", parameter=parameters["sigma"], effect=evm.effect.lnN(0.2))
                 res.add(process="background", expectation=bkg_mod(processes["background"]))
                 return res
 
@@ -78,8 +78,8 @@ class Model(eqx.Module):
         # Setup model
         processes = {"signal": jnp.array([10]), "background": jnp.array([50])}
         parameters = {
-            "mu": dlx.Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
-            "sigma": dlx.Parameter(value=jnp.array([0.0])),
+            "mu": evm.Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
+            "sigma": evm.Parameter(value=jnp.array([0.0])),
         }
 
         model = MyModel(processes=processes, parameters=parameters)

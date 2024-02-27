@@ -1,5 +1,5 @@
 """
-dilax: Differentiable (binned) likelihoods in JAX.
+evermore: Differentiable (binned) likelihoods in JAX.
 """
 from __future__ import annotations
 
@@ -7,10 +7,10 @@ __author__ = "Peter Fackeldey"
 __email__ = "peter.fackeldey@rwth-aachen.de"
 __copyright__ = "Copyright 2023, Peter Fackeldey"
 __credits__ = ["Peter Fackeldey"]
-__contact__ = "https://github.com/pfackeldey/dilax"
+__contact__ = "https://github.com/pfackeldey/evermore"
 __license__ = "BSD-3-Clause"
 __status__ = "Development"
-__version__ = "0.1.6"
+__version__ = "0.2.0"
 
 
 # expose public API
@@ -38,7 +38,7 @@ def __dir__():
     return __all__
 
 
-from dilax import (  # noqa: E402
+from evermore import (  # noqa: E402
     effect,
     ipy_util,
     likelihood,
@@ -46,11 +46,11 @@ from dilax import (  # noqa: E402
     pdf,
     util,
 )
-from dilax.model import Model, Result  # noqa: E402
-from dilax.modifier import (  # noqa: E402
+from evermore.model import Model, Result  # noqa: E402
+from evermore.modifier import (  # noqa: E402
     autostaterrors,
     compose,
     modifier,
     staterror,
 )
-from dilax.parameter import Parameter  # noqa: E402
+from evermore.parameter import Parameter  # noqa: E402

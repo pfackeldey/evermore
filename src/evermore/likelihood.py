@@ -4,8 +4,8 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-from dilax.custom_types import Sentinel, _NoValue
-from dilax.model import Model
+from evermore.custom_types import Sentinel, _NoValue
+from evermore.model import Model
 
 __all__ = [
     "NLL",

@@ -4,8 +4,8 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-from dilax.pdf import HashablePDF
-from dilax.util import as1darray
+from evermore.pdf import HashablePDF
+from evermore.util import as1darray
 
 __all__ = [
     "Parameter",

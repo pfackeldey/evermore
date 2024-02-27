@@ -1,6 +1,6 @@
-dilax.optimizer
+evermore.optimizer
 ================
 
-.. automodule:: dilax.optimizer
+.. automodule:: evermore.optimizer
     :show-inheritance:
     :members:

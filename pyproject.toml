@@ -2,7 +2,7 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 [project]
-name = "dilax"
+name = "evermore"
 authors = [
     { name = "Peter Fackeldey", email = "peter.fackeldey@rwth-aachen.de" },
 ]
@@ -24,7 +24,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Typing :: Typed",
 ]
-dynamic = ["version"] # version is set in src/dilax/__init__.py
+dynamic = ["version"] # version is set in src/evermore/__init__.py
 dependencies = [
     "equinox>=0.10.6", # eqx.field
     "jaxopt >=0.6",    # jaxopt.LGBFGS
@@ -43,14 +43,14 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/pfackeldey/dilax"
-"Bug Tracker" = "https://github.com/pfackeldey/dilax/issues"
-Discussions = "https://github.com/pfackeldey/dilax/discussions"
-Changelog = "https://github.com/pfackeldey/dilax/releases"
+Homepage = "https://github.com/pfackeldey/evermore"
+"Bug Tracker" = "https://github.com/pfackeldey/evermore/issues"
+Discussions = "https://github.com/pfackeldey/evermore/discussions"
+Changelog = "https://github.com/pfackeldey/evermore/releases"
 
 
 [tool.hatch]
-version.path = "src/dilax/__init__.py"
+version.path = "src/evermore/__init__.py"
 envs.default.dependencies = ["pytest", "pytest-cov"]
 
 [tool.pytest.ini_options]
@@ -63,7 +63,7 @@ testpaths = ["tests"]
 
 
 [tool.coverage]
-run.source = ["dilax"]
+run.source = ["evermore"]
 port.exclude_lines = ['pragma: no cover', '\.\.\.', 'if typing.TYPE_CHECKING:']
 
 

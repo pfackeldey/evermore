@@ -3,12 +3,12 @@ from __future__ import annotations
 import jax.numpy as jnp
 import pytest
 
-import dilax as dlx
-from dilax.pdf import Flat, Gauss, Poisson
+import evermore as evm
+from evermore.pdf import Flat, Gauss, Poisson
 
 
 def test_parameter():
-    p = dlx.Parameter(value=jnp.array(1.0), bounds=(jnp.array(0.0), jnp.array(2.0)))
+    p = evm.Parameter(value=jnp.array(1.0), bounds=(jnp.array(0.0), jnp.array(2.0)))
 
     assert p.value == 1.0
     assert p.update(jnp.array(2.0)).value == 2.0
@@ -19,8 +19,8 @@ def test_parameter():
 
 
 def test_unconstrained():
-    p = dlx.Parameter(value=jnp.array(1.0))
-    u = dlx.effect.unconstrained()
+    p = evm.Parameter(value=jnp.array(1.0))
+    u = evm.effect.unconstrained()
 
     assert u.constraint == Flat()
     assert u.scale_factor(p, jnp.array(1.0)) == pytest.approx(1.0)
@@ -30,8 +30,8 @@ def test_unconstrained():
 
 
 def test_gauss():
-    p = dlx.Parameter(value=jnp.array(0.0))
-    g = dlx.effect.gauss(width=jnp.array(1.0))
+    p = evm.Parameter(value=jnp.array(0.0))
+    g = evm.effect.gauss(width=jnp.array(1.0))
 
     assert g.constraint == Gauss(mean=0.0, width=1.0)
     assert g.scale_factor(p, jnp.array(1.0)) == pytest.approx(1.0)
@@ -41,8 +41,8 @@ def test_gauss():
 
 
 def test_lnN():
-    p = dlx.Parameter(value=jnp.array(0.0))
-    ln = dlx.effect.lnN(width=(0.9, 1.1))
+    p = evm.Parameter(value=jnp.array(0.0))
+    ln = evm.effect.lnN(width=(0.9, 1.1))
 
     assert ln.constraint == Gauss(mean=0.0, width=1.0)
     assert ln.scale_factor(p, jnp.array(1.0)) == pytest.approx(1.0)
@@ -50,8 +50,8 @@ def test_lnN():
 
 
 def test_poisson():
-    # p = dlx.Parameter(value=jnp.array(0.0))
-    po = dlx.effect.poisson(lamb=jnp.array(10))
+    # p = evm.Parameter(value=jnp.array(0.0))
+    po = evm.effect.poisson(lamb=jnp.array(10))
 
     assert po.constraint == Poisson(lamb=jnp.array(10))
     # assert po.scale_factor(p, jnp.array(1.0)) == pytest.approx(1.0) # FIXME
@@ -63,24 +63,24 @@ def test_shape():
 
 
 def test_modifier():
-    mu = dlx.Parameter(value=jnp.array(1.1))
-    norm = dlx.Parameter(value=jnp.array(0.0))
+    mu = evm.Parameter(value=jnp.array(1.1))
+    norm = evm.Parameter(value=jnp.array(0.0))
 
     # unconstrained effect
-    m_unconstrained = dlx.modifier(
-        name="mu", parameter=mu, effect=dlx.effect.unconstrained()
+    m_unconstrained = evm.modifier(
+        name="mu", parameter=mu, effect=evm.effect.unconstrained()
     )
     assert m_unconstrained(jnp.array([10])) == pytest.approx(11)
 
     # gauss effect
-    m_gauss = dlx.modifier(
-        name="norm", parameter=norm, effect=dlx.effect.gauss(jnp.array(0.1))
+    m_gauss = evm.modifier(
+        name="norm", parameter=norm, effect=evm.effect.gauss(jnp.array(0.1))
     )
     assert m_gauss(jnp.array([10])) == pytest.approx(10)
 
     # lnN effect
-    m_lnN = dlx.modifier(
-        name="norm", parameter=norm, effect=dlx.effect.lnN(width=(0.9, 1.1))
+    m_lnN = evm.modifier(
+        name="norm", parameter=norm, effect=evm.effect.lnN(width=(0.9, 1.1))
     )
     assert m_lnN(jnp.array([10])) == pytest.approx(10)
 
@@ -95,20 +95,20 @@ def test_modifier():
 
 
 def test_compose():
-    mu = dlx.Parameter(value=jnp.array(1.1))
-    norm = dlx.Parameter(value=jnp.array(0.0))
+    mu = evm.Parameter(value=jnp.array(1.1))
+    norm = evm.Parameter(value=jnp.array(0.0))
 
     # unconstrained effect
-    m_unconstrained = dlx.modifier(
-        name="mu", parameter=mu, effect=dlx.effect.unconstrained()
+    m_unconstrained = evm.modifier(
+        name="mu", parameter=mu, effect=evm.effect.unconstrained()
     )
     # gauss effect
-    m_gauss = dlx.modifier(
-        name="norm", parameter=norm, effect=dlx.effect.gauss(jnp.array(0.1))
+    m_gauss = evm.modifier(
+        name="norm", parameter=norm, effect=evm.effect.gauss(jnp.array(0.1))
     )
 
     # compose
-    m = dlx.compose(m_unconstrained, m_gauss)
+    m = evm.compose(m_unconstrained, m_gauss)
 
     assert len(m) == 2
     assert m(jnp.array([10])) == pytest.approx(11)

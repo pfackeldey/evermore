@@ -6,7 +6,7 @@ import jax
 import jaxopt
 import pytest
 
-from dilax.optimizer import JaxOptimizer
+from evermore.optimizer import JaxOptimizer
 
 
 def test_jaxoptimizer():
