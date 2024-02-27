@@ -15,9 +15,11 @@ python = ">3.9,<=3.11"
 ipython = "*"
 jaxlib = "*"
 jax = "*"
+myst-parser = "*"
 
 [host-dependencies]
 pip = "*"
+sphinx = "*"
 
 [tasks]
 postinstall = "pip install -e '.[dev]' && pip install pre-commit && pre-commit install"

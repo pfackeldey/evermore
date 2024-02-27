@@ -12,7 +12,7 @@ language = "en"
 templates_path = ["_templates"]
 html_static_path = ["_static"]
 master_doc = "index"
-source_suffix = ".rst"
+source_suffix = [".rst", ".md"]
 pygments_style = "sphinx"
 add_module_names = False
 
@@ -28,7 +28,7 @@ exclude_patterns = [
 html_title = f"{project} v{version}"
 html_theme = "sphinx_book_theme"
 html_theme_options = {
-    "logo_only": True,
+    # "logo_only": True,
     "home_page_in_toc": True,
     "show_navbar_depth": 2,
     "show_toc_level": 2,
@@ -45,10 +45,8 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
     "sphinx.ext.autosectionlabel",
-    "autodocsumm",
     "myst_parser",
     "sphinx_copybutton",
-    "sphinx_lfs_content",
 ]
 
 myst_enable_extensions = [
