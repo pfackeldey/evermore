@@ -37,6 +37,7 @@ html_theme_options = {
     "use_issues_button": True,
     "use_edit_page_button": True,
 }
+html_context = {"default_mode": "light"}
 
 extensions = [
     "sphinx.ext.autodoc",
