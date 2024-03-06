@@ -10,9 +10,12 @@ class LinearConstrained(eqx.Module):
     biases: jax.Array
 
     def __init__(self, in_size, out_size, key):
-        self.biases = jax.random.normal(key, (out_size,))
-        self.weights = evm.Parameter(value=jax.random.normal(key, (out_size, in_size)))
+        wkey, bkey = jax.random.split(key)
+        # weights
+        self.weights = evm.Parameter(value=jax.random.normal(wkey, (out_size, in_size)))
         self.weights.constraints.add(evm.pdf.Gauss(mean=0.0, width=0.5))
+        # biases
+        self.biases = jax.random.normal(bkey, (out_size,))
 
     def __call__(self, x: jax.Array):
         return self.weights.value @ x + self.biases
