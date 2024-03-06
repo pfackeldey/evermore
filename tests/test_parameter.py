@@ -76,7 +76,9 @@ def test_modifier():
     assert m_gauss(jnp.array([10])) == pytest.approx(10)
 
     # lnN effect
-    m_lnN = evm.modifier(parameter=norm, effect=evm.effect.lnN(width=(0.9, 1.1)))
+    m_lnN = evm.modifier(
+        parameter=norm, effect=evm.effect.lnN(width=jnp.array([0.9, 1.1]))
+    )
     assert m_lnN(jnp.array([10])) == pytest.approx(10)
 
     # poisson effect # FIXME
