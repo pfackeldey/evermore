@@ -60,15 +60,10 @@ class PoissonNLL(eqx.Module):
         return jax.scipy.stats.poisson.logpmf
 
     @jax.named_scope("evm.loss.PoissonNLL")
-    def __call__(
-        self, expectation: Array, observation: Array, constraint: Array
-    ) -> Array:
+    def __call__(self, expectation: Array, observation: Array) -> Array:
         # poisson log-likelihood
-        nll = jnp.sum(
+        return jnp.sum(
             self.logpdf(observation, expectation)
             - self.logpdf(observation, observation),
             axis=-1,
         )
-        # add constraint
-        nll += constraint
-        return -jnp.sum(nll)

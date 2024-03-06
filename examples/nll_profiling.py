@@ -32,11 +32,13 @@ def fixed_mu_fit(mu: Array) -> Array:
         model = eqx.combine(diff_model, static_model)
         expectations = model(hists)
         constraints = evm.loss.get_param_constraints(model)
-        return nll(
+        loss_val = nll(
             expectation=evm.util.sum_leaves(expectations),
             observation=observation,
-            constraint=evm.util.sum_leaves(constraints),
         )
+        # add constraint
+        loss_val += evm.util.sum_leaves(constraints)
+        return -2 * jnp.sum(loss_val)
 
     @eqx.filter_jit
     def make_step(model, opt_state, events, observation):
@@ -60,7 +62,8 @@ mus = jnp.linspace(0, 5, 11)
 for mu in mus:
     print(f"[for-loop] mu={mu:.2f} - NLL={fixed_mu_fit(jnp.array(mu)):.6f}")
 
+
 # or vectorized!!!
 likelihood_scan = jax.vmap(fixed_mu_fit)(mus)
 for mu, nll in zip(mus, likelihood_scan, strict=False):
-    print(f"[vectorized] mu={mu:.2f} - NLL={nll:.6f}")
+    print(f"[jax.vmap] mu={mu:.2f} - NLL={nll:.6f}")

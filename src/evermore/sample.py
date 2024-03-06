@@ -20,7 +20,7 @@ def toy_module(module: eqx.Module, key: PRNGKeyArray) -> PyTree[Callable]:
 
     def _sample(param: Parameter, key: Parameter) -> Array:
         if not param.constraints:
-            msg = f"Parameter {param} has no constraint pdf, can't sample from it."
+            msg = f"Parameter {param} has no constraint pdf, can't sample from it. Maybe you need to call the model once to populate all constraints?"
             raise RuntimeError(msg)
         if len(param.constraints) > 1:
             msg = f"More than one constraint per parameter is not allowed. Got: {param.constraints}"
