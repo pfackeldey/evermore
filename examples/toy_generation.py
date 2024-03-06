@@ -1,31 +1,43 @@
-from __future__ import annotations
+from typing import Any
 
 import equinox as eqx
 import jax
-from jax import config
-from model import init_values, model, observation, optimizer
+from jaxtyping import Array, PRNGKeyArray
+from model import hists, model, observation
 
-from evermore.likelihood import NLL, SampleToy
+import evermore as evm
 
-config.update("jax_enable_x64", True)
+key = jax.random.PRNGKey(0)
+
+# generate a new model with sampled parameters according to their constraint pdfs
+toymodel = evm.sample.toy_module(model, key)
 
 
-# create negative log likelihood
-nll = NLL(model=model, observation=observation)
+# generate new expectation based on the toy model
+def toy_expectation(
+    key: PRNGKeyArray,
+    module: eqx.Module,
+    hists: dict[Any, Array],
+) -> Array:
+    toymodel = evm.sample.toy_module(model, key)
+    expectations = toymodel(hists)
+    return evm.util.sum_leaves(expectations)
 
-# fit
-values, state = optimizer.fit(fun=nll, init_values=init_values)
 
-# create sampling method
-sample_toy = SampleToy(model=model, observation=observation)
-# vectorise and jit
-sample_toys = eqx.filter_vmap(in_axes=(None, 0))(eqx.filter_jit(sample_toy))
+expectation = toy_expectation(key, model, hists)
 
-sample_toy(values, jax.random.PRNGKey(1234))
 
-# sample 10 toys based on fitted parameters
-keys = jax.random.split(jax.random.PRNGKey(1234), num=10)
-# postfit toys
-toys_postfit = sample_toys(values, keys)
-# prefit toys
-toys_prefit = sample_toys(init_values, keys)
+# generate a new expectations vectorized over many keys
+keys = jax.random.split(key, 1000)
+
+# vectorized toy expectation
+toy_expectation_vec = jax.vmap(toy_expectation, in_axes=(0, None, None))
+expectations = toy_expectation_vec(keys, model, hists)
+
+
+# just sample observations with poisson
+poisson_obs = evm.pdf.Poisson(observation)
+sampled_observation = poisson_obs.sample(key)
+
+# vectorized sampling
+sampled_observations = jax.vmap(poisson_obs.sample)(keys)

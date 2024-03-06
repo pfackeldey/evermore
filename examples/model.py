@@ -1,94 +1,79 @@
 from __future__ import annotations
 
+from typing import Any
+
+import equinox as eqx
+import jax
 import jax.numpy as jnp
 
 import evermore as evm
 
 
-class SPlusBModel(evm.Model):
-    def __call__(self, processes: dict, parameters: dict) -> evm.Result:
-        res = evm.Result()
+class SPlusBModel(eqx.Module):
+    mu: evm.Parameter
+    norm1: evm.Parameter
+    norm2: evm.Parameter
+    shape1: evm.Parameter
 
-        mu_modifier = evm.modifier(
-            name="mu", parameter=parameters["mu"], effect=evm.effect.unconstrained()
+    def __init__(self) -> None:
+        self.mu = evm.Parameter(value=jnp.array([1.0]))
+        self.norm1 = evm.Parameter()
+        self.norm2 = evm.Parameter()
+        self.shape1 = evm.Parameter()
+
+    def __call__(self, hists: dict[Any, jax.Array]) -> dict[str, jax.Array]:
+        expectations = {}
+
+        # signal process
+        sig_mod = self.mu.unconstrained()
+        expectations["signal"] = sig_mod(hists[("signal", "nominal")])
+
+        # bkg1 process
+        bkg1_mod = self.norm1.lnN(width=jnp.array([0.9, 1.1])) @ self.shape1.shape(
+            up=hists[("bkg1", "shape_up")],
+            down=hists[("bkg1", "shape_down")],
         )
-        res.add(
-            process="signal",
-            expectation=mu_modifier(processes[("signal", "nominal")]),
+        expectations["bkg1"] = bkg1_mod(hists[("bkg1", "nominal")])
+
+        # bkg2 process
+        bkg2_mod = self.norm2.lnN(width=jnp.array([0.95, 1.05])) @ self.shape1.shape(
+            up=hists[("bkg2", "shape_up")],
+            down=hists[("bkg2", "shape_down")],
         )
+        expectations["bkg2"] = bkg2_mod(hists[("bkg2", "nominal")])
 
-        bkg1_modifier = evm.compose(
-            evm.modifier(
-                name="lnN1",
-                parameter=parameters["norm1"],
-                effect=evm.effect.lnN((0.9, 1.1)),
-            ),
-            evm.modifier(
-                name="shape1_bkg1",
-                parameter=parameters["shape1"],
-                effect=evm.effect.shape(
-                    up=processes[("background1", "shape_up")],
-                    down=processes[("background1", "shape_down")],
-                ),
-            ),
-        )
-        res.add(
-            process="background1",
-            expectation=bkg1_modifier(processes[("background1", "nominal")]),
-        )
-
-        bkg2_modifier = evm.compose(
-            evm.modifier(
-                name="lnN2",
-                parameter=parameters["norm2"],
-                effect=evm.effect.lnN((0.95, 1.05)),
-            ),
-            evm.modifier(
-                name="shape1_bkg2",
-                parameter=parameters["shape1"],
-                effect=evm.effect.shape(
-                    up=processes[("background2", "shape_up")],
-                    down=processes[("background2", "shape_down")],
-                ),
-            ),
-        )
-        res.add(
-            process="background2",
-            expectation=bkg2_modifier(processes[("background2", "nominal")]),
-        )
-        return res
+        # return the modified expectations
+        return expectations
 
 
-def create_model():
-    processes = {
-        ("signal", "nominal"): jnp.array([3]),
-        ("background1", "nominal"): jnp.array([10]),
-        ("background2", "nominal"): jnp.array([20]),
-        ("background1", "shape_up"): jnp.array([12]),
-        ("background1", "shape_down"): jnp.array([8]),
-        ("background2", "shape_up"): jnp.array([23]),
-        ("background2", "shape_down"): jnp.array([19]),
-    }
-    parameters = {
-        "mu": evm.Parameter(value=jnp.array([1.0]), bounds=(0.0, jnp.inf)),
-        "norm1": evm.Parameter(value=jnp.array([0.0])),
-        "norm2": evm.Parameter(value=jnp.array([0.0])),
-        "shape1": evm.Parameter(value=jnp.array([0.0])),
-    }
-
-    # return model
-    return SPlusBModel(processes=processes, parameters=parameters)
+model = SPlusBModel()
 
 
-model = create_model()
+hists = {
+    ("signal", "nominal"): jnp.array([3]),
+    ("bkg1", "nominal"): jnp.array([10]),
+    ("bkg2", "nominal"): jnp.array([20]),
+    ("bkg1", "shape_up"): jnp.array([12]),
+    ("bkg1", "shape_down"): jnp.array([8]),
+    ("bkg2", "shape_up"): jnp.array([23]),
+    ("bkg2", "shape_down"): jnp.array([19]),
+}
 
-init_values = model.parameter_values
 observation = jnp.array([37])
-asimov = model.evaluate().expectation()
+
+nll = evm.loss.PoissonNLL()
 
 
-# create optimizer (from `jaxopt`)
-optimizer = evm.optimizer.JaxOptimizer.make(
-    name="LBFGS",
-    settings={"maxiter": 5, "jit": True, "unroll": True},
-)
+@eqx.filter_jit
+def loss(model, hists, observation):
+    expectations = model(hists)
+    constraints = evm.loss.get_param_constraints(model)
+    return nll(
+        expectation=evm.util.sum_leaves(expectations),
+        observation=observation,
+        constraint=evm.util.sum_leaves(constraints),
+    )
+
+
+loss_val = loss(model, hists, observation)
+grads = eqx.filter_grad(loss)(model, hists, observation)

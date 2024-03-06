@@ -8,11 +8,12 @@ from evermore.pdf import Flat, Gauss, Poisson
 
 
 def test_parameter():
-    p = evm.Parameter(value=jnp.array(1.0), bounds=(jnp.array(0.0), jnp.array(2.0)))
+    p = evm.Parameter(value=jnp.array(1.0), lower=jnp.array(0.0), upper=jnp.array(2.0))
 
     assert p.value == 1.0
     assert p.update(jnp.array(2.0)).value == 2.0
-    assert p.bounds == (0.0, 2.0)
+    assert p.lower == 0.0
+    assert p.upper == 2.0
 
     assert p.boundary_penalty == 0.0
     assert p.update(jnp.array(3.0)).boundary_penalty == jnp.inf
@@ -42,7 +43,7 @@ def test_gauss():
 
 def test_lnN():
     p = evm.Parameter(value=jnp.array(0.0))
-    ln = evm.effect.lnN(width=(0.9, 1.1))
+    ln = evm.effect.lnN(width=jnp.array([0.9, 1.1]))
 
     assert ln.constraint == Gauss(mean=0.0, width=1.0)
     assert ln.scale_factor(p, jnp.array(1.0)) == pytest.approx(1.0)
@@ -67,21 +68,15 @@ def test_modifier():
     norm = evm.Parameter(value=jnp.array(0.0))
 
     # unconstrained effect
-    m_unconstrained = evm.modifier(
-        name="mu", parameter=mu, effect=evm.effect.unconstrained()
-    )
+    m_unconstrained = evm.modifier(parameter=mu, effect=evm.effect.unconstrained())
     assert m_unconstrained(jnp.array([10])) == pytest.approx(11)
 
     # gauss effect
-    m_gauss = evm.modifier(
-        name="norm", parameter=norm, effect=evm.effect.gauss(jnp.array(0.1))
-    )
+    m_gauss = evm.modifier(parameter=norm, effect=evm.effect.gauss(jnp.array(0.1)))
     assert m_gauss(jnp.array([10])) == pytest.approx(10)
 
     # lnN effect
-    m_lnN = evm.modifier(
-        name="norm", parameter=norm, effect=evm.effect.lnN(width=(0.9, 1.1))
-    )
+    m_lnN = evm.modifier(parameter=norm, effect=evm.effect.lnN(width=(0.9, 1.1)))
     assert m_lnN(jnp.array([10])) == pytest.approx(10)
 
     # poisson effect # FIXME
@@ -99,13 +94,9 @@ def test_compose():
     norm = evm.Parameter(value=jnp.array(0.0))
 
     # unconstrained effect
-    m_unconstrained = evm.modifier(
-        name="mu", parameter=mu, effect=evm.effect.unconstrained()
-    )
+    m_unconstrained = evm.modifier(parameter=mu, effect=evm.effect.unconstrained())
     # gauss effect
-    m_gauss = evm.modifier(
-        name="norm", parameter=norm, effect=evm.effect.gauss(jnp.array(0.1))
-    )
+    m_gauss = evm.modifier(parameter=norm, effect=evm.effect.gauss(jnp.array(0.1)))
 
     # compose
     m = evm.compose(m_unconstrained, m_gauss)

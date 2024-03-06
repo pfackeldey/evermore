@@ -1,10 +1,9 @@
 from collections.abc import Callable
 from typing import Any
 
-import jax
+import jaxtyping
 
-ArrayLike = jax.typing.ArrayLike
-AddOrMul = Callable[[ArrayLike, ArrayLike], jax.Array]
+AddOrMul = Callable[[jaxtyping.ArrayLike, jaxtyping.ArrayLike], jaxtyping.Array]
 
 
 class Sentinel:

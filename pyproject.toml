@@ -27,12 +27,11 @@ classifiers = [
 dynamic = ["version"] # version is set in src/evermore/__init__.py
 dependencies = [
     "equinox>=0.10.6", # eqx.field
-    "jaxopt >=0.6",    # jaxopt.LGBFGS
 ]
 
 [project.optional-dependencies]
 test = ["pytest >=6", "pytest-cov >=3"]
-dev = ["pytest >=6", "pytest-cov >=3"]
+dev = ["pytest >=6", "pytest-cov >=3", "optax", "jaxopt >=0.6"]
 docs = [
     "sphinx>=7.0",
     "myst_parser>=0.13",
