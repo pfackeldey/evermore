@@ -19,6 +19,7 @@ __all__ = [
     "__version__",
     "effect",
     "loss",
+    "parameter",
     "pdf",
     "util",
     "sample",
@@ -38,6 +39,7 @@ def __dir__():
 from evermore import (  # noqa: E402
     effect,
     loss,
+    parameter,
     pdf,
     sample,
     util,

@@ -17,9 +17,7 @@ class SPlusBModel(eqx.Module):
 
     def __init__(self) -> None:
         self.mu = evm.Parameter(value=jnp.array([1.0]))
-        self.norm1 = evm.Parameter()
-        self.norm2 = evm.Parameter()
-        self.shape1 = evm.Parameter()
+        self = evm.parameter.auto_init(self)
 
     def __call__(self, hists: dict[Any, jax.Array]) -> dict[str, jax.Array]:
         expectations = {}

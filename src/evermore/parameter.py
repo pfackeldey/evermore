@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "Parameter",
+    "auto_init",
 ]
 
 
@@ -76,3 +77,16 @@ class Parameter(eqx.Module):
         import evermore as evm
 
         return evm.modifier(parameter=self, effect=evm.effect.shape(up=up, down=down))
+
+
+def auto_init(module: eqx.Module) -> eqx.Module:
+    import dataclasses
+    import typing
+
+    type_hints = typing.get_type_hints(module.__class__)
+    for field in dataclasses.fields(module):
+        name = field.name
+        hint = type_hints[name]
+        if issubclass(hint, Parameter) and not hasattr(module, name):
+            setattr(module, name, hint())
+    return module
