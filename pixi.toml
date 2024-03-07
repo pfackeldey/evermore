@@ -16,6 +16,9 @@ ipython = "*"
 jaxlib = "*"
 jax = "*"
 myst-parser = "*"
+matplotlib = "*"
+mplhep = "*"
+imageio = "*"
 
 [host-dependencies]
 pip = "*"
