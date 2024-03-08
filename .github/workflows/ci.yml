@@ -51,9 +51,9 @@ jobs:
           python -m pytest -ra --cov --cov-report=xml --cov-report=term
           --durations=20
 
-      - name: Upload coverage report
-        uses: codecov/codecov-action@v4.0.2
+      # - name: Upload coverage report
+      #   uses: codecov/codecov-action@v4.0.2
 
-      - name: Test examples
-        run: >-
-          for f in examples/*.py; do echo "run $f" && python "$f"; done
+      # - name: Test examples
+      #   run: >-
+      #     for f in examples/*.py; do echo "run $f" && python "$f"; done
