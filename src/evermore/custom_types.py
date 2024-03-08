@@ -7,7 +7,7 @@ AddOrMul = Callable[[jaxtyping.ArrayLike, jaxtyping.ArrayLike], jaxtyping.Array]
 
 
 class Sentinel:
-    __slots__ = ("repr",)
+    repr: str
 
     def __init__(self, repr: str) -> None:
         self.repr = repr

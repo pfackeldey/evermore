@@ -1,19 +1,22 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, ArrayLike, Float
+import jax.tree_util as jtu
+from jaxtyping import Array, ArrayLike, Float, PyTree
 
-from evermore.pdf import HashablePDF
+from evermore.custom_types import Sentinel, _NoValue
+from evermore.pdf import PDF
 from evermore.util import as1darray
 
 if TYPE_CHECKING:
-    from evermore.modifier import modifier
+    from evermore.modifier import Modifier
 
 __all__ = [
     "Parameter",
+    "staterrors",
     "auto_init",
 ]
 
@@ -26,23 +29,38 @@ class Parameter(eqx.Module):
     value: Array = eqx.field(converter=as1darray)
     lower: Array = eqx.field(static=True, converter=as1darray)
     upper: Array = eqx.field(static=True, converter=as1darray)
-    constraints: set[HashablePDF] = eqx.field(static=True)
+    constraint: PDF | Sentinel = eqx.field(static=True)
 
     def __init__(
         self,
         value: ArrayLike = 0.0,
         lower: ArrayLike = -jnp.inf,
         upper: ArrayLike = jnp.inf,
+        constraint: PDF | Sentinel = _NoValue,
     ) -> None:
         self.value = as1darray(value)
         self.lower = as1darray(lower)
         self.upper = as1darray(upper)
-        self.constraints: set[HashablePDF] = set()
+        self.constraint = constraint
 
-    def update(self, value: Array | Parameter) -> Parameter:
-        if isinstance(value, Parameter):
-            value = value.value
-        return eqx.tree_at(lambda t: t.value, self, value)
+    def _set_constraint(self, constraint: PDF, overwrite: bool = False) -> PDF:
+        # Frozen dataclasses don't support setting attributes so we have to
+        # overload that operation here as they do in the dataclass implementation
+        assert isinstance(constraint, PDF)
+
+        # If no constraint is set or overwriting is allowed, set it and return.
+        if self.constraint is _NoValue or overwrite:
+            object.__setattr__(self, "constraint", constraint)
+            return constraint
+
+        # Check if new constraint is compatible by class only, otherwise complain.
+        # This is ok because we know that the constraints from evm.modifiers
+        # will always be compatible within the same class (underlying arrays are equal by construction).
+        # This significantly speeds up this check.
+        if self.constraint.__class__ is not constraint.__class__:
+            msg = f"Parameter constraint '{self.constraint}' is different than the constraint {constraint} to be added."
+            raise ValueError(msg)
+        return cast(PDF, self.constraint)
 
     @property
     def boundary_penalty(self) -> Array:
@@ -53,30 +71,57 @@ class Parameter(eqx.Module):
         )
 
     # shorthands
-    def unconstrained(self) -> modifier:
+    def unconstrained(self) -> Modifier:
         import evermore as evm
 
-        return evm.modifier(parameter=self, effect=evm.effect.unconstrained())
+        return evm.Modifier(parameter=self, effect=evm.effect.unconstrained())
 
-    def gauss(self, width: Array) -> modifier:
+    def gauss(self, width: Array) -> Modifier:
         import evermore as evm
 
-        return evm.modifier(parameter=self, effect=evm.effect.gauss(width=width))
+        return evm.Modifier(parameter=self, effect=evm.effect.gauss(width=width))
 
-    def lnN(self, width: Float[Array, 2]) -> modifier:
+    def lnN(self, width: Float[Array, 2]) -> Modifier:
         import evermore as evm
 
-        return evm.modifier(parameter=self, effect=evm.effect.lnN(width=width))
+        return evm.Modifier(parameter=self, effect=evm.effect.lnN(width=width))
 
-    def poisson(self, lamb: Array) -> modifier:
+    def poisson(self, lamb: Array) -> Modifier:
         import evermore as evm
 
-        return evm.modifier(parameter=self, effect=evm.effect.poisson(lamb=lamb))
+        return evm.Modifier(parameter=self, effect=evm.effect.poisson(lamb=lamb))
 
-    def shape(self, up: Array, down: Array) -> modifier:
+    def shape(self, up: Array, down: Array) -> Modifier:
         import evermore as evm
 
-        return evm.modifier(parameter=self, effect=evm.effect.shape(up=up, down=down))
+        return evm.Modifier(parameter=self, effect=evm.effect.shape(up=up, down=down))
+
+
+def staterrors(hists: PyTree[Array]) -> PyTree[Parameter]:
+    """
+    Create staterror (barlow-beeston) parameters.
+
+    Example:
+
+    .. code-block:: python
+
+        import jax.numpy as jnp
+        import evermore as evm
+
+        hists = {"qcd": jnp.array([1, 2, 3]), "dy": jnp.array([4, 5, 6])}
+
+        # bulk create staterrors
+        staterrors = evm.parameter.staterrors(hists=hists)
+    """
+
+    leaves = jtu.tree_leaves(hists)
+    # create parameters
+    return {
+        # per process and bin
+        "poisson": jtu.tree_map(lambda _: Parameter(value=0.0), hists),
+        # only per bin
+        "gauss": Parameter(value=jnp.zeros_like(leaves[0])),
+    }
 
 
 def auto_init(module: eqx.Module) -> eqx.Module:

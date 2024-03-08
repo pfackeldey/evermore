@@ -1,11 +1,14 @@
 from collections.abc import Callable
+from typing import cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array
 
+from evermore.custom_types import _NoValue
 from evermore.parameter import Parameter
+from evermore.pdf import PDF
 from evermore.util import _params_map
 
 __all__ = [
@@ -22,11 +25,10 @@ def get_param_constraints(module: eqx.Module) -> dict:
     constraints = {}
 
     def _constraint(param: Parameter) -> Array:
-        if param.constraints:
-            if len(param.constraints) > 1:
-                msg = f"More than one constraint per parameter is not allowed. Got: {param.constraints}"
-                raise ValueError(msg)
-            return next(iter(param.constraints)).logpdf(param.value)
+        constraint = param.constraint
+        if constraint is not _NoValue:
+            constraint = cast(PDF, constraint)
+            return constraint.logpdf(param.value)
         return jnp.array([0.0])
 
     # constraints from pdfs

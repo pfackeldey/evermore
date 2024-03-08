@@ -23,12 +23,10 @@ __all__ = [
     "pdf",
     "util",
     "sample",
+    "modifier",
     # explicitely expose some classes
     "Parameter",
-    "modifier",
-    # "staterror",
-    # "autostaterrors",
-    "compose",
+    "Modifier",
 ]
 
 
@@ -39,18 +37,11 @@ def __dir__():
 from evermore import (  # noqa: E402
     effect,
     loss,
+    modifier,
     parameter,
     pdf,
     sample,
     util,
 )
-
-# from evermore.model import Model, Result
-from evermore.modifier import (  # noqa: E402
-    # autostaterrors,
-    compose,
-    modifier,
-)
-
-# staterror,
+from evermore.modifier import Modifier  # noqa: E402
 from evermore.parameter import Parameter  # noqa: E402

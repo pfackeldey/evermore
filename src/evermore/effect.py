@@ -8,7 +8,7 @@ from jaxtyping import Array, Float
 
 from evermore.custom_types import AddOrMul
 from evermore.parameter import Parameter
-from evermore.pdf import Flat, Gauss, HashablePDF, Poisson
+from evermore.pdf import PDF, Flat, Gauss, Poisson
 from evermore.util import as1darray
 
 if TYPE_CHECKING:
@@ -34,9 +34,8 @@ def __dir__():
 class Effect(eqx.Module):
     apply_op: AbstractClassVar[AddOrMul]
 
-    @property
     @abc.abstractmethod
-    def constraint(self) -> HashablePDF:
+    def constraint(self, parameter: Parameter) -> PDF:
         ...
 
     @abc.abstractmethod
@@ -47,8 +46,7 @@ class Effect(eqx.Module):
 class unconstrained(Effect):
     apply_op: ClassVar[AddOrMul] = operator.mul
 
-    @property
-    def constraint(self) -> HashablePDF:
+    def constraint(self, parameter: Parameter) -> PDF:
         return Flat()
 
     def scale_factor(self, parameter: Parameter, sumw: Array) -> Array:
@@ -66,9 +64,10 @@ class gauss(Effect):
     def __init__(self, width: Array) -> None:
         self.width = width
 
-    @property
-    def constraint(self) -> HashablePDF:
-        return Gauss(mean=0.0, width=1.0)
+    def constraint(self, parameter: Parameter) -> PDF:
+        return Gauss(
+            mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
+        )
 
     def scale_factor(self, parameter: Parameter, sumw: Array) -> Array:
         """
@@ -124,9 +123,10 @@ class shape(Effect):
             )
         )
 
-    @property
-    def constraint(self) -> HashablePDF:
-        return Gauss(mean=0.0, width=1.0)
+    def constraint(self, parameter: Parameter) -> PDF:
+        return Gauss(
+            mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
+        )
 
     def scale_factor(self, parameter: Parameter, sumw: Array) -> Array:
         sf = parameter.value
@@ -165,9 +165,10 @@ class lnN(Effect):
             jnp.abs(x) >= 0.5, jnp.where(x >= 0, hi, lo), avg + alpha * halfdiff
         )
 
-    @property
-    def constraint(self) -> HashablePDF:
-        return Gauss(mean=0.0, width=1.0)
+    def constraint(self, parameter: Parameter) -> PDF:
+        return Gauss(
+            mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
+        )
 
     def scale_factor(self, parameter: Parameter, sumw: Array) -> Array:
         """
@@ -198,8 +199,8 @@ class poisson(Effect):
     def __init__(self, lamb: Array) -> None:
         self.lamb = lamb
 
-    @property
-    def constraint(self) -> HashablePDF:
+    def constraint(self, parameter: Parameter) -> PDF:
+        assert parameter.value.shape == self.lamb.shape
         return Poisson(lamb=self.lamb)
 
     def scale_factor(self, parameter: Parameter, sumw: Array) -> Array:

@@ -1,5 +1,3 @@
-from typing import Any
-
 import equinox as eqx
 import jax
 from jaxtyping import Array, PRNGKeyArray
@@ -17,7 +15,7 @@ toymodel = evm.sample.toy_module(model, key)
 def toy_expectation(
     key: PRNGKeyArray,
     module: eqx.Module,
-    hists: dict[Any, Array],
+    hists: dict,
 ) -> Array:
     toymodel = evm.sample.toy_module(model, key)
     expectations = toymodel(hists)

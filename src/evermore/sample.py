@@ -1,9 +1,12 @@
 from collections.abc import Callable
+from typing import cast
 
 import equinox as eqx
 import jax
 from jaxtyping import Array, PRNGKeyArray, PyTree
 
+from evermore.custom_types import _NoValue
+from evermore.pdf import PDF
 from evermore.util import is_parameter
 
 
@@ -19,16 +22,15 @@ def toy_module(module: eqx.Module, key: PRNGKeyArray) -> PyTree[Callable]:
     keys_tree = jax.tree_util.tree_unflatten(params_structure, keys)
 
     def _sample(param: Parameter, key: Parameter) -> Array:
-        if not param.constraints:
-            msg = f"Parameter {param} has no constraint pdf, can't sample from it. Maybe you need to call the model once to populate all constraints?"
+        if param.constraint is _NoValue:
+            msg = f"Parameter {param} has no constraint pdf, can't sample from it."
             raise RuntimeError(msg)
-        if len(param.constraints) > 1:
-            msg = f"More than one constraint per parameter is not allowed. Got: {param.constraints}"
-            raise ValueError(msg)
-        pdf = next(iter(param.constraints))
+
+        pdf = param.constraint
+        pdf = cast(PDF, pdf)
 
         # sample new value from the constraint pdf
-        sampled_param_value = pdf.sample(key.value, param)
+        sampled_param_value = pdf.sample(key.value)
 
         # replace the sampled parameter value and return new parameter
         return eqx.tree_at(lambda p: p.value, param, sampled_param_value)
