@@ -93,6 +93,11 @@ class ModifierBase(ApplyFn, MatMulCompose, AbstractModifier):
             modifier = parameter.unconstrained()
 
             clipped_modifier = clip(modifier=modifier, min_sf=0.8, max_sf=1.2)
+
+            # this example is trivial, because you can also implement it with `evm.modifier.transform`:
+            from functools import partial
+
+            clipped_modifier = evm.modifier.transform(partial(jnp.clip, a_min=0.8, a_max=1.2), modifier)
     """
 
 
