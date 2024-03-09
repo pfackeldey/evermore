@@ -19,6 +19,7 @@ myst-parser = "*"
 matplotlib = "*"
 mplhep = "*"
 imageio = "*"
+optimistix = "*"
 
 [host-dependencies]
 pip = "*"

@@ -1,20 +1,20 @@
 import abc
 import operator
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from evermore.custom_types import AddOrMul
+from evermore.custom_types import AddOrMulSFs
 from evermore.parameter import Parameter
 from evermore.pdf import PDF, Flat, Gauss, Poisson
-from evermore.util import as1darray
+from evermore.util import as1darray, initSF
 
 if TYPE_CHECKING:
-    from typing import ClassVar as AbstractClassVar
+    pass
 else:
-    from equinox import AbstractClassVar
+    pass
 
 
 __all__ = [
@@ -32,25 +32,23 @@ def __dir__():
 
 
 class Effect(eqx.Module):
-    apply_op: AbstractClassVar[AddOrMul]
-
     @abc.abstractmethod
     def constraint(self, parameter: Parameter) -> PDF:
         ...
 
     @abc.abstractmethod
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> Array:
+    def scale_factor(self, parameter: Parameter, sumw: Array) -> AddOrMulSFs:
         ...
 
 
 class unconstrained(Effect):
-    apply_op: ClassVar[AddOrMul] = operator.mul
-
     def constraint(self, parameter: Parameter) -> PDF:
         return Flat()
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> Array:
-        return parameter.value
+    def scale_factor(self, parameter: Parameter, sumw: Array) -> AddOrMulSFs:
+        sf = initSF(shape=parameter.value.shape)
+        sf[operator.mul] = parameter.value
+        return sf
 
 
 DEFAULT_EFFECT = unconstrained()
@@ -58,8 +56,6 @@ DEFAULT_EFFECT = unconstrained()
 
 class gauss(Effect):
     width: Array = eqx.field(static=True, converter=as1darray)
-
-    apply_op: ClassVar[AddOrMul] = operator.mul
 
     def __init__(self, width: Array) -> None:
         self.width = width
@@ -69,7 +65,7 @@ class gauss(Effect):
             mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
         )
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> Array:
+    def scale_factor(self, parameter: Parameter, sumw: Array) -> AddOrMulSFs:
         """
         Implementation with (inverse) CDFs is defined as follows:
 
@@ -87,14 +83,14 @@ class gauss(Effect):
                 return (parameter.value * self.width) + 1
 
         """
-        return (parameter.value * self.width) + 1
+        sf = initSF(shape=parameter.value.shape)
+        sf[operator.mul] = (parameter.value * self.width) + 1
+        return sf
 
 
 class shape(Effect):
     up: Array = eqx.field(converter=as1darray)
     down: Array = eqx.field(converter=as1darray)
-
-    apply_op: ClassVar[AddOrMul] = operator.add
 
     def __init__(
         self,
@@ -128,9 +124,11 @@ class shape(Effect):
             mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
         )
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> Array:
-        sf = parameter.value
-        return self.vshift(sf=sf, sumw=sumw)
+    def scale_factor(self, parameter: Parameter, sumw: Array) -> AddOrMulSFs:
+        p = parameter.value
+        sf = initSF(shape=p.shape)
+        sf[operator.add] = self.vshift(sf=p, sumw=sumw)
+        return sf
         # shift = self.vshift(sf=sf, sumw=sumw)
         # # handle zeros, see: https://github.com/google/jax/issues/5039
         # x = jnp.where(sumw == 0.0, 1.0, sumw)
@@ -139,8 +137,6 @@ class shape(Effect):
 
 class lnN(Effect):
     width: Float[Array, "2"] = eqx.field(static=True)
-
-    apply_op: ClassVar[AddOrMul] = operator.mul
 
     def __init__(
         self,
@@ -170,7 +166,7 @@ class lnN(Effect):
             mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
         )
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> Array:
+    def scale_factor(self, parameter: Parameter, sumw: Array) -> AddOrMulSFs:
         """
         Implementation with (inverse) CDFs is defined as follows:
 
@@ -188,13 +184,15 @@ class lnN(Effect):
                 return jnp.exp(parameter.value * self.interpolate(parameter=parameter))
 
         """
-        return jnp.exp(parameter.value * self.interpolate(parameter=parameter))
+        sf = initSF(shape=parameter.value.shape)
+        sf[operator.mul] = jnp.exp(
+            parameter.value * self.interpolate(parameter=parameter)
+        )
+        return sf
 
 
 class poisson(Effect):
     lamb: Array = eqx.field(static=True, converter=as1darray)
-
-    apply_op: ClassVar[AddOrMul] = operator.mul
 
     def __init__(self, lamb: Array) -> None:
         self.lamb = lamb
@@ -203,5 +201,7 @@ class poisson(Effect):
         assert parameter.value.shape == self.lamb.shape
         return Poisson(lamb=self.lamb)
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> Array:
-        return parameter.value + 1
+    def scale_factor(self, parameter: Parameter, sumw: Array) -> AddOrMulSFs:
+        sf = initSF(shape=parameter.value.shape)
+        sf[operator.add] = parameter.value + 1
+        return sf

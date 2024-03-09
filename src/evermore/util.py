@@ -3,9 +3,7 @@ from __future__ import annotations
 import operator
 from collections.abc import Callable
 from functools import partial
-from typing import (
-    Any,
-)
+from typing import Any
 
 import equinox as eqx
 import jax
@@ -13,7 +11,10 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jaxtyping import Array, ArrayLike, PyTree
 
+from evermore.custom_types import AddOrMulSFs
+
 __all__ = [
+    "initSF",
     "is_parameter",
     "sum_leaves",
     "as1darray",
@@ -26,14 +27,14 @@ def __dir__():
     return __all__
 
 
+def initSF(shape: tuple) -> AddOrMulSFs:
+    return {operator.add: jnp.zeros(shape), operator.mul: jnp.ones(shape)}
+
+
 def is_parameter(leaf: Any) -> bool:
     from evermore import Parameter
 
     return isinstance(leaf, Parameter)
-
-
-K = str
-V = Any
 
 
 def _filtered_module_map(

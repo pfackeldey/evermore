@@ -2,18 +2,17 @@ from __future__ import annotations
 
 import operator
 from functools import reduce
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array
 
-from evermore.custom_types import AddOrMul
-from evermore.effect import (
-    DEFAULT_EFFECT,
-)
+from evermore.custom_types import AddOrMul, AddOrMulSFs, ModifierLike
+from evermore.effect import DEFAULT_EFFECT
 from evermore.parameter import Parameter
+from evermore.util import initSF
 
 if TYPE_CHECKING:
     from evermore.effect import Effect
@@ -29,7 +28,15 @@ def __dir__():
     return __all__
 
 
-class Modifier(eqx.Module):
+class ApplyFn(eqx.Module):
+    @jax.named_scope("evm.modifier.ApplyFn")
+    def __call__(self: ModifierLike, sumw: Array) -> Array:
+        sf = self.scale_factor(sumw=sumw)
+        # apply
+        return sf[operator.mul] * (sumw + sf[operator.add])
+
+
+class Modifier(ApplyFn):
     """
     Create a new modifier for a given parameter and penalty.
 
@@ -82,21 +89,14 @@ class Modifier(eqx.Module):
         constraint = self.effect.constraint(parameter=self.parameter)
         self.parameter._set_constraint(constraint, overwrite=False)
 
-    def scale_factor(self, sumw: Array) -> Array:
+    def scale_factor(self, sumw: Array) -> AddOrMulSFs:
         return self.effect.scale_factor(parameter=self.parameter, sumw=sumw)
 
-    @jax.named_scope("evm.modifier")
-    def __call__(self, sumw: Array) -> Array:
-        op = self.effect.apply_op
-        shift = jnp.atleast_1d(self.scale_factor(sumw=sumw))
-        shift = jnp.broadcast_to(shift, sumw.shape)
-        return op(shift, sumw)  # type: ignore[call-arg]
-
-    def __matmul__(self, other: Composable) -> compose:
+    def __matmul__(self, other: ModifierLike) -> compose:
         return compose(self, other)
 
 
-class where(eqx.Module):
+class where(ApplyFn):
     """
     Combine two modifiers based on a condition.
 
@@ -125,29 +125,21 @@ class where(eqx.Module):
     modifier_true: Modifier
     modifier_false: Modifier
 
-    def scale_factor(self, sumw: Array) -> Array:
-        return jnp.where(
-            self.condition,
-            self.modifier_true.scale_factor(sumw),
-            self.modifier_false.scale_factor(sumw),
-        )
+    def scale_factor(self, sumw: Array) -> AddOrMulSFs:
+        sf = initSF(shape=sumw.shape)
 
-    @jax.named_scope("evm.where")
-    def __call__(self, sumw: Array) -> Array:
-        op_true = self.modifier_true.effect.apply_op
-        op_false = self.modifier_false.effect.apply_op
-        sf = self.scale_factor(sumw=sumw)
-        return jnp.where(
-            self.condition,
-            op_true(jnp.atleast_1d(sf), sumw),  # type: ignore[call-arg]
-            op_false(jnp.atleast_1d(sf), sumw),  # type: ignore[call-arg]
-        )
+        true_sf = self.modifier_true.scale_factor(sumw)
+        false_sf = self.modifier_false.scale_factor(sumw)
 
-    def __matmul__(self, other: Composable) -> compose:
+        for op in operator.mul, operator.add:
+            sf.update(jnp.where(self.condition, true_sf[op], false_sf[op]))
+        return sf
+
+    def __matmul__(self, other: ModifierLike) -> compose:
         return compose(self, other)
 
 
-class compose(eqx.Module):
+class compose(ApplyFn):
     """
     Composition of multiple modifiers, i.e.: `(f ∘ g ∘ h)(hist) = f(hist) * g(hist) * h(hist)`
     It behaves like a single modifier, but it is composed of multiple modifiers; it can be arbitrarly nested.
@@ -194,9 +186,9 @@ class compose(eqx.Module):
         eqx.filter_jit(composition)(hist)
     """
 
-    modifiers: list[Composable]
+    modifiers: list[ModifierLike]
 
-    def __init__(self, *modifiers: Composable) -> None:
+    def __init__(self, *modifiers: ModifierLike) -> None:
         self.modifiers = list(modifiers)
         # unroll nested compositions
         _modifiers = []
@@ -204,7 +196,7 @@ class compose(eqx.Module):
             if isinstance(mod, compose):
                 _modifiers.extend(mod.modifiers)
             else:
-                assert isinstance(mod, Modifier | where)
+                assert isinstance(mod, ModifierLike)
                 _modifiers.append(mod)
         # by now all modifiers are either modifier or staterror
         self.modifiers = _modifiers
@@ -212,61 +204,23 @@ class compose(eqx.Module):
     def __len__(self) -> int:
         return len(self.modifiers)
 
-    @jax.named_scope("evm.compose")
-    def __call__(self, sumw: Array) -> Array:
-        def _prep_shift(modifier: Modifier | where, sumw: Array) -> Array:
-            shift = modifier.scale_factor(sumw=sumw)
-            shift = jnp.atleast_1d(shift)
-            return jnp.broadcast_to(shift, sumw.shape)
-
+    def scale_factor(self, sumw: Array) -> AddOrMulSFs:
         # collect all multiplicative and additive shifts
-        shifts: dict[AddOrMul, list] = {operator.mul: [], operator.add: []}
+        sfs: dict[AddOrMul, list] = {operator.add: [], operator.mul: []}
         for m in range(len(self)):
             mod = self.modifiers[m]
-            # cast to modifier | staterror, we know it is one of them
-            # because we unrolled nested compositions in __init__
-            mod = cast(Modifier | where, mod)
-            sf = _prep_shift(mod, sumw)
-            if isinstance(mod, Modifier):
-                if mod.effect.apply_op is operator.mul:
-                    shifts[operator.mul].append(sf)
-                elif mod.effect.apply_op is operator.add:
-                    shifts[operator.add].append(sf)
-                else:
-                    msg = f"Unsupported apply_op {mod.effect.apply_op} for Modifier {mod}. Only multiplicative and additive effects are supported."
-                    raise ValueError(msg)
-            elif isinstance(mod, where):
-                op_true = mod.modifier_true.effect.apply_op
-                op_false = mod.modifier_false.effect.apply_op
-                # if both modifiers are multiplicative:
-                if op_true is operator.mul and op_false is operator.mul:
-                    shifts[operator.mul].append(sf)
-                # if both modifiers are additive:
-                elif op_true is operator.add and op_false is operator.add:
-                    shifts[operator.add].append(sf)
-                # if one is multiplicative and the other is additive:
-                elif op_true is operator.mul and op_false is operator.add:
-                    _mult_sf = jnp.where(mod.condition, sf, 1.0)
-                    _add_sf = jnp.where(mod.condition, sf, 0.0)
-                    shifts[operator.mul].append(_mult_sf)
-                    shifts[operator.add].append(_add_sf)
-                elif op_true is operator.add and op_false is operator.mul:
-                    _mult_sf = jnp.where(mod.condition, 1.0, sf)
-                    _add_sf = jnp.where(mod.condition, 0.0, sf)
-                    shifts[operator.mul].append(_mult_sf)
-                    shifts[operator.add].append(_add_sf)
-                else:
-                    msg = f"Unsupported apply_op {op_true} and {op_false} for 'where' Modifier {mod}. Only multiplicative and additive effects are supported."
-                    raise ValueError(msg)
-        # calculate the product with for operator.mul
-        _mult_fact = reduce(operator.mul, shifts[operator.mul], 1.0)
-        # calculate the sum for operator.add
-        _add_shift = reduce(operator.add, shifts[operator.add], 0.0)
-        # apply
-        return _mult_fact * (sumw + _add_shift)
+            _sf = mod.scale_factor(sumw)
+            for op in operator.add, operator.mul:
+                sfs[op].append(_sf[op])
 
-    def __matmul__(self, other: Composable) -> compose:
+        sf = initSF(shape=sumw.shape)
+        # calculate the product with for operator.mul and operator.add
+        for op, init_val in (
+            (operator.mul, jnp.ones_like(sumw)),
+            (operator.add, jnp.zeros_like(sumw)),
+        ):
+            sf[op] = reduce(op, sfs[op], init_val)
+        return sf
+
+    def __matmul__(self, other: ModifierLike) -> compose:
         return compose(self, other)
-
-
-Composable = Modifier | compose | where

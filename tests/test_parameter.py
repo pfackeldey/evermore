@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import operator
+
 import jax.numpy as jnp
 import pytest
 
@@ -22,7 +24,10 @@ def test_unconstrained():
     u = evm.effect.unconstrained()
 
     assert u.constraint(p) == Flat()
-    assert u.scale_factor(p, jnp.array(1.0)) == pytest.approx(1.0)
+    assert u.scale_factor(p, jnp.array(1.0)) == {
+        operator.mul: jnp.array([1.0]),
+        operator.add: jnp.array([0.0]),
+    }
 
 
 def test_gauss():
@@ -30,7 +35,10 @@ def test_gauss():
     g = evm.effect.gauss(width=jnp.array(1.0))
 
     assert g.constraint(p) == Gauss(mean=jnp.array(0.0), width=jnp.array(1.0))
-    assert g.scale_factor(p, jnp.array(1.0)) == pytest.approx(1.0)
+    assert g.scale_factor(p, jnp.array(1.0)) == {
+        operator.mul: jnp.array([1.0]),
+        operator.add: jnp.array([0.0]),
+    }
 
 
 def test_lnN():
@@ -38,8 +46,10 @@ def test_lnN():
     ln = evm.effect.lnN(width=jnp.array([0.9, 1.1]))
 
     assert ln.constraint(p) == Gauss(mean=jnp.array(0.0), width=jnp.array(1.0))
-    assert ln.scale_factor(p, jnp.array(1.0)) == pytest.approx(1.0)
-    # assert ln.scale_factor(p.update(jnp.array(2.0)), jnp.array(1.0)) == pytest.approx(1.1)
+    assert ln.scale_factor(p, jnp.array(1.0)) == {
+        operator.mul: jnp.array([1.0]),
+        operator.add: jnp.array([0.0]),
+    }
 
 
 def test_poisson():
