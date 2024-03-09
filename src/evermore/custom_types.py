@@ -25,7 +25,7 @@ class SF(NamedTuple):
 
 
 class Sentinel:
-    repr: str
+    __slots__ = ("repr",)
 
     def __init__(self, repr: str) -> None:
         self.repr = repr
