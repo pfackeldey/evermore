@@ -162,15 +162,23 @@ class where(ModifierBase):
             import evermore as evm
 
             hist = jnp.array([5, 20, 30])
-            syst = evm.Parameter(value=0.0)
+            syst = evm.Parameter(value=0.1)
 
             norm = syst.lnN(jnp.array([0.9, 1.1]))
             shape = syst.shape(up=jnp.array([7, 22, 31]), down=jnp.array([4, 16, 27]))
 
+            # apply norm if hist < 10, else apply shape
             modifier = evm.modifier.where(hist < 10, norm, shape)
 
             # apply
             modifier(hist)
+            # -> Array([ 5.049494, 20.281374, 30.181376], dtype=float32)
+
+            # for comparison:
+            norm(hist)
+            # -> Array([ 5.049494, 20.197975, 30.296963], dtype=float32)
+            shape(hist)
+            # -> Array([ 5.1593127, 20.281374 , 30.181376 ], dtype=float32)
     """
 
     condition: Array = eqx.field(static=True)
@@ -202,7 +210,7 @@ class mask(ModifierBase):
             import evermore as evm
 
             hist = jnp.array([5, 20, 30])
-            syst = evm.Parameter(value=0.0)
+            syst = evm.Parameter(value=0.1)
 
             norm = syst.lnN(jnp.array([0.9, 1.1]))
             mask = jnp.array([True, False, True])
@@ -211,6 +219,7 @@ class mask(ModifierBase):
 
             # apply
             modifier(hist)
+            # -> Array([ 5.049494, 20.      , 30.296963], dtype=float32)
     """
 
     where: Array = eqx.field(static=True)
