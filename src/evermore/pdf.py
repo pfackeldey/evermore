@@ -43,13 +43,13 @@ class PDF(eqx.Module):
 
 class Flat(PDF):
     def logpdf(self, x: Array) -> Array:
-        return jnp.array([0.0])
+        return jnp.zeros_like(x)
 
     def pdf(self, x: Array) -> Array:
-        return jnp.array([1.0])
+        return jnp.ones_like(x)
 
     def cdf(self, x: Array) -> Array:
-        return jnp.array([1.0])
+        return jnp.ones_like(x)
 
     def sample(self, key: PRNGKeyArray) -> Array:
         # sample parameter from pdf

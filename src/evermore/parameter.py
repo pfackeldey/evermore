@@ -58,7 +58,7 @@ class Parameter(eqx.Module):
         # will always be compatible within the same class (underlying arrays are equal by construction).
         # This significantly speeds up this check.
         if self.constraint.__class__ is not constraint.__class__:
-            msg = f"Parameter constraint '{self.constraint}' is different than the constraint {constraint} to be added."
+            msg = f"Parameter constraint '{self.constraint}' is different from the new constraint '{constraint}'."
             raise ValueError(msg)
         return cast(PDF, self.constraint)
 
