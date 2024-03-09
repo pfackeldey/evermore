@@ -40,10 +40,10 @@ _NoValue: Any = Sentinel("<NoValue>")
 
 
 class ModifierLike(Protocol):
-    def scale_factor(self, sumw: Array) -> SF:
+    def scale_factor(self, hist: Array) -> SF:
         ...
 
-    def __call__(self, sumw: Array) -> Array:
+    def __call__(self, hist: Array) -> Array:
         ...
 
     def __matmul__(self, other: ModifierLike) -> compose:

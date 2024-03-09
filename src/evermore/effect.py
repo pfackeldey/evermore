@@ -36,7 +36,7 @@ class Effect(eqx.Module):
         ...
 
     @abc.abstractmethod
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> SF:
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         ...
 
 
@@ -44,9 +44,9 @@ class unconstrained(Effect):
     def constraint(self, parameter: Parameter) -> PDF:
         return Flat()
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> SF:
-        sf = jnp.broadcast_to(parameter.value, sumw.shape)
-        return SF(multiplicative=sf, additive=jnp.zeros_like(sumw))
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
+        sf = jnp.broadcast_to(parameter.value, hist.shape)
+        return SF(multiplicative=sf, additive=jnp.zeros_like(hist))
 
 
 DEFAULT_EFFECT = unconstrained()
@@ -63,7 +63,7 @@ class gauss(Effect):
             mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
         )
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> SF:
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         """
         Implementation with (inverse) CDFs is defined as follows:
 
@@ -81,8 +81,8 @@ class gauss(Effect):
                 return (parameter.value * self.width) + 1
 
         """
-        sf = jnp.broadcast_to((parameter.value * self.width) + 1, sumw.shape)
-        return SF(multiplicative=sf, additive=jnp.zeros_like(sumw))
+        sf = jnp.broadcast_to((parameter.value * self.width) + 1, hist.shape)
+        return SF(multiplicative=sf, additive=jnp.zeros_like(hist))
 
 
 class shape(Effect):
@@ -97,9 +97,9 @@ class shape(Effect):
         self.up = up  # +1 sigma
         self.down = down  # -1 sigma
 
-    def vshift(self, sf: Array, sumw: Array) -> Array:
+    def vshift(self, sf: Array, hist: Array) -> Array:
         factor = sf
-        dx_sum = self.up + self.down - 2 * sumw
+        dx_sum = self.up + self.down - 2 * hist
         dx_diff = self.up - self.down
 
         # taken from https://github.com/nsmith-/jaxfit/blob/8479cd73e733ba35462287753fab44c0c560037b/src/jaxfit/roofit/combine.py#L173C6-L192
@@ -121,13 +121,13 @@ class shape(Effect):
             mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
         )
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> SF:
-        sf = self.vshift(sf=parameter.value, sumw=sumw)
-        return SF(multiplicative=jnp.ones_like(sumw), additive=sf)
-        # shift = self.vshift(sf=sf, sumw=sumw)
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
+        sf = self.vshift(sf=parameter.value, hist=hist)
+        return SF(multiplicative=jnp.ones_like(hist), additive=sf)
+        # shift = self.vshift(sf=sf, hist=hist)
         # # handle zeros, see: https://github.com/google/jax/issues/5039
-        # x = jnp.where(sumw == 0.0, 1.0, sumw)
-        # return jnp.where(sumw == 0.0, shift, (x + shift) / x)
+        # x = jnp.where(hist == 0.0, 1.0, hist)
+        # return jnp.where(hist == 0.0, shift, (x + shift) / x)
 
 
 class lnN(Effect):
@@ -161,7 +161,7 @@ class lnN(Effect):
             mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
         )
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> SF:
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         """
         Implementation with (inverse) CDFs is defined as follows:
 
@@ -180,8 +180,8 @@ class lnN(Effect):
 
         """
         interp = self.interpolate(parameter=parameter)
-        sf = jnp.broadcast_to(jnp.exp(parameter.value * interp), sumw.shape)
-        return SF(multiplicative=sf, additive=jnp.zeros_like(sumw))
+        sf = jnp.broadcast_to(jnp.exp(parameter.value * interp), hist.shape)
+        return SF(multiplicative=sf, additive=jnp.zeros_like(hist))
 
 
 class poisson(Effect):
@@ -194,6 +194,6 @@ class poisson(Effect):
         assert parameter.value.shape == self.lamb.shape
         return Poisson(lamb=self.lamb)
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> SF:
-        sf = jnp.broadcast_to(parameter.value + 1, sumw.shape)
-        return SF(multiplicative=sf, additive=jnp.zeros_like(sumw))
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
+        sf = jnp.broadcast_to(parameter.value + 1, hist.shape)
+        return SF(multiplicative=sf, additive=jnp.zeros_like(hist))

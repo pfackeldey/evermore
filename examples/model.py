@@ -13,7 +13,7 @@ class SPlusBModel(eqx.Module):
     norm2: evm.Parameter
     shape1: evm.Parameter
 
-    def __init__(self, sumw: dict[str, Array], sumw2: dict[str, Array]) -> None:
+    def __init__(self, hist: dict[str, Array], histw2: dict[str, Array]) -> None:
         self.mu = evm.Parameter(value=jnp.array([1.0]))
         self = evm.parameter.auto_init(self)
 
@@ -64,14 +64,14 @@ hists = {
     },
 }
 
-sumw = hists["nominal"]
-sumw2 = {
+hist = hists["nominal"]
+histw2 = {
     "signal": jnp.array([5]),
     "bkg1": jnp.array([11]),
     "bkg2": jnp.array([25]),
 }
 
-model = SPlusBModel(sumw, sumw2)
+model = SPlusBModel(hist, histw2)
 
 observation = jnp.array([37])
 expectations = model(hists)

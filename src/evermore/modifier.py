@@ -35,11 +35,11 @@ def __dir__():
 
 class AbstractModifier(eqx.Module):
     @abc.abstractmethod
-    def scale_factor(self: ModifierLike, sumw: Array) -> SF:
+    def scale_factor(self: ModifierLike, hist: Array) -> SF:
         ...
 
     @abc.abstractmethod
-    def __call__(self: ModifierLike, sumw: Array) -> Array:
+    def __call__(self: ModifierLike, hist: Array) -> Array:
         ...
 
     @abc.abstractmethod
@@ -49,10 +49,10 @@ class AbstractModifier(eqx.Module):
 
 class ApplyFn(eqx.Module):
     @jax.named_scope("evm.modifier.ApplyFn")
-    def __call__(self: ModifierLike, sumw: Array) -> Array:
-        sf = self.scale_factor(sumw=sumw)
+    def __call__(self: ModifierLike, hist: Array) -> Array:
+        sf = self.scale_factor(hist=hist)
         # apply
-        return sf.multiplicative * (sumw + sf.additive)
+        return sf.multiplicative * (hist + sf.additive)
 
 
 class MatMulCompose(eqx.Module):
@@ -63,7 +63,7 @@ class MatMulCompose(eqx.Module):
 class ModifierBase(ApplyFn, MatMulCompose, AbstractModifier):
     """
     This serves as a base class for all modifiers.
-    It automatically implements the __call__ method to apply the scale factors to the sumw array
+    It automatically implements the __call__ method to apply the scale factors to the hist array
     and the __matmul__ method to compose two modifiers.
 
     Custom modifiers should inherit from this class and implement the scale_factor method.
@@ -84,8 +84,8 @@ class ModifierBase(ApplyFn, MatMulCompose, AbstractModifier):
                 min_sf: float = eqx.field(static=True)
                 max_sf: float = eqx.field(static=True)
 
-                def scale_factor(self, sumw: Array) -> evm.custrom_types.SF:
-                    sf = self.modifier.scale_factor(sumw)
+                def scale_factor(self, hist: Array) -> evm.custrom_types.SF:
+                    sf = self.modifier.scale_factor(hist)
                     return jtu.tree_map(lambda x: jnp.clip(x, self.min_sf, self.max_sf), sf)
 
 
@@ -154,8 +154,8 @@ class Modifier(ModifierBase):
         constraint = self.effect.constraint(parameter=self.parameter)
         self.parameter._set_constraint(constraint, overwrite=False)
 
-    def scale_factor(self, sumw: Array) -> SF:
-        return self.effect.scale_factor(parameter=self.parameter, sumw=sumw)
+    def scale_factor(self, hist: Array) -> SF:
+        return self.effect.scale_factor(parameter=self.parameter, hist=hist)
 
 
 class where(ModifierBase):
@@ -195,9 +195,9 @@ class where(ModifierBase):
     modifier_true: Modifier
     modifier_false: Modifier
 
-    def scale_factor(self, sumw: Array) -> SF:
-        true_sf = self.modifier_true.scale_factor(sumw)
-        false_sf = self.modifier_false.scale_factor(sumw)
+    def scale_factor(self, hist: Array) -> SF:
+        true_sf = self.modifier_true.scale_factor(hist)
+        false_sf = self.modifier_false.scale_factor(hist)
 
         def _where(true: Array, false: Array) -> Array:
             return jnp.where(self.condition, true, false)
@@ -235,15 +235,15 @@ class mask(ModifierBase):
     where: Array = eqx.field(static=True)
     modifier: Modifier
 
-    def scale_factor(self, sumw: Array) -> SF:
-        sf = self.modifier.scale_factor(sumw)
+    def scale_factor(self, hist: Array) -> SF:
+        sf = self.modifier.scale_factor(hist)
 
         def _mask(true: Array, false: Array) -> Array:
             return jnp.where(self.where, true, false)
 
         return SF(
-            multiplicative=_mask(sf.multiplicative, jnp.ones_like(sumw)),
-            additive=_mask(sf.additive, jnp.zeros_like(sumw)),
+            multiplicative=_mask(sf.multiplicative, jnp.ones_like(hist)),
+            additive=_mask(sf.additive, jnp.zeros_like(hist)),
         )
 
 
@@ -279,8 +279,8 @@ class transform(ModifierBase):
     transform_fn: Callable = eqx.field(static=True)
     modifier: Modifier
 
-    def scale_factor(self, sumw: Array) -> SF:
-        sf = self.modifier.scale_factor(sumw)
+    def scale_factor(self, hist: Array) -> SF:
+        sf = self.modifier.scale_factor(hist)
         return jtu.tree_map(self.transform_fn, sf)
 
 
@@ -349,16 +349,16 @@ class compose(ModifierBase):
     def __len__(self) -> int:
         return len(self.modifiers)
 
-    def scale_factor(self, sumw: Array) -> SF:
+    def scale_factor(self, hist: Array) -> SF:
         # collect all multiplicative and additive shifts
         sfs: dict[AddOrMul, list] = {operator.add: [], operator.mul: []}
         for m in range(len(self)):
             mod = self.modifiers[m]
-            _sf = mod.scale_factor(sumw)
+            _sf = mod.scale_factor(hist)
             sfs[operator.mul].append(_sf.multiplicative)
             sfs[operator.add].append(_sf.additive)
 
         # calculate the product with for operator.mul and operator.add
-        multiplicative_sf = reduce(operator.mul, sfs[operator.mul], jnp.ones_like(sumw))
-        additive_sf = reduce(operator.add, sfs[operator.add], jnp.zeros_like(sumw))
+        multiplicative_sf = reduce(operator.mul, sfs[operator.mul], jnp.ones_like(hist))
+        additive_sf = reduce(operator.add, sfs[operator.add], jnp.zeros_like(hist))
         return SF(multiplicative=multiplicative_sf, additive=additive_sf)
