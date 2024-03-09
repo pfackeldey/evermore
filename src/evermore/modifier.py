@@ -70,16 +70,19 @@ class ModifierBase(ApplyFn, MatMulCompose, AbstractModifier):
 
         .. code-block:: python
 
+            import equinox as eqx
             import jax.numpy as jnp
             import jax.tree_util as jtu
+            from jaxtyping import Array
+
             import evermore as evm
 
             class clip(evm.ModifierBase):
                 modifier: evm.ModifierBase
-                min_sf: float
-                max_sf: float
+                min_sf: float = eqx.field(static=True)
+                max_sf: float = eqx.field(static=True)
 
-                def scale_factor(self, sumw: jnp.ndarray) -> evm.SF:
+                def scale_factor(self, sumw: Array) -> evm.SF:
                     sf = self.modifier.scale_factor(sumw)
                     return jtu.tree_map(lambda x: jnp.clip(x, self.min_sf, self.max_sf), sf)
 
