@@ -11,10 +11,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jaxtyping import Array, ArrayLike, PyTree
 
-from evermore.custom_types import AddOrMulSFs
-
 __all__ = [
-    "initSF",
     "is_parameter",
     "sum_leaves",
     "as1darray",
@@ -25,10 +22,6 @@ __all__ = [
 
 def __dir__():
     return __all__
-
-
-def initSF(shape: tuple) -> AddOrMulSFs:
-    return {operator.add: jnp.zeros(shape), operator.mul: jnp.ones(shape)}
 
 
 def is_parameter(leaf: Any) -> bool:

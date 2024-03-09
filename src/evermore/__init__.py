@@ -27,6 +27,7 @@ __all__ = [
     # explicitely expose some classes
     "Parameter",
     "Modifier",
+    "ModifierBase",
 ]
 
 
@@ -43,5 +44,5 @@ from evermore import (  # noqa: E402
     sample,
     util,
 )
-from evermore.modifier import Modifier  # noqa: E402
+from evermore.modifier import Modifier, ModifierBase  # noqa: E402
 from evermore.parameter import Parameter  # noqa: E402

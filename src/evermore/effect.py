@@ -1,15 +1,14 @@
 import abc
-import operator
 from typing import TYPE_CHECKING
 
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from evermore.custom_types import AddOrMulSFs
+from evermore.custom_types import SF
 from evermore.parameter import Parameter
 from evermore.pdf import PDF, Flat, Gauss, Poisson
-from evermore.util import as1darray, initSF
+from evermore.util import as1darray
 
 if TYPE_CHECKING:
     pass
@@ -37,7 +36,7 @@ class Effect(eqx.Module):
         ...
 
     @abc.abstractmethod
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> AddOrMulSFs:
+    def scale_factor(self, parameter: Parameter, sumw: Array) -> SF:
         ...
 
 
@@ -45,10 +44,9 @@ class unconstrained(Effect):
     def constraint(self, parameter: Parameter) -> PDF:
         return Flat()
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> AddOrMulSFs:
-        sf = initSF(shape=parameter.value.shape)
-        sf[operator.mul] = parameter.value
-        return sf
+    def scale_factor(self, parameter: Parameter, sumw: Array) -> SF:
+        sf = jnp.broadcast_to(parameter.value, sumw.shape)
+        return SF(multiplicative=sf, additive=jnp.zeros_like(sumw))
 
 
 DEFAULT_EFFECT = unconstrained()
@@ -65,7 +63,7 @@ class gauss(Effect):
             mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
         )
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> AddOrMulSFs:
+    def scale_factor(self, parameter: Parameter, sumw: Array) -> SF:
         """
         Implementation with (inverse) CDFs is defined as follows:
 
@@ -83,9 +81,8 @@ class gauss(Effect):
                 return (parameter.value * self.width) + 1
 
         """
-        sf = initSF(shape=parameter.value.shape)
-        sf[operator.mul] = (parameter.value * self.width) + 1
-        return sf
+        sf = jnp.broadcast_to((parameter.value * self.width) + 1, sumw.shape)
+        return SF(multiplicative=sf, additive=jnp.zeros_like(sumw))
 
 
 class shape(Effect):
@@ -124,11 +121,9 @@ class shape(Effect):
             mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
         )
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> AddOrMulSFs:
-        p = parameter.value
-        sf = initSF(shape=p.shape)
-        sf[operator.add] = self.vshift(sf=p, sumw=sumw)
-        return sf
+    def scale_factor(self, parameter: Parameter, sumw: Array) -> SF:
+        sf = self.vshift(sf=parameter.value, sumw=sumw)
+        return SF(multiplicative=jnp.ones_like(sumw), additive=sf)
         # shift = self.vshift(sf=sf, sumw=sumw)
         # # handle zeros, see: https://github.com/google/jax/issues/5039
         # x = jnp.where(sumw == 0.0, 1.0, sumw)
@@ -166,7 +161,7 @@ class lnN(Effect):
             mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
         )
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> AddOrMulSFs:
+    def scale_factor(self, parameter: Parameter, sumw: Array) -> SF:
         """
         Implementation with (inverse) CDFs is defined as follows:
 
@@ -184,11 +179,9 @@ class lnN(Effect):
                 return jnp.exp(parameter.value * self.interpolate(parameter=parameter))
 
         """
-        sf = initSF(shape=parameter.value.shape)
-        sf[operator.mul] = jnp.exp(
-            parameter.value * self.interpolate(parameter=parameter)
-        )
-        return sf
+        interp = self.interpolate(parameter=parameter)
+        sf = jnp.broadcast_to(jnp.exp(parameter.value * interp), sumw.shape)
+        return SF(multiplicative=sf, additive=jnp.zeros_like(sumw))
 
 
 class poisson(Effect):
@@ -201,7 +194,6 @@ class poisson(Effect):
         assert parameter.value.shape == self.lamb.shape
         return Poisson(lamb=self.lamb)
 
-    def scale_factor(self, parameter: Parameter, sumw: Array) -> AddOrMulSFs:
-        sf = initSF(shape=parameter.value.shape)
-        sf[operator.add] = parameter.value + 1
-        return sf
+    def scale_factor(self, parameter: Parameter, sumw: Array) -> SF:
+        sf = jnp.broadcast_to(parameter.value + 1, sumw.shape)
+        return SF(multiplicative=sf, additive=jnp.zeros_like(sumw))

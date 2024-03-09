@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 import operator
 from functools import reduce
 from typing import TYPE_CHECKING
@@ -7,17 +8,18 @@ from typing import TYPE_CHECKING
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import jax.tree_util as jtu
 from jaxtyping import Array
 
-from evermore.custom_types import AddOrMul, AddOrMulSFs, ModifierLike
+from evermore.custom_types import SF, AddOrMul, ModifierLike
 from evermore.effect import DEFAULT_EFFECT
 from evermore.parameter import Parameter
-from evermore.util import initSF
 
 if TYPE_CHECKING:
     from evermore.effect import Effect
 
 __all__ = [
+    "ModifierBase",
     "Modifier",
     "compose",
     "where",
@@ -28,15 +30,67 @@ def __dir__():
     return __all__
 
 
+class AbstractModifier(eqx.Module):
+    @abc.abstractmethod
+    def scale_factor(self: ModifierLike, sumw: Array) -> SF:
+        ...
+
+    @abc.abstractmethod
+    def __call__(self: ModifierLike, sumw: Array) -> Array:
+        ...
+
+    @abc.abstractmethod
+    def __matmul__(self: ModifierLike, other: ModifierLike) -> compose:
+        ...
+
+
 class ApplyFn(eqx.Module):
     @jax.named_scope("evm.modifier.ApplyFn")
     def __call__(self: ModifierLike, sumw: Array) -> Array:
         sf = self.scale_factor(sumw=sumw)
         # apply
-        return sf[operator.mul] * (sumw + sf[operator.add])
+        return sf.multiplicative * (sumw + sf.additive)
 
 
-class Modifier(ApplyFn):
+class MatMulCompose(eqx.Module):
+    def __matmul__(self: ModifierLike, other: ModifierLike) -> compose:
+        return compose(self, other)
+
+
+class ModifierBase(ApplyFn, MatMulCompose, AbstractModifier):
+    """
+    This serves as a base class for all modifiers.
+    It automatically implements the __call__ method to apply the scale factors to the sumw array
+    and the __matmul__ method to compose two modifiers.
+
+    Custom modifiers should inherit from this class and implement the scale_factor method.
+
+    Example:
+
+        .. code-block:: python
+
+            import jax.numpy as jnp
+            import jax.tree_util as jtu
+            import evermore as evm
+
+            class clip(evm.ModifierBase):
+                modifier: evm.ModifierBase
+                min_sf: float
+                max_sf: float
+
+                def scale_factor(self, sumw: jnp.ndarray) -> evm.SF:
+                    sf = self.modifier.scale_factor(sumw)
+                    return jtu.tree_map(lambda x: jnp.clip(x, self.min_sf, self.max_sf), sf)
+
+
+            parameter = evm.Parameter(value=1.1)
+            modifier = parameter.unconstrained()
+
+            clipped_modifier = clip(modifier=modifier, min_sf=0.8, max_sf=1.2)
+    """
+
+
+class Modifier(ModifierBase):
     """
     Create a new modifier for a given parameter and penalty.
 
@@ -89,14 +143,11 @@ class Modifier(ApplyFn):
         constraint = self.effect.constraint(parameter=self.parameter)
         self.parameter._set_constraint(constraint, overwrite=False)
 
-    def scale_factor(self, sumw: Array) -> AddOrMulSFs:
+    def scale_factor(self, sumw: Array) -> SF:
         return self.effect.scale_factor(parameter=self.parameter, sumw=sumw)
 
-    def __matmul__(self, other: ModifierLike) -> compose:
-        return compose(self, other)
 
-
-class where(ApplyFn):
+class where(ModifierBase):
     """
     Combine two modifiers based on a condition.
 
@@ -125,21 +176,17 @@ class where(ApplyFn):
     modifier_true: Modifier
     modifier_false: Modifier
 
-    def scale_factor(self, sumw: Array) -> AddOrMulSFs:
-        sf = initSF(shape=sumw.shape)
-
+    def scale_factor(self, sumw: Array) -> SF:
         true_sf = self.modifier_true.scale_factor(sumw)
         false_sf = self.modifier_false.scale_factor(sumw)
 
-        for op in operator.mul, operator.add:
-            sf.update(jnp.where(self.condition, true_sf[op], false_sf[op]))
-        return sf
+        def _where(true: Array, false: Array) -> Array:
+            return jnp.where(self.condition, true, false)
 
-    def __matmul__(self, other: ModifierLike) -> compose:
-        return compose(self, other)
+        return jtu.tree_map(_where, true_sf, false_sf)
 
 
-class compose(ApplyFn):
+class compose(ModifierBase):
     """
     Composition of multiple modifiers, i.e.: `(f ∘ g ∘ h)(hist) = f(hist) * g(hist) * h(hist)`
     It behaves like a single modifier, but it is composed of multiple modifiers; it can be arbitrarly nested.
@@ -196,7 +243,7 @@ class compose(ApplyFn):
             if isinstance(mod, compose):
                 _modifiers.extend(mod.modifiers)
             else:
-                assert isinstance(mod, ModifierLike)
+                assert isinstance(mod, ModifierBase)
                 _modifiers.append(mod)
         # by now all modifiers are either modifier or staterror
         self.modifiers = _modifiers
@@ -204,23 +251,16 @@ class compose(ApplyFn):
     def __len__(self) -> int:
         return len(self.modifiers)
 
-    def scale_factor(self, sumw: Array) -> AddOrMulSFs:
+    def scale_factor(self, sumw: Array) -> SF:
         # collect all multiplicative and additive shifts
         sfs: dict[AddOrMul, list] = {operator.add: [], operator.mul: []}
         for m in range(len(self)):
             mod = self.modifiers[m]
             _sf = mod.scale_factor(sumw)
-            for op in operator.add, operator.mul:
-                sfs[op].append(_sf[op])
+            sfs[operator.mul].append(_sf.multiplicative)
+            sfs[operator.add].append(_sf.additive)
 
-        sf = initSF(shape=sumw.shape)
         # calculate the product with for operator.mul and operator.add
-        for op, init_val in (
-            (operator.mul, jnp.ones_like(sumw)),
-            (operator.add, jnp.zeros_like(sumw)),
-        ):
-            sf[op] = reduce(op, sfs[op], init_val)
-        return sf
-
-    def __matmul__(self, other: ModifierLike) -> compose:
-        return compose(self, other)
+        multiplicative_sf = reduce(operator.mul, sfs[operator.mul], jnp.ones_like(sumw))
+        additive_sf = reduce(operator.add, sfs[operator.add], jnp.zeros_like(sumw))
+        return SF(multiplicative=multiplicative_sf, additive=additive_sf)
