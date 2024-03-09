@@ -23,6 +23,7 @@ __all__ = [
     "Modifier",
     "compose",
     "where",
+    "mask",
 ]
 
 
@@ -184,6 +185,47 @@ class where(ModifierBase):
             return jnp.where(self.condition, true, false)
 
         return jtu.tree_map(_where, true_sf, false_sf)
+
+
+class mask(ModifierBase):
+    """
+    Mask a modifier for specific bins.
+
+    The mask is a boolean array (True, False for each bin).
+    The modifier is only applied to the bins where the mask is True.
+
+    Example:
+
+        .. code-block:: python
+
+            import jax.numpy as jnp
+            import evermore as evm
+
+            hist = jnp.array([5, 20, 30])
+            syst = evm.Parameter(value=0.0)
+
+            norm = syst.lnN(jnp.array([0.9, 1.1]))
+            mask = jnp.array([True, False, True])
+
+            modifier = evm.modifier.mask(mask, norm)
+
+            # apply
+            modifier(hist)
+    """
+
+    where: Array = eqx.field(static=True)
+    modifier: Modifier
+
+    def scale_factor(self, sumw: Array) -> SF:
+        sf = self.modifier.scale_factor(sumw)
+
+        def _mask(true: Array, false: Array) -> Array:
+            return jnp.where(self.where, true, false)
+
+        return SF(
+            multiplicative=_mask(sf.multiplicative, jnp.ones_like(sumw)),
+            additive=_mask(sf.additive, jnp.zeros_like(sumw)),
+        )
 
 
 class compose(ModifierBase):
