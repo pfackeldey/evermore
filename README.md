@@ -25,7 +25,7 @@ cd evermore
 python -m pip install .
 ```
 
-## Usage - Model definition and fitting
+## Example - Model and Loss Definition
 
 See more in `examples/`
 
