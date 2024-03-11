@@ -1,7 +1,7 @@
-# evermore.likelihood
+# evermore.loss
 
 ```{eval-rst}
-.. automodule:: evermore.likelihood
+.. automodule:: evermore.loss
     :show-inheritance:
     :members:
 ```

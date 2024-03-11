@@ -2,11 +2,11 @@
 
 ```{toctree}
 effect.md
-likelihood.md
+loss.md
 model.md
 modifier.md
-optimizer.md
 parameter.md
 pdf.md
+sample.md
 util.md
 ```

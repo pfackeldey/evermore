@@ -1,7 +1,7 @@
-# evermore.optimizer
+# evermore.sample
 
 ```{eval-rst}
-.. automodule:: evermore.optimizer
+.. automodule:: evermore.sample
     :show-inheritance:
     :members:
 ```
