@@ -55,7 +55,7 @@ class PoissonNLL(eqx.Module):
                 loss = nll(expectation, y)
                 constraints = evm.loss.get_param_constraints(model)
                 loss += evm.util.sum_leaves(constraints))
-                return loss
+                return -jnp.sum(loss)
     """
 
     @property
