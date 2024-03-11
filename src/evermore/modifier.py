@@ -116,29 +116,29 @@ class Modifier(ModifierBase):
         norm = evm.Parameter(value=0.0)
 
         # create a new parameter and a penalty
-        modify = evm.modifier(parameter=mu, effect=evm.effect.unconstrained())
+        modify = evm.Modifier(parameter=mu, effect=evm.effect.unconstrained())
         # or shorthand
         modify = mu.unconstrained()
 
-        # apply the modifier
+        # apply the Modifier
         modify(jnp.array([10, 20, 30]))
         # -> Array([11., 22., 33.], dtype=float32, weak_type=True),
 
         # lnN effect
-        modify = evm.modifier(parameter=norm, effect=evm.effect.lnN(jnp.array([0.8, 1.2])))
+        modify = evm.Modifier(parameter=norm, effect=evm.effect.lnN(jnp.array([0.8, 1.2])))
         # or shorthand
         modify = norm.lnN(jnp.array([0.8, 1.2]))
 
         # poisson effect
         hist = jnp.array([10, 20, 30])
-        modify = evm.modifier(parameter=norm, effect=evm.effect.poisson(hist))
+        modify = evm.Modifier(parameter=norm, effect=evm.effect.poisson(hist))
         # or shorthand
         modify = norm.poisson(hist)
 
         # shape effect
         up = jnp.array([12, 23, 35])
         down = jnp.array([8, 19, 26])
-        modify = evm.modifier(parameter=norm, effect=evm.effect.shape(up, down))
+        modify = evm.Modifier(parameter=norm, effect=evm.effect.shape(up, down))
         # or shorthand
         modify = norm.shape(up, down)
     """
@@ -322,7 +322,7 @@ class compose(ModifierBase):
         # nest compositions
         composition = evm.compose(
             composition,
-            evm.modifier(parameter=sigma, effect=evm.effect.lnN(jnp.array([0.8, 1.2]))),
+            evm.Modifier(parameter=sigma, effect=evm.effect.lnN(jnp.array([0.8, 1.2]))),
         )
 
         # jit
