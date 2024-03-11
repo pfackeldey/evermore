@@ -18,19 +18,16 @@ __version__ = "0.2.0"
 __all__ = [
     "__version__",
     "effect",
-    "ipy_util",
-    "likelihood",
-    "optimizer",
+    "loss",
+    "parameter",
     "pdf",
     "util",
-    # explicitely expose some classes
-    "Model",
-    "Result",
-    "Parameter",
+    "sample",
     "modifier",
-    "staterror",
-    "autostaterrors",
-    "compose",
+    # explicitely expose some classes
+    "Parameter",
+    "Modifier",
+    "ModifierBase",
 ]
 
 
@@ -40,17 +37,12 @@ def __dir__():
 
 from evermore import (  # noqa: E402
     effect,
-    ipy_util,
-    likelihood,
-    optimizer,
+    loss,
+    modifier,
+    parameter,
     pdf,
+    sample,
     util,
 )
-from evermore.model import Model, Result  # noqa: E402
-from evermore.modifier import (  # noqa: E402
-    autostaterrors,
-    compose,
-    modifier,
-    staterror,
-)
+from evermore.modifier import Modifier, ModifierBase  # noqa: E402
 from evermore.parameter import Parameter  # noqa: E402

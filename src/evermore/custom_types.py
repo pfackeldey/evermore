@@ -1,10 +1,27 @@
+from __future__ import annotations
+
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any, NamedTuple, Protocol
 
-import jax
+from jaxtyping import Array
 
-ArrayLike = jax.typing.ArrayLike
-AddOrMul = Callable[[ArrayLike, ArrayLike], jax.Array]
+if TYPE_CHECKING:
+    from evermore.modifier import compose
+
+
+__all__ = [
+    "SF",
+    "AddOrMul",
+    "ModifierLike",
+]
+
+
+AddOrMul = Callable[[Array, Array], Array]
+
+
+class SF(NamedTuple):
+    multiplicative: Array
+    additive: Array
 
 
 class Sentinel:
@@ -20,3 +37,14 @@ class Sentinel:
 
 
 _NoValue: Any = Sentinel("<NoValue>")
+
+
+class ModifierLike(Protocol):
+    def scale_factor(self, hist: Array) -> SF:
+        ...
+
+    def __call__(self, hist: Array) -> Array:
+        ...
+
+    def __matmul__(self, other: ModifierLike) -> compose:
+        ...

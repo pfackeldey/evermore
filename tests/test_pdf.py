@@ -19,13 +19,11 @@ def test_flat():
 
 
 def test_gauss():
-    pdf = Gauss(mean=0.0, width=1.0)
+    pdf = Gauss(mean=jnp.array(0.0), width=jnp.array(1.0))
 
     assert pdf.pdf(jnp.array(0.0)) == pytest.approx(1.0 / jnp.sqrt(2 * jnp.pi))
     assert pdf.logpdf(jnp.array(0.0)) == pytest.approx(0.0)
     assert pdf.cdf(jnp.array(0.0)) == pytest.approx(0.5)
-    assert pdf.inv_cdf(jnp.array(0.5)) == pytest.approx(0.0)
-    assert pdf.inv_cdf(pdf.cdf(jnp.array(0.0))) == pytest.approx(0.0)
 
 
 def test_poisson():
@@ -34,11 +32,11 @@ def test_poisson():
     assert pdf.pdf(jnp.array(0)) == pytest.approx(0.12510978)
     assert pdf.logpdf(jnp.array(-0.5)) == pytest.approx(-1.196003)
     assert pdf.cdf(jnp.array(0)) == pytest.approx(0.5830412)
-    # assert pdf.inv_cdf(jnp.array(0.5830412)) == pytest.approx(10)
-    # assert pdf.inv_cdf(pdf.cdf(jnp.array(10))) == pytest.approx(10)
 
 
 def test_hashable():
     assert hash(Flat()) == hash(Flat())
-    assert hash(Gauss(mean=0.0, width=1.0)) == hash(Gauss(mean=0.0, width=1.0))
+    assert hash(Gauss(mean=jnp.array(0.0), width=jnp.array(1.0))) == hash(
+        Gauss(mean=jnp.array(0.0), width=jnp.array(1.0))
+    )
     assert hash(Poisson(lamb=jnp.array(10))) == hash(Poisson(lamb=jnp.array(10)))

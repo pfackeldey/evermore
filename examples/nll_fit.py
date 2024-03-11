@@ -1,18 +1,55 @@
-from __future__ import annotations
+import equinox as eqx
+import jax
+import jax.numpy as jnp
+import optax
+from model import hists, model, observation
 
-from jax import config
-from model import init_values, model, observation, optimizer
+import evermore as evm
 
-from evermore.likelihood import NLL
+optim = optax.sgd(learning_rate=1e-2)
+opt_state = optim.init(eqx.filter(model, eqx.is_inexact_array))
 
-config.update("jax_enable_x64", True)
+nll = evm.loss.PoissonNLL()
 
 
-# create negative log likelihood
-nll = NLL(model=model, observation=observation)
+@eqx.filter_jit
+def loss(model, hists, observation):
+    expectations = model(hists)
+    constraints = evm.loss.get_param_constraints(model)
+    loss_val = nll(
+        expectation=evm.util.sum_leaves(expectations),
+        observation=observation,
+    )
+    # add constraint
+    loss_val += evm.util.sum_leaves(constraints)
+    return -jnp.sum(loss_val)
 
-# fit
-values, state = optimizer.fit(fun=nll, init_values=init_values)
 
-# update model with fitted values
-fitted_model = model.update(values=values)
+@eqx.filter_jit
+def make_step(model, opt_state, events, observation):
+    # differentiate full analysis
+    grads = eqx.filter_grad(loss)(model, events, observation)
+    updates, opt_state = optim.update(grads, opt_state)
+    # apply nuisance parameter and DNN weight updates
+    model = eqx.apply_updates(model, updates)
+    return model, opt_state
+
+
+# minimize model with 1000 steps
+for step in range(1000):
+    if step % 100 == 0:
+        loss_val = loss(model, hists, observation)
+        print(f"{step=} - {loss_val=:.6f}")
+    model, opt_state = make_step(model, opt_state, hists, observation)
+
+
+# For low overhead it is recommended to use jax.lax.fori_loop.
+# In case you want to jit the for loop, you can use the following function,
+# this will prevent jax from unrolling the loop and creating a huge graph
+@jax.jit
+def fit(steps: int = 1000) -> tuple[eqx.Module, tuple]:
+    def fun(step, model_optstate):
+        model, opt_state = model_optstate
+        return make_step(model, opt_state, hists, observation)
+
+    return jax.lax.fori_loop(0, steps, fun, (model, opt_state))

@@ -160,6 +160,10 @@ Thumbs.db
 # if examples are run
 examples/*.eqx
 
+# analysis optimisation example
+examples/analysis_opt.py
+plots_analysis_opt/
+
 test/
 .vscode/
 .zed/

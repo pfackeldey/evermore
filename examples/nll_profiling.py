@@ -1,67 +1,69 @@
-from __future__ import annotations
-
-from functools import partial
-
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jax import config
-from model import asimov, model, optimizer
+import jax.tree_util as jtu
+import optax
+from jaxtyping import Array
 
-from evermore import Model
-from evermore.likelihood import NLL
-from evermore.optimizer import JaxOptimizer
-
-config.update("jax_enable_x64", True)
+import evermore as evm
 
 
-def nll_profiling(
-    value_name: str,
-    scan_points: jax.Array,
-    model: Model,
-    observation: jax.Array,
-    optimizer: JaxOptimizer,
-    fit: bool,
-) -> jax.Array:
-    # define single fit for a fixed parameter of interest (poi)
-    @partial(jax.jit, static_argnames=("value_name", "optimizer", "fit"))
-    def fixed_poi_fit(
-        value_name: str,
-        scan_point: jax.Array,
-        model: Model,
-        observation: jax.Array,
-        optimizer: JaxOptimizer,
-        fit: bool,
-    ) -> jax.Array:
-        # fix theta into the model
-        model = model.update(values={value_name: scan_point})
-        init_values = model.parameter_values
-        init_values.pop(value_name, 1)
-        # minimize
-        nll = eqx.filter_jit(NLL(model=model, observation=observation))
-        if fit:
-            values, _ = optimizer.fit(fun=nll, init_values=init_values)
-        else:
-            values = model.parameter_values
-        return nll(values=values)
+def fixed_mu_fit(mu: Array) -> Array:
+    from model import hists, model, observation
 
-    # vectorise for multiple fixed values (scan points)
-    fixed_poi_fit_vec = jax.vmap(
-        fixed_poi_fit, in_axes=(None, 0, None, None, None, None)
-    )
-    return fixed_poi_fit_vec(
-        value_name, scan_points, model, observation, optimizer, fit
+    nll = evm.loss.PoissonNLL()
+
+    optim = optax.sgd(learning_rate=1e-2)
+    opt_state = optim.init(eqx.filter(model, eqx.is_inexact_array))
+
+    model = eqx.tree_at(lambda t: t.mu.value, model, mu)
+
+    # filter out mu from the model (no gradients will be calculated for mu!)
+    # see: https://github.com/patrick-kidger/equinox/blob/main/examples/frozen_layer.ipynb
+    filter_spec = jtu.tree_map(lambda _: True, model)
+    filter_spec = eqx.tree_at(
+        lambda tree: tree.mu.value,
+        filter_spec,
+        replace=False,
     )
 
+    @eqx.filter_jit
+    def loss(diff_model, static_model, hists, observation):
+        model = eqx.combine(diff_model, static_model)
+        expectations = model(hists)
+        constraints = evm.loss.get_param_constraints(model)
+        loss_val = nll(
+            expectation=evm.util.sum_leaves(expectations),
+            observation=observation,
+        )
+        # add constraint
+        loss_val += evm.util.sum_leaves(constraints)
+        return -2 * jnp.sum(loss_val)
 
-# profile the NLL around starting point of `0`
-scan_points = jnp.r_[-1.9:2.0:0.1]
+    @eqx.filter_jit
+    def make_step(model, opt_state, events, observation):
+        # differentiate
+        diff_model, static_model = eqx.partition(model, filter_spec)
+        grads = eqx.filter_grad(loss)(diff_model, static_model, events, observation)
+        updates, opt_state = optim.update(grads, opt_state)
+        # apply nuisance parameter and DNN weight updates
+        model = eqx.apply_updates(model, updates)
+        return model, opt_state
 
-profile_postfit = nll_profiling(
-    value_name="norm1",
-    scan_points=scan_points,
-    model=model,
-    observation=asimov,
-    optimizer=optimizer,
-    fit=True,
-)
+    # minimize model with 1000 steps
+    for _ in range(1000):
+        model, opt_state = make_step(model, opt_state, hists, observation)
+    diff_model, static_model = eqx.partition(model, filter_spec)
+    return loss(diff_model, static_model, hists, observation)
+
+
+mus = jnp.linspace(0, 5, 11)
+# for loop over mu values
+for mu in mus:
+    print(f"[for-loop] mu={mu:.2f} - NLL={fixed_mu_fit(jnp.array(mu)):.6f}")
+
+
+# or vectorized!!!
+likelihood_scan = jax.vmap(fixed_mu_fit)(mus)
+for mu, nll in zip(mus, likelihood_scan, strict=False):
+    print(f"[jax.vmap] mu={mu:.2f} - NLL={nll:.6f}")

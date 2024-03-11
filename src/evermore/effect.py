@@ -1,20 +1,19 @@
 import abc
-import operator
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
+from jaxtyping import Array, Float
 
-from evermore.custom_types import AddOrMul, ArrayLike
+from evermore.custom_types import SF
 from evermore.parameter import Parameter
-from evermore.pdf import Flat, Gauss, HashablePDF, Poisson
+from evermore.pdf import PDF, Flat, Gauss, Poisson
 from evermore.util import as1darray
 
 if TYPE_CHECKING:
-    from typing import ClassVar as AbstractClassVar
+    pass
 else:
-    from equinox import AbstractClassVar
+    pass
 
 
 __all__ = [
@@ -32,45 +31,39 @@ def __dir__():
 
 
 class Effect(eqx.Module):
-    apply_op: AbstractClassVar[AddOrMul]
-
-    @property
     @abc.abstractmethod
-    def constraint(self) -> HashablePDF:
+    def constraint(self, parameter: Parameter) -> PDF:
         ...
 
     @abc.abstractmethod
-    def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         ...
 
 
 class unconstrained(Effect):
-    apply_op: ClassVar[AddOrMul] = operator.mul
-
-    @property
-    def constraint(self) -> HashablePDF:
+    def constraint(self, parameter: Parameter) -> PDF:
         return Flat()
 
-    def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
-        return parameter.value
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
+        sf = jnp.broadcast_to(parameter.value, hist.shape)
+        return SF(multiplicative=sf, additive=jnp.zeros_like(hist))
 
 
 DEFAULT_EFFECT = unconstrained()
 
 
 class gauss(Effect):
-    width: ArrayLike = eqx.field(static=True, converter=as1darray)
+    width: Array = eqx.field(static=True, converter=as1darray)
 
-    apply_op: ClassVar[AddOrMul] = operator.mul
-
-    def __init__(self, width: ArrayLike) -> None:
+    def __init__(self, width: Array) -> None:
         self.width = width
 
-    @property
-    def constraint(self) -> HashablePDF:
-        return Gauss(mean=0.0, width=1.0)
+    def constraint(self, parameter: Parameter) -> PDF:
+        return Gauss(
+            mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
+        )
 
-    def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         """
         Implementation with (inverse) CDFs is defined as follows:
 
@@ -88,26 +81,25 @@ class gauss(Effect):
                 return (parameter.value * self.width) + 1
 
         """
-        return (parameter.value * self.width) + 1
+        sf = jnp.broadcast_to((parameter.value * self.width) + 1, hist.shape)
+        return SF(multiplicative=sf, additive=jnp.zeros_like(hist))
 
 
 class shape(Effect):
-    up: jax.Array = eqx.field(converter=as1darray)
-    down: jax.Array = eqx.field(converter=as1darray)
-
-    apply_op: ClassVar[AddOrMul] = operator.add
+    up: Array = eqx.field(converter=as1darray)
+    down: Array = eqx.field(converter=as1darray)
 
     def __init__(
         self,
-        up: jax.Array,
-        down: jax.Array,
+        up: Array,
+        down: Array,
     ) -> None:
         self.up = up  # +1 sigma
         self.down = down  # -1 sigma
 
-    def vshift(self, sf: jax.Array, sumw: jax.Array) -> jax.Array:
+    def vshift(self, sf: Array, hist: Array) -> Array:
         factor = sf
-        dx_sum = self.up + self.down - 2 * sumw
+        dx_sum = self.up + self.down - 2 * hist
         dx_diff = self.up - self.down
 
         # taken from https://github.com/nsmith-/jaxfit/blob/8479cd73e733ba35462287753fab44c0c560037b/src/jaxfit/roofit/combine.py#L173C6-L192
@@ -124,34 +116,31 @@ class shape(Effect):
             )
         )
 
-    @property
-    def constraint(self) -> HashablePDF:
-        return Gauss(mean=0.0, width=1.0)
+    def constraint(self, parameter: Parameter) -> PDF:
+        return Gauss(
+            mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
+        )
 
-    def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
-        sf = parameter.value
-        return self.vshift(sf=sf, sumw=sumw)
-        # shift = self.vshift(sf=sf, sumw=sumw)
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
+        sf = self.vshift(sf=parameter.value, hist=hist)
+        return SF(multiplicative=jnp.ones_like(hist), additive=sf)
+        # shift = self.vshift(sf=sf, hist=hist)
         # # handle zeros, see: https://github.com/google/jax/issues/5039
-        # x = jnp.where(sumw == 0.0, 1.0, sumw)
-        # return jnp.where(sumw == 0.0, shift, (x + shift) / x)
+        # x = jnp.where(hist == 0.0, 1.0, hist)
+        # return jnp.where(hist == 0.0, shift, (x + shift) / x)
 
 
 class lnN(Effect):
-    width: tuple[ArrayLike, ArrayLike] = eqx.field(static=True)
-
-    apply_op: ClassVar[AddOrMul] = operator.mul
+    width: Float[Array, "2"] = eqx.field(static=True)
 
     def __init__(
         self,
-        width: tuple[ArrayLike, ArrayLike],
+        width: Float[Array, "2"],  # given as (down, up)
     ) -> None:
-        # given as (down, up)
-        assert isinstance(width, tuple)
-        assert len(width) == 2
+        assert width.shape == (2,)
         self.width = width
 
-    def interpolate(self, parameter: Parameter) -> jax.Array:
+    def interpolate(self, parameter: Parameter) -> Array:
         # https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/be488af288361ef101859a398ae618131373cad7/src/ProcessNormalization.cc#L112-L129
         x = parameter.value
         lo, hi = self.width
@@ -167,11 +156,12 @@ class lnN(Effect):
             jnp.abs(x) >= 0.5, jnp.where(x >= 0, hi, lo), avg + alpha * halfdiff
         )
 
-    @property
-    def constraint(self) -> HashablePDF:
-        return Gauss(mean=0.0, width=1.0)
+    def constraint(self, parameter: Parameter) -> PDF:
+        return Gauss(
+            mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
+        )
 
-    def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         """
         Implementation with (inverse) CDFs is defined as follows:
 
@@ -189,20 +179,21 @@ class lnN(Effect):
                 return jnp.exp(parameter.value * self.interpolate(parameter=parameter))
 
         """
-        return jnp.exp(parameter.value * self.interpolate(parameter=parameter))
+        interp = self.interpolate(parameter=parameter)
+        sf = jnp.broadcast_to(jnp.exp(parameter.value * interp), hist.shape)
+        return SF(multiplicative=sf, additive=jnp.zeros_like(hist))
 
 
 class poisson(Effect):
-    lamb: jax.Array = eqx.field(static=True, converter=as1darray)
+    lamb: Array = eqx.field(static=True, converter=as1darray)
 
-    apply_op: ClassVar[AddOrMul] = operator.mul
-
-    def __init__(self, lamb: jax.Array) -> None:
+    def __init__(self, lamb: Array) -> None:
         self.lamb = lamb
 
-    @property
-    def constraint(self) -> HashablePDF:
+    def constraint(self, parameter: Parameter) -> PDF:
+        assert parameter.value.shape == self.lamb.shape
         return Poisson(lamb=self.lamb)
 
-    def scale_factor(self, parameter: Parameter, sumw: jax.Array) -> jax.Array:
-        return parameter.value + 1
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
+        sf = jnp.broadcast_to(parameter.value + 1, hist.shape)
+        return SF(multiplicative=sf, additive=jnp.zeros_like(hist))

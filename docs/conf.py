@@ -38,6 +38,8 @@ html_theme_options = {
     "use_edit_page_button": True,
 }
 html_context = {"default_mode": "light"}
+html_logo = "../assets/favicon.png"
+html_favicon = "../assets/favicon.png"
 
 extensions = [
     "sphinx.ext.autodoc",

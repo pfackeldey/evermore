@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from typing import TYPE_CHECKING
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+from jaxtyping import Array, PRNGKeyArray
+
+if TYPE_CHECKING:
+    pass
 
 __all__ = [
-    "HashablePDF",
+    "PDF",
     "Flat",
     "Gauss",
     "Poisson",
@@ -18,106 +23,83 @@ def __dir__():
     return __all__
 
 
-class HashablePDF(eqx.Module):
+class PDF(eqx.Module):
     @abstractmethod
-    def __hash__(self) -> int:
+    def logpdf(self, x: Array) -> Array:
         ...
 
     @abstractmethod
-    def logpdf(self, x: jax.Array) -> jax.Array:
+    def pdf(self, x: Array) -> Array:
         ...
 
     @abstractmethod
-    def pdf(self, x: jax.Array) -> jax.Array:
+    def cdf(self, x: Array) -> Array:
         ...
 
     @abstractmethod
-    def cdf(self, x: jax.Array) -> jax.Array:
-        ...
-
-    @abstractmethod
-    def inv_cdf(self, x: jax.Array) -> jax.Array:
+    def sample(self, key: PRNGKeyArray) -> Array:
         ...
 
 
-class Flat(HashablePDF):
-    def __hash__(self):
-        return hash(self.__class__)
+class Flat(PDF):
+    def logpdf(self, x: Array) -> Array:
+        return jnp.zeros_like(x)
 
-    def logpdf(self, x: jax.Array) -> jax.Array:
-        return jnp.array([0.0])
+    def pdf(self, x: Array) -> Array:
+        return jnp.ones_like(x)
 
-    def pdf(self, x: jax.Array) -> jax.Array:
-        return jnp.array([1.0])
+    def cdf(self, x: Array) -> Array:
+        return jnp.ones_like(x)
 
-    def cdf(self, x: jax.Array) -> jax.Array:
-        return jnp.array([1.0])
+    def sample(self, key: PRNGKeyArray) -> Array:
+        # sample parameter from pdf
+        # what should be the ranges?
+        # +/-jnp.inf leads to nans...
+        # minval=??,
+        # maxval=??,
+        return jax.random.uniform(key)
 
-    def inv_cdf(self, x: jax.Array) -> jax.Array:
-        msg = "Flat distribution has no inverse CDF."
-        raise ValueError(msg)
 
+class Gauss(PDF):
+    mean: Array = eqx.field(static=True)
+    width: Array = eqx.field(static=True)
 
-class Gauss(HashablePDF):
-    mean: float = eqx.field(static=True)
-    width: float = eqx.field(static=True)
-
-    def __init__(self, mean: float, width: float) -> None:
-        self.mean = mean
-        self.width = width
-
-    def __hash__(self):
-        return hash(self.__class__) ^ hash((self.mean, self.width))
-
-    def logpdf(self, x: jax.Array) -> jax.Array:
+    def logpdf(self, x: Array) -> Array:
         logpdf_max = jax.scipy.stats.norm.logpdf(
             self.mean, loc=self.mean, scale=self.width
         )
         unnormalized = jax.scipy.stats.norm.logpdf(x, loc=self.mean, scale=self.width)
         return unnormalized - logpdf_max
 
-    def pdf(self, x: jax.Array) -> jax.Array:
+    def pdf(self, x: Array) -> Array:
         return jax.scipy.stats.norm.pdf(x, loc=self.mean, scale=self.width)
 
-    def cdf(self, x: jax.Array) -> jax.Array:
+    def cdf(self, x: Array) -> Array:
         return jax.scipy.stats.norm.cdf(x, loc=self.mean, scale=self.width)
 
-    def inv_cdf(self, x: jax.Array) -> jax.Array:
-        return jax.scipy.stats.norm.ppf(x, loc=self.mean, scale=self.width)
+    def sample(self, key: PRNGKeyArray) -> Array:
+        # sample parameter from pdf
+        return self.mean + self.width * jax.random.normal(key)
 
 
-class Poisson(HashablePDF):
-    lamb: jax.Array = eqx.field(static=True)
+class Poisson(PDF):
+    lamb: Array = eqx.field(static=True)
 
-    def __init__(self, lamb: jax.Array) -> None:
-        self.lamb = lamb
-
-    def __hash__(self):
-        return hash(self.__class__) ^ hash(str(self.lamb))  # is this a safe hash??
-
-    def logpdf(self, x: jax.Array) -> jax.Array:
+    def logpdf(self, x: Array) -> Array:
         logpdf_max = jax.scipy.stats.poisson.logpmf(self.lamb, mu=self.lamb)
         unnormalized = jax.scipy.stats.poisson.logpmf((x + 1) * self.lamb, mu=self.lamb)
         return unnormalized - logpdf_max
 
-    def pdf(self, x: jax.Array) -> jax.Array:
+    def pdf(self, x: Array) -> Array:
         return jax.scipy.stats.poisson.pmf((x + 1) * self.lamb, mu=self.lamb)
 
-    def cdf(self, x: jax.Array) -> jax.Array:
+    def cdf(self, x: Array) -> Array:
         return jax.scipy.stats.poisson.cdf((x + 1) * self.lamb, mu=self.lamb)
 
-    def inv_cdf(self, x: jax.Array) -> jax.Array:
-        # see: https://num.pyro.ai/en/stable/tutorials/truncated_distributions.html?highlight=poisson%20inverse#5.3-Example:-Left-truncated-Poisson
-        def cond_fn(val):
-            n, cdf = val
-            return jnp.any(cdf < x)
-
-        def body_fn(val):
-            n, cdf = val
-            n_new = jnp.where(cdf < x, n + 1, n)
-            return n_new, self.cdf(n_new)
-
-        start = jnp.zeros_like(x)
-        cdf_start = self.cdf(start)
-        n, _ = jax.lax.while_loop(cond_fn, body_fn, (start, cdf_start))
-        return n.astype(jnp.result_type(int))
+    def sample(self, key: PRNGKeyArray) -> Array:
+        # sample parameter from pdf
+        # some problems with this:
+        #  - this samples only integers, do we want that?
+        #  - this breaks for 0 in self.lamb
+        #  - if jax.random.poisson(key, self.lamb) == 0 then what do we know about the parameter?
+        return (jax.random.poisson(key, self.lamb) / self.lamb) - 1
