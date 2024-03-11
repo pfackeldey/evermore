@@ -52,8 +52,9 @@ class PoissonNLL(eqx.Module):
 
             def loss(model, x, y):
                 expectation = model(x)
+                loss = nll(expectation, y)
                 constraints = evm.loss.get_param_constraints(model)
-                loss = nll(expectation, y, evm.util.sum_leaves(constraints))
+                loss += evm.util.sum_leaves(constraints))
                 return loss
     """
 
