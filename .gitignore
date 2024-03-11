@@ -164,6 +164,9 @@ examples/*.eqx
 examples/analysis_opt.py
 plots_analysis_opt/
 
+# presentation code snippets
+examples/presentation_snippets.py
+
 test/
 .vscode/
 .zed/
