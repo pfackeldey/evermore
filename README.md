@@ -49,7 +49,7 @@ class Model(eqx.Module):
 
     def __call__(self, hists: dict[str, Array]) -> Array:
         mu_modifier = self.mu.unconstrained()
-        syst_modifier = self.syst.lnN(width=jnp.array([0.9, 1.1]))
+        syst_modifier = self.syst.lnN(up=jnp.array([1.1]), down=jnp.array([0.9]))
         return mu_modifier(hists["signal"]) + syst_modifier(hists["bkg"])
 
 

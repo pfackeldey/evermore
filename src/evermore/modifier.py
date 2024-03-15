@@ -361,8 +361,9 @@ class compose(ModifierBase):
             groups[jtu.tree_structure(mod)].append(mod)
         # then do the `jax.lax.scan` loops
         for _, group_mods in groups.items():
-            # Essentially we are turning an array of modifiers into a single modifier with a stack of scale factors and effect leaves (e.g. `width`).
-            # Then we can use XLA's loop constructs (e.g.: `jax.lax.scan`) to calculate the scale factors without having to compile the fully unrolled loop.
+            # Essentially we are turning an array of modifiers into a single modifier of stacked leaves.
+            # Then we can use XLA's loop constructs (e.g.: `jax.lax.scan`) to calculate the scale factors
+            # without having to compile the fully unrolled loop.
             stack = tree_stack(group_mods, broadcast_leaves=True)  # type: ignore[arg-type]
             # scan over first axis of stack
             dynamic_stack, static_stack = eqx.partition(stack, eqx.is_array)
