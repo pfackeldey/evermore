@@ -9,15 +9,10 @@ import evermore as evm
 
 
 class SPlusBModel(eqx.Module):
-    mu: evm.Parameter
-    norm1: evm.Parameter
-    norm2: evm.Parameter
     staterrors: PyTree[evm.Parameter]
 
     def __init__(self, hists: dict[str, Array]) -> None:
-        self.mu = evm.Parameter(value=1.0, lower=0.0, upper=10.0)
         self.staterrors = evm.parameter.staterrors(hists=hists)
-        self = evm.parameter.auto_init(self)
 
     def __call__(self, hists: dict, histsw2: dict) -> dict[str, Array]:
         expectations = {}
@@ -32,20 +27,17 @@ class SPlusBModel(eqx.Module):
         # signal process
         signal_poisson = self.staterrors["poisson"]["signal"].poisson(hists["signal"])
         signal_mc_stats = evm.modifier.where(mask, gauss_mcstat, signal_poisson)
-        mu_mod = self.mu.unconstrained()
-        expectations["signal"] = (signal_mc_stats @ mu_mod)(hists["signal"])
+        expectations["signal"] = signal_mc_stats(hists["signal"])
 
         # bkg1 process
         bkg1_poisson = self.staterrors["poisson"]["bkg1"].poisson(hists["bkg1"])
         bkg1_mc_stats = evm.modifier.where(mask, gauss_mcstat, bkg1_poisson)
-        norm1_mod = self.norm1.lnN(jnp.array([0.9, 1.1]))
-        expectations["bkg1"] = (bkg1_mc_stats @ norm1_mod)(hists["bkg1"])
+        expectations["bkg1"] = bkg1_mc_stats(hists["bkg1"])
 
         # bkg2 process
         bkg2_poisson = self.staterrors["poisson"]["bkg2"].poisson(hists["bkg2"])
         bkg2_mc_stats = evm.modifier.where(mask, gauss_mcstat, bkg2_poisson)
-        norm2_mod = self.norm2.lnN(jnp.array([0.95, 1.05]))
-        expectations["bkg2"] = (bkg2_mc_stats @ norm2_mod)(hists["bkg2"])
+        expectations["bkg2"] = bkg2_mc_stats(hists["bkg2"])
 
         # return the modified expectations
         return expectations

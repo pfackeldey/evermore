@@ -39,7 +39,7 @@ def test_gauss():
 
 def test_lnN():
     p = evm.Parameter(value=jnp.array(0.0))
-    ln = evm.effect.lnN(width=jnp.array([0.9, 1.1]))
+    ln = evm.effect.lnN(up=jnp.array([1.1]), down=jnp.array([0.9]))
 
     assert ln.constraint(p) == Gauss(mean=jnp.array(0.0), width=jnp.array(1.0))
     assert ln.scale_factor(p, jnp.array([1.0])) == SF(
@@ -74,7 +74,8 @@ def test_modifier():
 
     # lnN effect
     m_lnN = evm.Modifier(
-        parameter=norm, effect=evm.effect.lnN(width=jnp.array([0.9, 1.1]))
+        parameter=norm,
+        effect=evm.effect.lnN(up=jnp.array([1.1]), down=jnp.array([0.9])),
     )
     assert m_lnN(jnp.array([10])) == pytest.approx(10)
 

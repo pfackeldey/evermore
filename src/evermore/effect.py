@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, Float
+from jaxtyping import Array
 
 from evermore.custom_types import SF
 from evermore.parameter import Parameter
@@ -53,10 +53,7 @@ DEFAULT_EFFECT = unconstrained()
 
 
 class gauss(Effect):
-    width: Array = eqx.field(static=True, converter=as1darray)
-
-    def __init__(self, width: Array) -> None:
-        self.width = width
+    width: Array = eqx.field(converter=as1darray)
 
     def constraint(self, parameter: Parameter) -> PDF:
         return Gauss(
@@ -86,16 +83,8 @@ class gauss(Effect):
 
 
 class shape(Effect):
-    up: Array = eqx.field(converter=as1darray)
-    down: Array = eqx.field(converter=as1darray)
-
-    def __init__(
-        self,
-        up: Array,
-        down: Array,
-    ) -> None:
-        self.up = up  # +1 sigma
-        self.down = down  # -1 sigma
+    up: Array = eqx.field(converter=as1darray)  # + 1 sigma
+    down: Array = eqx.field(converter=as1darray)  # - 1 sigma
 
     def vshift(self, sf: Array, hist: Array) -> Array:
         factor = sf
@@ -131,19 +120,13 @@ class shape(Effect):
 
 
 class lnN(Effect):
-    width: Float[Array, "2"] = eqx.field(static=True)
-
-    def __init__(
-        self,
-        width: Float[Array, "2"],  # given as (down, up)
-    ) -> None:
-        assert width.shape == (2,)
-        self.width = width
+    up: Array = eqx.field(converter=as1darray)
+    down: Array = eqx.field(converter=as1darray)
 
     def interpolate(self, parameter: Parameter) -> Array:
         # https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/be488af288361ef101859a398ae618131373cad7/src/ProcessNormalization.cc#L112-L129
         x = parameter.value
-        lo, hi = self.width
+        lo, hi = self.down, self.up
         hi = jnp.log(hi)
         lo = jnp.log(lo)
         lo = -lo
@@ -185,10 +168,7 @@ class lnN(Effect):
 
 
 class poisson(Effect):
-    lamb: Array = eqx.field(static=True, converter=as1darray)
-
-    def __init__(self, lamb: Array) -> None:
-        self.lamb = lamb
+    lamb: Array = eqx.field(converter=as1darray)
 
     def constraint(self, parameter: Parameter) -> PDF:
         assert parameter.value.shape == self.lamb.shape
