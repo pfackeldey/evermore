@@ -14,6 +14,7 @@ from jaxtyping import Array, ArrayLike, PyTree
 __all__ = [
     "is_parameter",
     "sum_leaves",
+    "tree_stack",
     "as1darray",
     "dump_hlo_graph",
     "dump_jaxpr",
@@ -48,6 +49,60 @@ _params_map = partial(_filtered_module_map, filter=is_parameter)
 
 def sum_leaves(tree: PyTree) -> Array:
     return jtu.tree_reduce(operator.add, tree)
+
+
+def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
+    """
+    Turn an array of `evm.Modifier`(s) into a `evm.Modifier` of arrays.
+    Caution:
+        It is important that the `jax.Array`(s) of the underlying `evm.Parameter` have the same shape.
+        Same applies for the effect leaves (e.g. `width`). However, the effect leaves can be
+        broadcasted to the same shape if `broadcast_effect_leaves` is set to `True`.
+
+    Example:
+
+        .. code-block:: python
+
+            import evermore as evm
+            import jax
+            import jax.numpy as jnp
+
+            modifier = [
+                evm.Parameter().lnN(up=jnp.array([0.9, 0.95]), down=jnp.array([1.1, 1.14])),
+                evm.Parameter().lnN(up=jnp.array([0.8]), down=jnp.array([1.2])),
+            ]
+            print(modifier_stack2(modifier))
+            # -> Modifier(
+            #      parameter=Parameter(
+            #        value=f32[2,1], # <- stacked dimension (2, 1)
+            #        lower=f32[1],
+            #        upper=f32[1],
+            #        constraint=Gauss(mean=f32[1], width=f32[1])
+            #      ),
+            #      effect=lnN(up=f32[2,1], down=f32[2,1]) # <- stacked dimension (2, 1)
+            #    )
+    """
+    # If there is only one modifier, we can return it directly
+    if len(trees) == 1:
+        return trees[0]
+    leaves_list = []
+    treedef_list = []
+    for tree in trees:
+        leaves, treedef = jtu.tree_flatten(tree)
+        leaves_list.append(leaves)
+        treedef_list.append(treedef)
+
+    grouped_leaves = zip(*leaves_list, strict=False)
+    stacked_leaves = []
+    for leaves in grouped_leaves:  # type: ignore[assignment]
+        if broadcast_leaves:
+            shape = jnp.broadcast_shapes(*[leaf.shape for leaf in leaves])
+            stacked_leaves.append(
+                jnp.stack(jtu.tree_map(partial(jnp.broadcast_to, shape=shape), leaves))
+            )
+        else:
+            stacked_leaves.append(jnp.stack(leaves))
+    return jtu.tree_unflatten(treedef_list[0], stacked_leaves)
 
 
 def as1darray(x: ArrayLike) -> Array:

@@ -27,8 +27,8 @@ def __dir__():
 
 class Parameter(eqx.Module):
     value: Array = eqx.field(converter=as1darray)
-    lower: Array = eqx.field(static=True, converter=as1darray)
-    upper: Array = eqx.field(static=True, converter=as1darray)
+    lower: Array = eqx.field(converter=as1darray)
+    upper: Array = eqx.field(converter=as1darray)
     constraint: PDF | Sentinel = eqx.field(static=True)
 
     def __init__(

@@ -61,8 +61,8 @@ class Flat(PDF):
 
 
 class Gauss(PDF):
-    mean: Array = eqx.field(static=True)
-    width: Array = eqx.field(static=True)
+    mean: Array
+    width: Array
 
     def logpdf(self, x: Array) -> Array:
         logpdf_max = jax.scipy.stats.norm.logpdf(
@@ -83,7 +83,7 @@ class Gauss(PDF):
 
 
 class Poisson(PDF):
-    lamb: Array = eqx.field(static=True)
+    lamb: Array
 
     def logpdf(self, x: Array) -> Array:
         logpdf_max = jax.scipy.stats.poisson.logpmf(self.lamb, mu=self.lamb)

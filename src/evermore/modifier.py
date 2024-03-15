@@ -14,6 +14,7 @@ from jaxtyping import Array
 from evermore.custom_types import SF, ModifierLike
 from evermore.effect import DEFAULT_EFFECT
 from evermore.parameter import Parameter
+from evermore.util import tree_stack
 
 if TYPE_CHECKING:
     from evermore.effect import Effect
@@ -173,7 +174,7 @@ class where(ModifierBase):
             hist = jnp.array([5, 20, 30])
             syst = evm.Parameter(value=0.1)
 
-            norm = syst.lnN(jnp.array([0.9, 1.1]))
+            norm = syst.lnN(up=jnp.array([1.1]), down=jnp.array([0.9]))
             shape = syst.shape(up=jnp.array([7, 22, 31]), down=jnp.array([4, 16, 27]))
 
             # apply norm if hist < 10, else apply shape
@@ -190,7 +191,7 @@ class where(ModifierBase):
             # -> Array([ 5.1593127, 20.281374 , 30.181376 ], dtype=float32)
     """
 
-    condition: Array = eqx.field(static=True)
+    condition: Array
     modifier_true: Modifier
     modifier_false: Modifier
 
@@ -231,7 +232,7 @@ class mask(ModifierBase):
             # -> Array([ 5.049494, 20.      , 30.296963], dtype=float32)
     """
 
-    where: Array = eqx.field(static=True)
+    where: Array
     modifier: Modifier
 
     def scale_factor(self, hist: Array) -> SF:
@@ -321,7 +322,7 @@ class compose(ModifierBase):
         # nest compositions
         composition = evm.modifier.compose(
             composition,
-            evm.Modifier(parameter=sigma, effect=evm.effect.lnN(jnp.array([0.8, 1.2]))),
+            evm.Modifier(parameter=sigma, effect=evm.effect.lnN(up=jnp.array([1.2]), down=jnp.array([0.8]))),
         )
 
         # jit
@@ -355,31 +356,14 @@ class compose(ModifierBase):
         additive_sf = jnp.zeros_like(hist)
 
         groups = defaultdict(list)
-        _sentinel = object()
+        # first group modifiers into same tree structures
         for mod in self.modifiers:
-            key = jtu.tree_structure(mod) if isinstance(mod, Modifier) else _sentinel
-            # We have to handle the case where we have a `Modifier` instance, and the case where we have a
-            # other types of `ModifierBase` instances, e.g. `evm.modifier.where`, `evm.modifier.transform`, etc.
-            # basically: anything that is not a `Modifier` instance, but inherits from `ModifierBase`.
-            # It's unclear how to use them in `jax.lax.scan` constructs for now,
-            # so we just loop over them and calculate the scale factors with python for-loops.
-            # This is not ideal for compiletime, but it's a start. It is not expected that there
-            # are many of these in a typical composition.
-            groups[key].append(mod)
-
-        # first do the python for-loops
-        mods = groups.pop(_sentinel, [])
-        for mod in mods:
-            sf = mod.scale_factor(hist)
-            multiplicative_sf *= sf.multiplicative
-            additive_sf += sf.additive
-
+            groups[jtu.tree_structure(mod)].append(mod)
         # then do the `jax.lax.scan` loops
         for _, group_mods in groups.items():
-            # Filter stack for modifiers with same effect cls, and stack them in order to reduce compile time.
             # Essentially we are turning an array of modifiers into a single modifier with a stack of scale factors and effect leaves (e.g. `width`).
             # Then we can use XLA's loop constructs (e.g.: `jax.lax.scan`) to calculate the scale factors without having to compile the fully unrolled loop.
-            stack = modifier_stack(group_mods, broadcast_effect_leaves=True)  # type: ignore[arg-type]
+            stack = tree_stack(group_mods, broadcast_leaves=True)  # type: ignore[arg-type]
             # scan over first axis of stack
             dynamic_stack, static_stack = eqx.partition(stack, eqx.is_array)
 
@@ -397,75 +381,3 @@ class compose(ModifierBase):
             additive_sf += jnp.sum(sf.additive, axis=0)
 
         return SF(multiplicative=multiplicative_sf, additive=additive_sf)
-
-
-def modifier_stack(
-    modifiers: list[Modifier], broadcast_effect_leaves: bool = False
-) -> Modifier:
-    """
-    Turn an array of `evm.Modifier`(s) into a `evm.Modifier` of arrays.
-    Caution:
-        It is important that the `jax.Array`(s) of the underlying `evm.Parameter` have the same shape.
-        Same applies for the effect leaves (e.g. `width`). However, the effect leaves can be
-        broadcasted to the same shape if `broadcast_effect_leaves` is set to `True`.
-
-    Example:
-
-        .. code-block:: python
-
-            import evermore as evm
-            import jax
-            import jax.numpy as jnp
-
-            modifier = [
-                evm.Parameter().lnN(up=jnp.array([0.9, 0.95]), down=jnp.array([1.1, 1.14])),
-                evm.Parameter().lnN(up=jnp.array([0.8]), down=jnp.array([1.2])),
-            ]
-            print(modifier_stack(modifier))
-            # -> Modifier(
-            #      parameter=Parameter(
-            #        value=f32[2,1], # <- stacked dimension (2, 1)
-            #        lower=f32[1],
-            #        upper=f32[1],
-            #        constraint=Gauss(mean=f32[1], width=f32[1])
-            #      ),
-            #      effect=lnN(up=f32[2,1], down=f32[2,1]) # <- stacked dimension (2, 1)
-            #    )
-    """
-    # If there is only one modifier, we can return it directly
-    if len(modifiers) == 1:
-        return modifiers[0]
-    param_leaves_list = []
-    effect_leaves_list = []
-    for modifier in modifiers:
-        # parameter
-        param_leaves_list.extend(jtu.tree_leaves(modifier.parameter))
-        # effect
-        effect_leaves_list.extend(jtu.tree_leaves(modifier.effect))
-
-    stacked_leaves = []
-
-    # Parameter:
-    # Here we are dealing with the evm.Parameter value
-    # We can not broadcast its leaves as that would change
-    # the meaning/correlation of the parameter
-    stacked_leaves.append(jnp.stack(param_leaves_list))
-
-    # Effect:
-    # Here, we are dealing with the effect of the modifier.
-    # We can broadcast the leaves as they are independent if `broadcast_effect_leaves=True`.
-    # Effects may have multiple leaves, e.g. `lnN` has `up` and `down`,
-    # thus we need to stack them separately, so we loop over the leaf groups
-    grouped_effect_leaves = zip(*effect_leaves_list, strict=False)
-    for leaves in grouped_effect_leaves:
-        if broadcast_effect_leaves:
-            shape = jnp.broadcast_shapes(*[leaf.shape for leaf in leaves])
-            stacked_leaves.append(
-                jnp.stack(jtu.tree_map(partial(jnp.broadcast_to, shape=shape), leaves))
-            )
-        else:
-            stacked_leaves.append(jnp.stack(leaves))
-
-    # reconstruct the modifier
-    modifier_structure = jtu.tree_structure(modifiers[0])
-    return jtu.tree_unflatten(modifier_structure, stacked_leaves)

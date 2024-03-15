@@ -31,7 +31,7 @@ def test_gauss():
     p = evm.Parameter(value=jnp.array(0.0))
     g = evm.effect.gauss(width=jnp.array(1.0))
 
-    assert g.constraint(p) == Gauss(mean=jnp.array(0.0), width=jnp.array(1.0))
+    assert isinstance(g.constraint(p), Gauss)
     assert g.scale_factor(p, jnp.array([1.0])) == SF(
         multiplicative=jnp.array([1.0]), additive=jnp.array([0.0])
     )
@@ -41,7 +41,7 @@ def test_lnN():
     p = evm.Parameter(value=jnp.array(0.0))
     ln = evm.effect.lnN(up=jnp.array([1.1]), down=jnp.array([0.9]))
 
-    assert ln.constraint(p) == Gauss(mean=jnp.array(0.0), width=jnp.array(1.0))
+    assert isinstance(ln.constraint(p), Gauss)
     assert ln.scale_factor(p, jnp.array([1.0])) == SF(
         multiplicative=jnp.array([1.0]), additive=jnp.array([0.0])
     )
@@ -51,7 +51,7 @@ def test_poisson():
     p = evm.Parameter(value=jnp.array(0.0))
     po = evm.effect.poisson(lamb=jnp.array(10))
 
-    assert po.constraint(p) == Poisson(lamb=jnp.array(10))
+    assert isinstance(po.constraint(p), Poisson)
     # assert po.scale_factor(p, jnp.array(1.0)) == pytest.approx(1.0) # FIXME
     # assert po.scale_factor(p.update(jnp.array(2.0)), jnp.array(1.0)) == pytest.approx(1.1) # FIXME
 
