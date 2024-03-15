@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import abc
-import operator
 from collections.abc import Callable
-from functools import reduce
+from functools import partial
 from typing import TYPE_CHECKING
 
 import equinox as eqx
@@ -12,7 +11,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jaxtyping import Array
 
-from evermore.custom_types import SF, AddOrMul, ModifierLike
+from evermore.custom_types import SF, ModifierLike
 from evermore.effect import DEFAULT_EFFECT
 from evermore.parameter import Parameter
 
@@ -305,10 +304,10 @@ class compose(ModifierBase):
         # all bins with bin content below 10 (threshold) are treated as poisson, else gauss
 
         # create a new parameter and a composition of modifiers
-        mu_mod = mu.constrained()
-        sigma_mod = sigma.lnN(jnp.array([0.9, 1.1]))
-        sigma2_mod = sigma2.lnN(jnp.array([0.95, 1.05]))
-        composition = evm.compose(
+        mu_mod = mu.unconstrained()
+        sigma_mod = sigma.lnN(up=jnp.array([1.1]), down=jnp.array([0.9]))
+        sigma2_mod = sigma2.lnN(up=jnp.array([1.05]), down=jnp.array([0.95]))
+        composition = evm.modifier.compose(
             mu_mod,
             sigma_mod,
             evm.modifier.where(hist < 15, sigma2_mod, sigma_mod),
@@ -320,7 +319,7 @@ class compose(ModifierBase):
         composition(hist)
 
         # nest compositions
-        composition = evm.compose(
+        composition = evm.modifier.compose(
             composition,
             evm.Modifier(parameter=sigma, effect=evm.effect.lnN(jnp.array([0.8, 1.2]))),
         )
@@ -350,15 +349,123 @@ class compose(ModifierBase):
         return len(self.modifiers)
 
     def scale_factor(self, hist: Array) -> SF:
-        # collect all multiplicative and additive shifts
-        sfs: dict[AddOrMul, list] = {operator.add: [], operator.mul: []}
-        for m in range(len(self)):
-            mod = self.modifiers[m]
-            _sf = mod.scale_factor(hist)
-            sfs[operator.mul].append(_sf.multiplicative)
-            sfs[operator.add].append(_sf.additive)
+        from collections import defaultdict
 
-        # calculate the product with for operator.mul and operator.add
-        multiplicative_sf = reduce(operator.mul, sfs[operator.mul], jnp.ones_like(hist))
-        additive_sf = reduce(operator.add, sfs[operator.add], jnp.zeros_like(hist))
+        multiplicative_sf = jnp.ones_like(hist)
+        additive_sf = jnp.zeros_like(hist)
+
+        groups = defaultdict(list)
+        _sentinel = object()
+        for mod in self.modifiers:
+            key = jtu.tree_structure(mod) if isinstance(mod, Modifier) else _sentinel
+            # We have to handle the case where we have a `Modifier` instance, and the case where we have a
+            # other types of `ModifierBase` instances, e.g. `evm.modifier.where`, `evm.modifier.transform`, etc.
+            # basically: anything that is not a `Modifier` instance, but inherits from `ModifierBase`.
+            # It's unclear how to use them in `jax.lax.scan` constructs for now,
+            # so we just loop over them and calculate the scale factors with python for-loops.
+            # This is not ideal for compiletime, but it's a start. It is not expected that there
+            # are many of these in a typical composition.
+            groups[key].append(mod)
+
+        # first do the python for-loops
+        mods = groups.pop(_sentinel, [])
+        for mod in mods:
+            sf = mod.scale_factor(hist)
+            multiplicative_sf *= sf.multiplicative
+            additive_sf += sf.additive
+
+        # then do the `jax.lax.scan` loops
+        for _, group_mods in groups.items():
+            # Filter stack for modifiers with same effect cls, and stack them in order to reduce compile time.
+            # Essentially we are turning an array of modifiers into a single modifier with a stack of scale factors and effect leaves (e.g. `width`).
+            # Then we can use XLA's loop constructs (e.g.: `jax.lax.scan`) to calculate the scale factors without having to compile the fully unrolled loop.
+            stack = modifier_stack(group_mods, broadcast_effect_leaves=True)  # type: ignore[arg-type]
+            # scan over first axis of stack
+            dynamic_stack, static_stack = eqx.partition(stack, eqx.is_array)
+
+            def calc_sf(_hist, _dynamic_stack, _static_stack):
+                stack = eqx.combine(_dynamic_stack, _static_stack)
+                sf = stack.scale_factor(_hist)
+                return _hist, sf
+
+            _, sf = jax.lax.scan(
+                partial(calc_sf, _static_stack=static_stack),
+                hist,
+                dynamic_stack,
+            )
+            multiplicative_sf *= jnp.prod(sf.multiplicative, axis=0)
+            additive_sf += jnp.sum(sf.additive, axis=0)
+
         return SF(multiplicative=multiplicative_sf, additive=additive_sf)
+
+
+def modifier_stack(
+    modifiers: list[Modifier], broadcast_effect_leaves: bool = False
+) -> Modifier:
+    """
+    Turn an array of `evm.Modifier`(s) into a `evm.Modifier` of arrays.
+    Caution:
+        It is important that the `jax.Array`(s) of the underlying `evm.Parameter` have the same shape.
+        Same applies for the effect leaves (e.g. `width`). However, the effect leaves can be
+        broadcasted to the same shape if `broadcast_effect_leaves` is set to `True`.
+
+    Example:
+
+        .. code-block:: python
+
+            import evermore as evm
+            import jax
+            import jax.numpy as jnp
+
+            modifier = [
+                evm.Parameter().lnN(up=jnp.array([0.9, 0.95]), down=jnp.array([1.1, 1.14])),
+                evm.Parameter().lnN(up=jnp.array([0.8]), down=jnp.array([1.2])),
+            ]
+            print(modifier_stack(modifier))
+            # -> Modifier(
+            #      parameter=Parameter(
+            #        value=f32[2,1], # <- stacked dimension (2, 1)
+            #        lower=f32[1],
+            #        upper=f32[1],
+            #        constraint=Gauss(mean=f32[1], width=f32[1])
+            #      ),
+            #      effect=lnN(up=f32[2,1], down=f32[2,1]) # <- stacked dimension (2, 1)
+            #    )
+    """
+    # If there is only one modifier, we can return it directly
+    if len(modifiers) == 1:
+        return modifiers[0]
+    param_leaves_list = []
+    effect_leaves_list = []
+    for modifier in modifiers:
+        # parameter
+        param_leaves_list.extend(jtu.tree_leaves(modifier.parameter))
+        # effect
+        effect_leaves_list.extend(jtu.tree_leaves(modifier.effect))
+
+    stacked_leaves = []
+
+    # Parameter:
+    # Here we are dealing with the evm.Parameter value
+    # We can not broadcast its leaves as that would change
+    # the meaning/correlation of the parameter
+    stacked_leaves.append(jnp.stack(param_leaves_list))
+
+    # Effect:
+    # Here, we are dealing with the effect of the modifier.
+    # We can broadcast the leaves as they are independent if `broadcast_effect_leaves=True`.
+    # Effects may have multiple leaves, e.g. `lnN` has `up` and `down`,
+    # thus we need to stack them separately, so we loop over the leaf groups
+    grouped_effect_leaves = zip(*effect_leaves_list, strict=False)
+    for leaves in grouped_effect_leaves:
+        if broadcast_effect_leaves:
+            shape = jnp.broadcast_shapes(*[leaf.shape for leaf in leaves])
+            stacked_leaves.append(
+                jnp.stack(jtu.tree_map(partial(jnp.broadcast_to, shape=shape), leaves))
+            )
+        else:
+            stacked_leaves.append(jnp.stack(leaves))
+
+    # reconstruct the modifier
+    modifier_structure = jtu.tree_structure(modifiers[0])
+    return jtu.tree_unflatten(modifier_structure, stacked_leaves)

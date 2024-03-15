@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, cast
 import equinox as eqx
 import jax.numpy as jnp
 import jax.tree_util as jtu
-from jaxtyping import Array, ArrayLike, Float, PyTree
+from jaxtyping import Array, ArrayLike, PyTree
 
 from evermore.custom_types import Sentinel, _NoValue
 from evermore.pdf import PDF
@@ -81,10 +81,10 @@ class Parameter(eqx.Module):
 
         return evm.Modifier(parameter=self, effect=evm.effect.gauss(width=width))
 
-    def lnN(self, width: Float[Array, 2]) -> Modifier:
+    def lnN(self, up: Array, down: Array) -> Modifier:
         import evermore as evm
 
-        return evm.Modifier(parameter=self, effect=evm.effect.lnN(width=width))
+        return evm.Modifier(parameter=self, effect=evm.effect.lnN(up=up, down=down))
 
     def poisson(self, lamb: Array) -> Modifier:
         import evermore as evm

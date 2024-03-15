@@ -25,7 +25,7 @@ class SPlusBModel(eqx.Module):
         expectations["signal"] = sig_mod(hists["nominal"]["signal"])
 
         # bkg1 process
-        bkg1_lnN = self.norm1.lnN(width=jnp.array([0.9, 1.1]))
+        bkg1_lnN = self.norm1.lnN(up=jnp.array([1.1]), down=jnp.array([0.9]))
         bkg1_shape = self.shape1.shape(
             up=hists["shape_up"]["bkg1"],
             down=hists["shape_down"]["bkg1"],
@@ -35,7 +35,7 @@ class SPlusBModel(eqx.Module):
         expectations["bkg1"] = bkg1_mod(hists["nominal"]["bkg1"])
 
         # bkg2 process
-        bkg2_lnN = self.norm2.lnN(width=jnp.array([0.95, 1.05]))
+        bkg2_lnN = self.norm2.lnN(up=jnp.array([1.05]), down=jnp.array([0.95]))
         bkg2_shape = self.shape1.shape(
             up=hists["shape_up"]["bkg2"],
             down=hists["shape_down"]["bkg2"],
