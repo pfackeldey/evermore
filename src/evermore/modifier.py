@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 from collections.abc import Callable
 from functools import partial
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import equinox as eqx
 import jax
@@ -357,16 +357,14 @@ class compose(ModifierBase):
         groups = defaultdict(list)
         _sentinel = object()
         for mod in self.modifiers:
-            if isinstance(mod, Modifier):
-                key = jtu.tree_structure(cast(Modifier, mod))
-            else:
-                # Here, we have a `evm.modifier.where`, `evm.modifier.transform`, etc.,
-                # basically: anything that is not a `Modifier` instance, but inherits from `ModifierBase`.
-                # It's unclear how to use them in `jax.lax.scan` constructs for now,
-                # so we just loop over them and calculate the scale factors with python for-loops.
-                # This is not ideal for compiletime, but it's a start. It is not expected that there
-                # are many of these in a typical composition.
-                key = _sentinel
+            key = jtu.tree_structure(mod) if isinstance(mod, Modifier) else _sentinel
+            # We have to handle the case where we have a `Modifier` instance, and the case where we have a
+            # other types of `ModifierBase` instances, e.g. `evm.modifier.where`, `evm.modifier.transform`, etc.
+            # basically: anything that is not a `Modifier` instance, but inherits from `ModifierBase`.
+            # It's unclear how to use them in `jax.lax.scan` constructs for now,
+            # so we just loop over them and calculate the scale factors with python for-loops.
+            # This is not ideal for compiletime, but it's a start. It is not expected that there
+            # are many of these in a typical composition.
             groups[key].append(mod)
 
         # first do the python for-loops
@@ -376,7 +374,7 @@ class compose(ModifierBase):
             multiplicative_sf *= sf.multiplicative
             additive_sf += sf.additive
 
-        # then do the `jax.lax.scan`
+        # then do the `jax.lax.scan` loops
         for _, group_mods in groups.items():
             # Filter stack for modifiers with same effect cls, and stack them in order to reduce compile time.
             # Essentially we are turning an array of modifiers into a single modifier with a stack of scale factors and effect leaves (e.g. `width`).
