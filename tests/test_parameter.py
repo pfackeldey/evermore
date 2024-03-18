@@ -18,40 +18,44 @@ def test_parameter():
 
 
 def test_unconstrained():
-    p = evm.Parameter(value=jnp.array(1.0))
+    p = evm.FreeFloating()
     u = evm.effect.unconstrained()
 
-    assert u.constraint(p) == Flat()
+    assert p.is_valid_effect(u)
+    assert p.constraint == Flat()
     assert u.scale_factor(p, jnp.array([1.0])) == SF(
         multiplicative=jnp.array([1.0]), additive=jnp.array([0.0])
     )
 
 
 def test_gauss():
-    p = evm.Parameter(value=jnp.array(0.0))
+    p = evm.GaussConstrained()
     g = evm.effect.gauss(width=jnp.array(1.0))
 
-    assert isinstance(g.constraint(p), Gauss)
+    assert p.is_valid_effect(g)
+    assert isinstance(p.constraint, Gauss)
     assert g.scale_factor(p, jnp.array([1.0])) == SF(
         multiplicative=jnp.array([1.0]), additive=jnp.array([0.0])
     )
 
 
 def test_lnN():
-    p = evm.Parameter(value=jnp.array(0.0))
+    p = evm.GaussConstrained()
     ln = evm.effect.lnN(up=jnp.array([1.1]), down=jnp.array([0.9]))
 
-    assert isinstance(ln.constraint(p), Gauss)
+    assert p.is_valid_effect(ln)
+    assert p.constraint, Gauss
     assert ln.scale_factor(p, jnp.array([1.0])) == SF(
         multiplicative=jnp.array([1.0]), additive=jnp.array([0.0])
     )
 
 
 def test_poisson():
-    p = evm.Parameter(value=jnp.array(0.0))
+    p = evm.PoissonConstrained(hist=jnp.array([10]))
     po = evm.effect.poisson(lamb=jnp.array(10))
 
-    assert isinstance(po.constraint(p), Poisson)
+    assert p.is_valid_effect(po)
+    assert isinstance(p.constraint, Poisson)
     # assert po.scale_factor(p, jnp.array(1.0)) == pytest.approx(1.0) # FIXME
     # assert po.scale_factor(p.update(jnp.array(2.0)), jnp.array(1.0)) == pytest.approx(1.1) # FIXME
 
@@ -61,8 +65,8 @@ def test_shape():
 
 
 def test_modifier():
-    mu = evm.Parameter(value=jnp.array(1.1))
-    norm = evm.Parameter(value=jnp.array(0.0))
+    mu = evm.FreeFloating(value=jnp.array(1.1))
+    norm = evm.GaussConstrained(value=jnp.array(0.0))
 
     # unconstrained effect
     m_unconstrained = evm.Modifier(parameter=mu, effect=evm.effect.unconstrained())
@@ -90,8 +94,8 @@ def test_modifier():
 
 
 def test_compose():
-    mu = evm.Parameter(value=jnp.array(1.1))
-    norm = evm.Parameter(value=jnp.array(0.0))
+    mu = evm.FreeFloating(value=jnp.array(1.1))
+    norm = evm.GaussConstrained(value=jnp.array(0.0))
 
     # unconstrained effect
     m_unconstrained = evm.Modifier(parameter=mu, effect=evm.effect.unconstrained())

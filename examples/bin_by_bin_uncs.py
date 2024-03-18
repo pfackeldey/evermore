@@ -25,17 +25,17 @@ class SPlusBModel(eqx.Module):
         mask = evm.util.sum_leaves(hists) > 10
 
         # signal process
-        signal_poisson = self.staterrors["poisson"]["signal"].poisson(hists["signal"])
+        signal_poisson = self.staterrors["poisson"]["signal"].poisson()
         signal_mc_stats = evm.modifier.where(mask, gauss_mcstat, signal_poisson)
         expectations["signal"] = signal_mc_stats(hists["signal"])
 
         # bkg1 process
-        bkg1_poisson = self.staterrors["poisson"]["bkg1"].poisson(hists["bkg1"])
+        bkg1_poisson = self.staterrors["poisson"]["bkg1"].poisson()
         bkg1_mc_stats = evm.modifier.where(mask, gauss_mcstat, bkg1_poisson)
         expectations["bkg1"] = bkg1_mc_stats(hists["bkg1"])
 
         # bkg2 process
-        bkg2_poisson = self.staterrors["poisson"]["bkg2"].poisson(hists["bkg2"])
+        bkg2_poisson = self.staterrors["poisson"]["bkg2"].poisson()
         bkg2_mc_stats = evm.modifier.where(mask, gauss_mcstat, bkg2_poisson)
         expectations["bkg2"] = bkg2_mc_stats(hists["bkg2"])
 

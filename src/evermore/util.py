@@ -26,7 +26,7 @@ def __dir__():
 
 
 def is_parameter(leaf: Any) -> bool:
-    from evermore import Parameter
+    from evermore.parameter import Parameter
 
     return isinstance(leaf, Parameter)
 

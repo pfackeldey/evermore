@@ -1,5 +1,4 @@
 import abc
-from typing import TYPE_CHECKING
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -7,14 +6,7 @@ from jaxtyping import Array
 
 from evermore.custom_types import SF
 from evermore.parameter import Parameter
-from evermore.pdf import PDF, Flat, Gauss, Poisson
 from evermore.util import as1darray
-
-if TYPE_CHECKING:
-    pass
-else:
-    pass
-
 
 __all__ = [
     "Effect",
@@ -32,18 +24,11 @@ def __dir__():
 
 class Effect(eqx.Module):
     @abc.abstractmethod
-    def constraint(self, parameter: Parameter) -> PDF:
-        ...
-
-    @abc.abstractmethod
     def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         ...
 
 
 class unconstrained(Effect):
-    def constraint(self, parameter: Parameter) -> PDF:
-        return Flat()
-
     def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         sf = jnp.broadcast_to(parameter.value, hist.shape)
         return SF(multiplicative=sf, additive=jnp.zeros_like(hist))
@@ -54,11 +39,6 @@ DEFAULT_EFFECT = unconstrained()
 
 class gauss(Effect):
     width: Array = eqx.field(converter=as1darray)
-
-    def constraint(self, parameter: Parameter) -> PDF:
-        return Gauss(
-            mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
-        )
 
     def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         """
@@ -105,18 +85,9 @@ class shape(Effect):
             )
         )
 
-    def constraint(self, parameter: Parameter) -> PDF:
-        return Gauss(
-            mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
-        )
-
     def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         sf = self.vshift(sf=parameter.value, hist=hist)
         return SF(multiplicative=jnp.ones_like(hist), additive=sf)
-        # shift = self.vshift(sf=sf, hist=hist)
-        # # handle zeros, see: https://github.com/google/jax/issues/5039
-        # x = jnp.where(hist == 0.0, 1.0, hist)
-        # return jnp.where(hist == 0.0, shift, (x + shift) / x)
 
 
 class lnN(Effect):
@@ -137,11 +108,6 @@ class lnN(Effect):
         alpha = 0.125 * twox * (twox2 * (3 * twox2 - 10.0) + 15.0)
         return jnp.where(
             jnp.abs(x) >= 0.5, jnp.where(x >= 0, hi, lo), avg + alpha * halfdiff
-        )
-
-    def constraint(self, parameter: Parameter) -> PDF:
-        return Gauss(
-            mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
         )
 
     def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
@@ -169,10 +135,6 @@ class lnN(Effect):
 
 class poisson(Effect):
     lamb: Array = eqx.field(converter=as1darray)
-
-    def constraint(self, parameter: Parameter) -> PDF:
-        assert parameter.value.shape == self.lamb.shape
-        return Poisson(lamb=self.lamb)
 
     def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         sf = jnp.broadcast_to(parameter.value + 1, hist.shape)

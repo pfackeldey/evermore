@@ -26,6 +26,9 @@ __all__ = [
     "modifier",
     # explicitely expose some classes
     "Parameter",
+    "FreeFloating",
+    "GaussConstrained",
+    "PoissonConstrained",
     "Modifier",
     "ModifierBase",
 ]
@@ -45,4 +48,9 @@ from evermore import (  # noqa: E402
     util,
 )
 from evermore.modifier import Modifier, ModifierBase  # noqa: E402
-from evermore.parameter import Parameter  # noqa: E402
+from evermore.parameter import (  # noqa: E402
+    FreeFloating,
+    GaussConstrained,
+    Parameter,
+    PoissonConstrained,
+)

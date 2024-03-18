@@ -149,10 +149,8 @@ class Modifier(ModifierBase):
     def __init__(self, parameter: Parameter, effect: Effect = DEFAULT_EFFECT) -> None:
         self.parameter = parameter
         self.effect = effect
-
-        # first time: set the constraint pdf
-        constraint = self.effect.constraint(parameter=self.parameter)
-        self.parameter._set_constraint(constraint, overwrite=False)
+        # make sure we don't combine parameters with effects that make no sense
+        self.parameter.is_valid_effect(self.effect)
 
     def scale_factor(self, hist: Array) -> SF:
         return self.effect.scale_factor(parameter=self.parameter, hist=hist)

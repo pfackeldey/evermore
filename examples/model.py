@@ -8,13 +8,12 @@ import evermore as evm
 
 
 class SPlusBModel(eqx.Module):
-    mu: evm.Parameter
-    norm1: evm.Parameter
-    norm2: evm.Parameter
-    shape1: evm.Parameter
+    mu: evm.FreeFloating
+    norm1: evm.GaussConstrained
+    norm2: evm.GaussConstrained
+    shape1: evm.GaussConstrained
 
     def __init__(self, hist: dict[str, Array], histw2: dict[str, Array]) -> None:
-        self.mu = evm.Parameter(value=jnp.array([1.0]))
         self = evm.parameter.auto_init(self)
 
     def __call__(self, hists: dict) -> dict[str, Array]:

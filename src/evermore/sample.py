@@ -12,7 +12,7 @@ from evermore.util import is_parameter
 
 # get the PDFs from the parameters of the model
 def toy_module(module: eqx.Module, key: PRNGKeyArray) -> PyTree[Callable]:
-    from evermore import Parameter
+    from evermore.parameter import Parameter
 
     params_tree, rest_tree = eqx.partition(module, is_parameter, is_leaf=is_parameter)
     params_structure = jax.tree_util.tree_structure(params_tree)

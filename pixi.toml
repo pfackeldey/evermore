@@ -20,6 +20,7 @@ matplotlib = "*"
 mplhep = "*"
 imageio = "*"
 optimistix = "*"
+flax = "*"
 
 [host-dependencies]
 pip = "*"
