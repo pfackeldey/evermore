@@ -34,7 +34,7 @@ class LinearConstrained(eqx.Module):
 def loss_fn(model, x, y):
     pred_y = jax.vmap(model)(x)
     mse = jax.numpy.mean((y - pred_y) ** 2)
-    constraints = evm.loss.get_param_constraints(model)
+    constraints = evm.loss.get_log_probs(model)
     # sum them all up for each weight
     constraints = jax.tree_util.tree_map(jnp.sum, constraints)
     return mse + evm.util.sum_leaves(constraints)

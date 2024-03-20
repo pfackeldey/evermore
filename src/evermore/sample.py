@@ -1,19 +1,26 @@
-from collections.abc import Callable
 from typing import cast
 
 import equinox as eqx
 import jax
+import jax.tree_util as jtu
 from jaxtyping import Array, PRNGKeyArray, PyTree
 
 from evermore.custom_types import PDFLike
+from evermore.parameter import Parameter
 from evermore.util import is_parameter
 
+__all__ = [
+    "sample_parameters",
+]
 
-# get the PDFs from the parameters of the model
-def toy_module(module: eqx.Module, key: PRNGKeyArray) -> PyTree[Callable]:
-    from evermore.parameter import Parameter
 
-    params_tree, rest_tree = eqx.partition(module, is_parameter, is_leaf=is_parameter)
+def __dir__():
+    return __all__
+
+
+def sample_parameters(tree: PyTree, key: PRNGKeyArray) -> PyTree:
+    # partition the tree into parameters and the rest
+    params_tree, rest_tree = eqx.partition(tree, is_parameter, is_leaf=is_parameter)
     params_structure = jax.tree_util.tree_structure(params_tree)
     n_params = params_structure.num_leaves  # type: ignore[attr-defined]
 
@@ -35,7 +42,7 @@ def toy_module(module: eqx.Module, key: PRNGKeyArray) -> PyTree[Callable]:
         return eqx.tree_at(lambda p: p.value, param, sampled_param_value)
 
     # sample for each parameter
-    sampled_params_tree = jax.tree_util.tree_map(
+    sampled_params_tree = jtu.tree_map(
         _sample, params_tree, keys_tree, is_leaf=is_parameter
     )
 
