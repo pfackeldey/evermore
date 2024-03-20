@@ -54,10 +54,10 @@ def sum_leaves(tree: PyTree) -> Array:
 def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
     """
     Turn an array of `evm.Modifier`(s) into a `evm.Modifier` of arrays.
-    Caution:
-        It is important that the `jax.Array`(s) of the underlying `evm.Parameter` have the same shape.
-        Same applies for the effect leaves (e.g. `width`). However, the effect leaves can be
-        broadcasted to the same shape if `broadcast_effect_leaves` is set to `True`.
+
+    It is important that the `jax.Array`(s) of the underlying `evm.Parameter` have the same shape.
+    Same applies for the effect leaves (e.g. `width`). However, the effect leaves can be
+    broadcasted to the same shape if `broadcast_effect_leaves` is set to `True`.
 
     Example:
 
@@ -68,12 +68,12 @@ def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
             import jax.numpy as jnp
 
             modifier = [
-                evm.Parameter().log_normal(up=jnp.array([0.9, 0.95]), down=jnp.array([1.1, 1.14])),
-                evm.Parameter().log_normal(up=jnp.array([0.8]), down=jnp.array([1.2])),
+                evm.NormalConstrained().log_normal(up=jnp.array([0.9, 0.95]), down=jnp.array([1.1, 1.14])),
+                evm.NormalConstrained().log_normal(up=jnp.array([0.8]), down=jnp.array([1.2])),
             ]
             print(modifier_stack2(modifier))
             # -> Modifier(
-            #      parameter=Parameter(
+            #      parameter=NormalConstrained(
             #        value=f32[2,1], # <- stacked dimension (2, 1)
             #        lower=f32[1],
             #        upper=f32[1],
