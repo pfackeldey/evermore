@@ -44,8 +44,8 @@ jax.config.update("jax_enable_x64", True)
 
 # define a simple model with two processes and two parameters
 class Model(eqx.Module):
-    mu: evm.Parameter
-    syst: evm.Parameter
+    mu: evm.FreeFloating
+    syst: evm.NormalConstrained
 
     def __call__(self, hists: dict[str, Array]) -> Array:
         mu_modifier = self.mu.unconstrained()
@@ -61,7 +61,7 @@ def loss(model: Model, hists: dict[str, Array], observation: Array) -> Array:
     # Poisson NLL of the expectation and observation
     log_likelihood = nll(expectation, observation)
     # Add parameter constraints from logpdfs
-    constraints = evm.loss.get_param_constraints(model)
+    constraints = evm.loss.get_logpdf_constraints(model)
     log_likelihood += evm.util.sum_leaves(constraints)
     return -jnp.sum(log_likelihood)
 
@@ -69,7 +69,7 @@ def loss(model: Model, hists: dict[str, Array], observation: Array) -> Array:
 # setup model and data
 hists = {"signal": jnp.array([3]), "bkg": jnp.array([10])}
 observation = jnp.array([15])
-model = Model(mu=evm.Parameter(1.0), syst=evm.Parameter(0.0))
+model = Model(mu=evm.FreeFloating(), syst=evm.NormalConstrained())
 
 # negative log-likelihood
 loss_val = loss(model, hists, observation)
