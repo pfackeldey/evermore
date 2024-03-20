@@ -63,5 +63,5 @@ def where(process):
 
 
 for process, histw2 in histsw2.items():
-    mod = model.staterrors.get(where=where)
+    mod = model.staterrors.get(where=where(process))
     modified_histsw2[process] = mod(histw2)
