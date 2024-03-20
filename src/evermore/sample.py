@@ -5,8 +5,7 @@ import equinox as eqx
 import jax
 from jaxtyping import Array, PRNGKeyArray, PyTree
 
-from evermore.custom_types import _NoValue
-from evermore.pdf import PDF
+from evermore.custom_types import PDFLike
 from evermore.util import is_parameter
 
 
@@ -22,12 +21,12 @@ def toy_module(module: eqx.Module, key: PRNGKeyArray) -> PyTree[Callable]:
     keys_tree = jax.tree_util.tree_unflatten(params_structure, keys)
 
     def _sample(param: Parameter, key: Parameter) -> Array:
-        if param.constraint is _NoValue:
-            msg = f"Parameter {param} has no constraint pdf, can't sample from it."
+        if not isinstance(param.constraint, PDFLike):
+            msg = f"Parameter {param} has no sampling method, can't sample from it."
             raise RuntimeError(msg)
 
         pdf = param.constraint
-        pdf = cast(PDF, pdf)
+        pdf = cast(PDFLike, pdf)
 
         # sample new value from the constraint pdf
         sampled_param_value = pdf.sample(key.value)

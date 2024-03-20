@@ -6,9 +6,8 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, PyTree
 
-from evermore.custom_types import _NoValue
+from evermore.custom_types import PDFLike
 from evermore.parameter import Parameter
-from evermore.pdf import PDF
 from evermore.util import _params_map
 
 __all__ = [
@@ -25,9 +24,9 @@ def __dir__():
 def get_logpdf_constraints(module: PyTree) -> PyTree:
     def _constraint(param: Parameter) -> Array:
         constraint = param.constraint
-        if constraint is not _NoValue:
-            constraint = cast(PDF, constraint)
-            return constraint.logpdf(param.value)
+        if isinstance(constraint, PDFLike):
+            constraint = cast(PDFLike, constraint)
+            return constraint.log_prob(param.value)
         return jnp.array([0.0])
 
     # constraints from pdfs

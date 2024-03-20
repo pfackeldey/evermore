@@ -6,8 +6,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike
 
-from evermore.custom_types import Sentinel, _NoValue
-from evermore.pdf import PDF, Flat, Normal, Poisson
+from evermore.custom_types import PDFLike, Sentinel, _NoValue
+from evermore.pdf import Flat, Normal, Poisson
 from evermore.util import as1darray
 
 if TYPE_CHECKING:
@@ -30,14 +30,14 @@ class Parameter(eqx.Module):
     value: Array = eqx.field(converter=as1darray)
     lower: Array = eqx.field(converter=as1darray)
     upper: Array = eqx.field(converter=as1darray)
-    constraint: PDF | Sentinel = eqx.field(static=True)
+    constraint: PDFLike | Sentinel = eqx.field(static=True)
 
     def __init__(
         self,
         value: ArrayLike,
         lower: ArrayLike,
         upper: ArrayLike,
-        constraint: PDF | Sentinel = _NoValue,
+        constraint: PDFLike | Sentinel = _NoValue,
     ) -> None:
         self.value = as1darray(value)
         self.lower = jnp.broadcast_to(as1darray(lower), self.value.shape)

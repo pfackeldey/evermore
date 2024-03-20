@@ -21,10 +21,10 @@ def __dir__():
 
 class PDF(eqx.Module):
     @abstractmethod
-    def logpdf(self, x: Array) -> Array: ...
+    def log_prob(self, x: Array) -> Array: ...
 
     @abstractmethod
-    def pdf(self, x: Array) -> Array: ...
+    def prob(self, x: Array) -> Array: ...
 
     @abstractmethod
     def cdf(self, x: Array) -> Array: ...
@@ -34,10 +34,10 @@ class PDF(eqx.Module):
 
 
 class Flat(PDF):
-    def logpdf(self, x: Array) -> Array:
+    def log_prob(self, x: Array) -> Array:
         return jnp.zeros_like(x)
 
-    def pdf(self, x: Array) -> Array:
+    def prob(self, x: Array) -> Array:
         return jnp.ones_like(x)
 
     def cdf(self, x: Array) -> Array:
@@ -56,14 +56,14 @@ class Normal(PDF):
     mean: Array
     width: Array
 
-    def logpdf(self, x: Array) -> Array:
+    def log_prob(self, x: Array) -> Array:
         logpdf_max = jax.scipy.stats.norm.logpdf(
             self.mean, loc=self.mean, scale=self.width
         )
         unnormalized = jax.scipy.stats.norm.logpdf(x, loc=self.mean, scale=self.width)
         return unnormalized - logpdf_max
 
-    def pdf(self, x: Array) -> Array:
+    def prob(self, x: Array) -> Array:
         return jax.scipy.stats.norm.pdf(x, loc=self.mean, scale=self.width)
 
     def cdf(self, x: Array) -> Array:
@@ -77,12 +77,12 @@ class Normal(PDF):
 class Poisson(PDF):
     lamb: Array
 
-    def logpdf(self, x: Array) -> Array:
+    def log_prob(self, x: Array) -> Array:
         logpdf_max = jax.scipy.stats.poisson.logpmf(self.lamb, mu=self.lamb)
         unnormalized = jax.scipy.stats.poisson.logpmf((x + 1) * self.lamb, mu=self.lamb)
         return unnormalized - logpdf_max
 
-    def pdf(self, x: Array) -> Array:
+    def prob(self, x: Array) -> Array:
         return jax.scipy.stats.poisson.pmf((x + 1) * self.lamb, mu=self.lamb)
 
     def cdf(self, x: Array) -> Array:
