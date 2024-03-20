@@ -174,4 +174,5 @@ test/
 .vscode/
 .zed/
 .pixi/
+pixi.lock
 pyrightconfig.json
