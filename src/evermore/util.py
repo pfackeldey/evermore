@@ -53,11 +53,11 @@ def sum_leaves(tree: PyTree) -> Array:
 
 def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
     """
-    Turn an array of `evm.Modifier`(s) into a `evm.Modifier` of arrays.
+    Turn an array of evm.Modifier(s) into a evm.Modifier of arrays.
 
-    It is important that the `jax.Array`(s) of the underlying `evm.Parameter` have the same shape.
-    Same applies for the effect leaves (e.g. `width`). However, the effect leaves can be
-    broadcasted to the same shape if `broadcast_effect_leaves` is set to `True`.
+    It is important that the jax.Array(s) of the underlying evm.Parameter have the same shape.
+    Same applies for the effect leaves (e.g. width). However, the effect leaves can be
+    broadcasted to the same shape if broadcast_effect_leaves is set to True.
 
     Example:
 
