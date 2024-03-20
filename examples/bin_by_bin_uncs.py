@@ -50,3 +50,18 @@ model = SPlusBModel(hists, histsw2)
 
 # test the model
 expectations = model(hists)
+
+
+# scale the histsw2 e.g. after minimization with
+# the best fit values of the staterror modifiers.
+# This is needed to get the correct stat. uncertainties
+modified_histsw2 = {}
+
+
+def where(process):
+    return lambda x: x[process]
+
+
+for process, histw2 in histsw2.items():
+    mod = model.staterrors.get(where=where)
+    modified_histsw2[process] = mod(histw2)
