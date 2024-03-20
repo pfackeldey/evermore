@@ -61,7 +61,7 @@ def loss(model: Model, hists: dict[str, Array], observation: Array) -> Array:
     # Poisson NLL of the expectation and observation
     log_likelihood = nll(expectation, observation)
     # Add parameter constraints from logpdfs
-    constraints = evm.loss.get_logpdf_constraints(model)
+    constraints = evm.loss.get_log_probs(model)
     log_likelihood += evm.util.sum_leaves(constraints)
     return -jnp.sum(log_likelihood)
 

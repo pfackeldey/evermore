@@ -11,7 +11,7 @@ from evermore.parameter import Parameter
 from evermore.util import _params_map
 
 __all__ = [
-    "get_logpdf_constraints",
+    "get_log_probs",
     "get_boundary_constraints",
     "PoissonNLL",
 ]
@@ -21,7 +21,7 @@ def __dir__():
     return __all__
 
 
-def get_logpdf_constraints(module: PyTree) -> PyTree:
+def get_log_probs(module: PyTree) -> PyTree:
     def _constraint(param: Parameter) -> Array:
         constraint = param.constraint
         if isinstance(constraint, PDFLike):
@@ -52,7 +52,7 @@ class PoissonNLL(eqx.Module):
             def loss(model, x, y):
                 expectation = model(x)
                 loss = nll(expectation, y)
-                constraints = evm.loss.get_logpdf_constraints(model)
+                constraints = evm.loss.get_log_probs(model)
                 loss += evm.util.sum_leaves(constraints))
                 return -jnp.sum(loss)
     """

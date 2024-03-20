@@ -15,7 +15,7 @@ nll = evm.loss.PoissonNLL()
 @eqx.filter_jit
 def loss(model, hists, observation):
     expectations = model(hists)
-    constraints = evm.loss.get_logpdf_constraints(model)
+    constraints = evm.loss.get_log_probs(model)
     loss_val = nll(
         expectation=evm.util.sum_leaves(expectations),
         observation=observation,
