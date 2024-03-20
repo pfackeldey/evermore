@@ -20,15 +20,15 @@ class SPlusBModel(eqx.Module):
         expectations = {}
 
         # signal process
-        signal_mcstat_mod = self.staterrors(get=lambda p: p["signal"])
+        signal_mcstat_mod = self.staterrors.get(where=lambda p: p["signal"])
         expectations["signal"] = signal_mcstat_mod(hists["signal"])
 
         # bkg1 process
-        bkg1_mcstat_mod = self.staterrors(get=lambda p: p["bkg1"])
+        bkg1_mcstat_mod = self.staterrors.get(where=lambda p: p["bkg1"])
         expectations["bkg1"] = bkg1_mcstat_mod(hists["bkg1"])
 
         # bkg2 process
-        bkg2_mcstat_mod = self.staterrors(get=lambda p: p["bkg2"])
+        bkg2_mcstat_mod = self.staterrors.get(where=lambda p: p["bkg2"])
         expectations["bkg2"] = bkg2_mcstat_mod(hists["bkg2"])
 
         # return the modified expectations

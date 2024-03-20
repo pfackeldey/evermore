@@ -8,7 +8,7 @@ import jax.tree_util as jtu
 from jaxtyping import Array, PyTree
 
 from evermore.custom_types import ModifierLike
-from evermore.modifier import where
+from evermore.modifier import where as modifier_where
 from evermore.parameter import NormalConstrained, PoissonConstrained
 from evermore.util import sum_leaves
 
@@ -65,7 +65,7 @@ class StatErrors(eqx.Module):
         wtot_eff = jnp.round(wtot**2 / self.etot**2, decimals=0)
         self.mask = wtot_eff > threshold
 
-    def __call__(self, get: Callable) -> ModifierLike:
-        poisson_mod = get(self.params_per_process).poisson()
+    def get(self, where: Callable) -> ModifierLike:
+        poisson_mod = where(self.params_per_process).poisson()
         normal_mod = self.params_global.normal(width=self.etot)
-        return where(self.mask, normal_mod, poisson_mod)
+        return modifier_where(self.mask, normal_mod, poisson_mod)
