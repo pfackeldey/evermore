@@ -31,7 +31,7 @@ def fixed_mu_fit(mu: Array) -> Array:
     def loss(diff_model, static_model, hists, observation):
         model = eqx.combine(diff_model, static_model)
         expectations = model(hists)
-        constraints = evm.loss.get_param_constraints(model)
+        constraints = evm.loss.get_logpdf_constraints(model)
         loss_val = nll(
             expectation=evm.util.sum_leaves(expectations),
             observation=observation,

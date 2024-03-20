@@ -4,7 +4,7 @@ from typing import cast
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array
+from jaxtyping import Array, PyTree
 
 from evermore.custom_types import _NoValue
 from evermore.parameter import Parameter
@@ -12,7 +12,8 @@ from evermore.pdf import PDF
 from evermore.util import _params_map
 
 __all__ = [
-    "get_param_constraints",
+    "get_logpdf_constraints",
+    "get_boundary_constraints",
     "PoissonNLL",
 ]
 
@@ -21,9 +22,7 @@ def __dir__():
     return __all__
 
 
-def get_param_constraints(module: eqx.Module) -> dict:
-    constraints = {}
-
+def get_logpdf_constraints(module: PyTree) -> PyTree:
     def _constraint(param: Parameter) -> Array:
         constraint = param.constraint
         if constraint is not _NoValue:
@@ -32,10 +31,11 @@ def get_param_constraints(module: eqx.Module) -> dict:
         return jnp.array([0.0])
 
     # constraints from pdfs
-    constraints["pdfs"] = _params_map(module, _constraint)
-    # constraints from boundaries
-    constraints["boundaries"] = _params_map(module, lambda p: p.boundary_penalty)
-    return constraints
+    return _params_map(module, _constraint)
+
+
+def get_boundary_constraints(module: PyTree) -> PyTree:
+    return _params_map(module, lambda p: p.boundary_penalty)
 
 
 class PoissonNLL(eqx.Module):

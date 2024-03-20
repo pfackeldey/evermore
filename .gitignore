@@ -167,6 +167,9 @@ plots_analysis_opt/
 # presentation code snippets
 examples/presentation_snippets.py
 
+# compiletime stress test
+examples/compiletime.py
+
 test/
 .vscode/
 .zed/

@@ -26,7 +26,7 @@ def __dir__():
 
 
 def is_parameter(leaf: Any) -> bool:
-    from evermore import Parameter
+    from evermore.parameter import Parameter
 
     return isinstance(leaf, Parameter)
 
@@ -68,8 +68,8 @@ def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
             import jax.numpy as jnp
 
             modifier = [
-                evm.Parameter().lnN(up=jnp.array([0.9, 0.95]), down=jnp.array([1.1, 1.14])),
-                evm.Parameter().lnN(up=jnp.array([0.8]), down=jnp.array([1.2])),
+                evm.Parameter().log_normal(up=jnp.array([0.9, 0.95]), down=jnp.array([1.1, 1.14])),
+                evm.Parameter().log_normal(up=jnp.array([0.8]), down=jnp.array([1.2])),
             ]
             print(modifier_stack2(modifier))
             # -> Modifier(
@@ -79,7 +79,7 @@ def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
             #        upper=f32[1],
             #        constraint=Gauss(mean=f32[1], width=f32[1])
             #      ),
-            #      effect=lnN(up=f32[2,1], down=f32[2,1]) # <- stacked dimension (2, 1)
+            #      effect=log_normal(up=f32[2,1], down=f32[2,1]) # <- stacked dimension (2, 1)
             #    )
     """
     # If there is only one modifier, we can return it directly

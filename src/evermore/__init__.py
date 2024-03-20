@@ -1,6 +1,7 @@
 """
 evermore: Differentiable (binned) likelihoods in JAX.
 """
+
 from __future__ import annotations
 
 __author__ = "Peter Fackeldey"
@@ -24,8 +25,12 @@ __all__ = [
     "util",
     "sample",
     "modifier",
+    "staterror",
     # explicitely expose some classes
     "Parameter",
+    "FreeFloating",
+    "NormalConstrained",
+    "PoissonConstrained",
     "Modifier",
     "ModifierBase",
 ]
@@ -42,7 +47,13 @@ from evermore import (  # noqa: E402
     parameter,
     pdf,
     sample,
+    staterror,
     util,
 )
 from evermore.modifier import Modifier, ModifierBase  # noqa: E402
-from evermore.parameter import Parameter  # noqa: E402
+from evermore.parameter import (  # noqa: E402
+    FreeFloating,
+    NormalConstrained,
+    Parameter,
+    PoissonConstrained,
+)

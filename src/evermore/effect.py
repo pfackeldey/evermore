@@ -1,5 +1,4 @@
 import abc
-from typing import TYPE_CHECKING
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -7,20 +6,13 @@ from jaxtyping import Array
 
 from evermore.custom_types import SF
 from evermore.parameter import Parameter
-from evermore.pdf import PDF, Flat, Gauss, Poisson
 from evermore.util import as1darray
-
-if TYPE_CHECKING:
-    pass
-else:
-    pass
-
 
 __all__ = [
     "Effect",
     "unconstrained",
-    "gauss",
-    "lnN",
+    "normal",
+    "log_normal",
     "poisson",
     "shape",
 ]
@@ -32,18 +24,10 @@ def __dir__():
 
 class Effect(eqx.Module):
     @abc.abstractmethod
-    def constraint(self, parameter: Parameter) -> PDF:
-        ...
-
-    @abc.abstractmethod
-    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
-        ...
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF: ...
 
 
 class unconstrained(Effect):
-    def constraint(self, parameter: Parameter) -> PDF:
-        return Flat()
-
     def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         sf = jnp.broadcast_to(parameter.value, hist.shape)
         return SF(multiplicative=sf, additive=jnp.zeros_like(hist))
@@ -52,13 +36,8 @@ class unconstrained(Effect):
 DEFAULT_EFFECT = unconstrained()
 
 
-class gauss(Effect):
+class normal(Effect):
     width: Array = eqx.field(converter=as1darray)
-
-    def constraint(self, parameter: Parameter) -> PDF:
-        return Gauss(
-            mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
-        )
 
     def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         """
@@ -66,8 +45,8 @@ class gauss(Effect):
 
             .. code-block:: python
 
-                gx = Gauss(mean=1.0, width=self.width)  # type: ignore[arg-type]
-                g1 = Gauss(mean=1.0, width=1.0)
+                gx = Normal(mean=1.0, width=self.width)  # type: ignore[arg-type]
+                g1 = Normal(mean=1.0, width=1.0)
 
                 return gx.inv_cdf(g1.cdf(parameter.value + 1))
 
@@ -105,21 +84,12 @@ class shape(Effect):
             )
         )
 
-    def constraint(self, parameter: Parameter) -> PDF:
-        return Gauss(
-            mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
-        )
-
     def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         sf = self.vshift(sf=parameter.value, hist=hist)
         return SF(multiplicative=jnp.ones_like(hist), additive=sf)
-        # shift = self.vshift(sf=sf, hist=hist)
-        # # handle zeros, see: https://github.com/google/jax/issues/5039
-        # x = jnp.where(hist == 0.0, 1.0, hist)
-        # return jnp.where(hist == 0.0, shift, (x + shift) / x)
 
 
-class lnN(Effect):
+class log_normal(Effect):
     up: Array = eqx.field(converter=as1darray)
     down: Array = eqx.field(converter=as1darray)
 
@@ -139,19 +109,14 @@ class lnN(Effect):
             jnp.abs(x) >= 0.5, jnp.where(x >= 0, hi, lo), avg + alpha * halfdiff
         )
 
-    def constraint(self, parameter: Parameter) -> PDF:
-        return Gauss(
-            mean=jnp.zeros_like(parameter.value), width=jnp.ones_like(parameter.value)
-        )
-
     def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         """
         Implementation with (inverse) CDFs is defined as follows:
 
             .. code-block:: python
 
-                gx = Gauss(mean=jnp.exp(parameter.value), width=width)  # type: ignore[arg-type]
-                g1 = Gauss(mean=1.0, width=1.0)
+                gx = Normal(mean=jnp.exp(parameter.value), width=width)  # type: ignore[arg-type]
+                g1 = Normal(mean=1.0, width=1.0)
 
                 return gx.inv_cdf(g1.cdf(parameter.value + 1))
 
@@ -169,10 +134,6 @@ class lnN(Effect):
 
 class poisson(Effect):
     lamb: Array = eqx.field(converter=as1darray)
-
-    def constraint(self, parameter: Parameter) -> PDF:
-        assert parameter.value.shape == self.lamb.shape
-        return Poisson(lamb=self.lamb)
 
     def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
         sf = jnp.broadcast_to(parameter.value + 1, hist.shape)

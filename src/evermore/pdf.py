@@ -1,20 +1,16 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, PRNGKeyArray
 
-if TYPE_CHECKING:
-    pass
-
 __all__ = [
     "PDF",
     "Flat",
-    "Gauss",
+    "Normal",
     "Poisson",
 ]
 
@@ -25,20 +21,16 @@ def __dir__():
 
 class PDF(eqx.Module):
     @abstractmethod
-    def logpdf(self, x: Array) -> Array:
-        ...
+    def logpdf(self, x: Array) -> Array: ...
 
     @abstractmethod
-    def pdf(self, x: Array) -> Array:
-        ...
+    def pdf(self, x: Array) -> Array: ...
 
     @abstractmethod
-    def cdf(self, x: Array) -> Array:
-        ...
+    def cdf(self, x: Array) -> Array: ...
 
     @abstractmethod
-    def sample(self, key: PRNGKeyArray) -> Array:
-        ...
+    def sample(self, key: PRNGKeyArray) -> Array: ...
 
 
 class Flat(PDF):
@@ -60,7 +52,7 @@ class Flat(PDF):
         return jax.random.uniform(key)
 
 
-class Gauss(PDF):
+class Normal(PDF):
     mean: Array
     width: Array
 

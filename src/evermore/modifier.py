@@ -35,16 +35,13 @@ def __dir__():
 
 class AbstractModifier(eqx.Module):
     @abc.abstractmethod
-    def scale_factor(self: ModifierLike, hist: Array) -> SF:
-        ...
+    def scale_factor(self: ModifierLike, hist: Array) -> SF: ...
 
     @abc.abstractmethod
-    def __call__(self: ModifierLike, hist: Array) -> Array:
-        ...
+    def __call__(self: ModifierLike, hist: Array) -> Array: ...
 
     @abc.abstractmethod
-    def __matmul__(self: ModifierLike, other: ModifierLike) -> compose:
-        ...
+    def __matmul__(self: ModifierLike, other: ModifierLike) -> compose: ...
 
 
 class ApplyFn(eqx.Module):
@@ -124,10 +121,10 @@ class Modifier(ModifierBase):
         modify(jnp.array([10, 20, 30]))
         # -> Array([11., 22., 33.], dtype=float32, weak_type=True),
 
-        # lnN effect
-        modify = evm.Modifier(parameter=norm, effect=evm.effect.lnN(jnp.array([0.8, 1.2])))
+        # log_normal effect
+        modify = evm.Modifier(parameter=norm, effect=evm.effect.log_normal(jnp.array([0.8, 1.2])))
         # or shorthand
-        modify = norm.lnN(jnp.array([0.8, 1.2]))
+        modify = norm.log_normal(jnp.array([0.8, 1.2]))
 
         # poisson effect
         hist = jnp.array([10, 20, 30])
@@ -150,10 +147,6 @@ class Modifier(ModifierBase):
         self.parameter = parameter
         self.effect = effect
 
-        # first time: set the constraint pdf
-        constraint = self.effect.constraint(parameter=self.parameter)
-        self.parameter._set_constraint(constraint, overwrite=False)
-
     def scale_factor(self, hist: Array) -> SF:
         return self.effect.scale_factor(parameter=self.parameter, hist=hist)
 
@@ -174,7 +167,7 @@ class where(ModifierBase):
             hist = jnp.array([5, 20, 30])
             syst = evm.Parameter(value=0.1)
 
-            norm = syst.lnN(up=jnp.array([1.1]), down=jnp.array([0.9]))
+            norm = syst.log_normal(up=jnp.array([1.1]), down=jnp.array([0.9]))
             shape = syst.shape(up=jnp.array([7, 22, 31]), down=jnp.array([4, 16, 27]))
 
             # apply norm if hist < 10, else apply shape
@@ -222,7 +215,7 @@ class mask(ModifierBase):
             hist = jnp.array([5, 20, 30])
             syst = evm.Parameter(value=0.1)
 
-            norm = syst.lnN(jnp.array([0.9, 1.1]))
+            norm = syst.log_normal(jnp.array([0.9, 1.1]))
             mask = jnp.array([True, False, True])
 
             modifier = evm.modifier.mask(mask, norm)
@@ -263,7 +256,7 @@ class transform(ModifierBase):
             hist = jnp.array([5, 20, 30])
             syst = evm.Parameter(value=0.1)
 
-            norm = syst.lnN(jnp.array([0.9, 1.1]))
+            norm = syst.log_normal(jnp.array([0.9, 1.1]))
 
             transformed_norm = evm.modifier.transform(jnp.sqrt, norm)
 
@@ -302,12 +295,12 @@ class compose(ModifierBase):
 
         hist = jnp.array([10, 20, 30])
 
-        # all bins with bin content below 10 (threshold) are treated as poisson, else gauss
+        # all bins with bin content below 10 (threshold) are treated as poisson, else normal
 
         # create a new parameter and a composition of modifiers
         mu_mod = mu.unconstrained()
-        sigma_mod = sigma.lnN(up=jnp.array([1.1]), down=jnp.array([0.9]))
-        sigma2_mod = sigma2.lnN(up=jnp.array([1.05]), down=jnp.array([0.95]))
+        sigma_mod = sigma.log_normal(up=jnp.array([1.1]), down=jnp.array([0.9]))
+        sigma2_mod = sigma2.log_normal(up=jnp.array([1.05]), down=jnp.array([0.95]))
         composition = evm.modifier.compose(
             mu_mod,
             sigma_mod,
@@ -322,7 +315,7 @@ class compose(ModifierBase):
         # nest compositions
         composition = evm.modifier.compose(
             composition,
-            evm.Modifier(parameter=sigma, effect=evm.effect.lnN(up=jnp.array([1.2]), down=jnp.array([0.8]))),
+            evm.Modifier(parameter=sigma, effect=evm.effect.log_normal(up=jnp.array([1.2]), down=jnp.array([0.8]))),
         )
 
         # jit
@@ -358,7 +351,7 @@ class compose(ModifierBase):
         groups = defaultdict(list)
         # first group modifiers into same tree structures
         for mod in self.modifiers:
-            groups[jtu.tree_structure(mod)].append(mod)
+            groups[hash(jtu.tree_structure(mod))].append(mod)
         # then do the `jax.lax.scan` loops
         for _, group_mods in groups.items():
             # Essentially we are turning an array of modifiers into a single modifier of stacked leaves.
