@@ -9,9 +9,9 @@ import evermore as evm
 
 class SPlusBModel(eqx.Module):
     mu: evm.FreeFloating
-    norm1: evm.GaussConstrained
-    norm2: evm.GaussConstrained
-    shape1: evm.GaussConstrained
+    norm1: evm.NormalConstrained
+    norm2: evm.NormalConstrained
+    shape1: evm.NormalConstrained
 
     def __init__(self, hist: dict[str, Array], histw2: dict[str, Array]) -> None:
         self = evm.parameter.auto_init(self)
@@ -24,7 +24,7 @@ class SPlusBModel(eqx.Module):
         expectations["signal"] = sig_mod(hists["nominal"]["signal"])
 
         # bkg1 process
-        bkg1_lnN = self.norm1.lnN(up=jnp.array([1.1]), down=jnp.array([0.9]))
+        bkg1_lnN = self.norm1.log_normal(up=jnp.array([1.1]), down=jnp.array([0.9]))
         bkg1_shape = self.shape1.shape(
             up=hists["shape_up"]["bkg1"],
             down=hists["shape_down"]["bkg1"],
@@ -34,7 +34,7 @@ class SPlusBModel(eqx.Module):
         expectations["bkg1"] = bkg1_mod(hists["nominal"]["bkg1"])
 
         # bkg2 process
-        bkg2_lnN = self.norm2.lnN(up=jnp.array([1.05]), down=jnp.array([0.95]))
+        bkg2_lnN = self.norm2.log_normal(up=jnp.array([1.05]), down=jnp.array([0.95]))
         bkg2_shape = self.shape1.shape(
             up=hists["shape_up"]["bkg2"],
             down=hists["shape_down"]["bkg2"],

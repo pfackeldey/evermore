@@ -10,7 +10,7 @@ from jaxtyping import Array, PRNGKeyArray
 __all__ = [
     "PDF",
     "Flat",
-    "Gauss",
+    "Normal",
     "Poisson",
 ]
 
@@ -21,20 +21,16 @@ def __dir__():
 
 class PDF(eqx.Module):
     @abstractmethod
-    def logpdf(self, x: Array) -> Array:
-        ...
+    def logpdf(self, x: Array) -> Array: ...
 
     @abstractmethod
-    def pdf(self, x: Array) -> Array:
-        ...
+    def pdf(self, x: Array) -> Array: ...
 
     @abstractmethod
-    def cdf(self, x: Array) -> Array:
-        ...
+    def cdf(self, x: Array) -> Array: ...
 
     @abstractmethod
-    def sample(self, key: PRNGKeyArray) -> Array:
-        ...
+    def sample(self, key: PRNGKeyArray) -> Array: ...
 
 
 class Flat(PDF):
@@ -56,7 +52,7 @@ class Flat(PDF):
         return jax.random.uniform(key)
 
 
-class Gauss(PDF):
+class Normal(PDF):
     mean: Array
     width: Array
 

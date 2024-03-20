@@ -12,7 +12,7 @@ class LinearConstrained(eqx.Module):
     def __init__(self, in_size, out_size, key):
         wkey, bkey = jax.random.split(key)
         # weights
-        gauss = evm.pdf.Gauss(
+        normal = evm.pdf.Normal(
             mean=jnp.zeros((out_size, in_size)),
             width=jnp.full((out_size, in_size), 0.5),
         )
@@ -20,7 +20,7 @@ class LinearConstrained(eqx.Module):
             value=jax.random.normal(wkey, (out_size, in_size)),
             lower=-jnp.inf,
             upper=jnp.inf,
-            constraint=gauss,
+            constraint=normal,
         )
 
         # biases

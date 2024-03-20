@@ -11,8 +11,8 @@ from evermore.util import as1darray
 __all__ = [
     "Effect",
     "unconstrained",
-    "gauss",
-    "lnN",
+    "normal",
+    "log_normal",
     "poisson",
     "shape",
 ]
@@ -24,8 +24,7 @@ def __dir__():
 
 class Effect(eqx.Module):
     @abc.abstractmethod
-    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
-        ...
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF: ...
 
 
 class unconstrained(Effect):
@@ -37,7 +36,7 @@ class unconstrained(Effect):
 DEFAULT_EFFECT = unconstrained()
 
 
-class gauss(Effect):
+class normal(Effect):
     width: Array = eqx.field(converter=as1darray)
 
     def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
@@ -46,8 +45,8 @@ class gauss(Effect):
 
             .. code-block:: python
 
-                gx = Gauss(mean=1.0, width=self.width)  # type: ignore[arg-type]
-                g1 = Gauss(mean=1.0, width=1.0)
+                gx = Normal(mean=1.0, width=self.width)  # type: ignore[arg-type]
+                g1 = Normal(mean=1.0, width=1.0)
 
                 return gx.inv_cdf(g1.cdf(parameter.value + 1))
 
@@ -90,7 +89,7 @@ class shape(Effect):
         return SF(multiplicative=jnp.ones_like(hist), additive=sf)
 
 
-class lnN(Effect):
+class log_normal(Effect):
     up: Array = eqx.field(converter=as1darray)
     down: Array = eqx.field(converter=as1darray)
 
@@ -116,8 +115,8 @@ class lnN(Effect):
 
             .. code-block:: python
 
-                gx = Gauss(mean=jnp.exp(parameter.value), width=width)  # type: ignore[arg-type]
-                g1 = Gauss(mean=1.0, width=1.0)
+                gx = Normal(mean=jnp.exp(parameter.value), width=width)  # type: ignore[arg-type]
+                g1 = Normal(mean=1.0, width=1.0)
 
                 return gx.inv_cdf(g1.cdf(parameter.value + 1))
 

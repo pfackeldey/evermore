@@ -5,7 +5,7 @@ import pytest
 
 import evermore as evm
 from evermore.custom_types import SF, _NoValue
-from evermore.pdf import Flat, Gauss, Poisson
+from evermore.pdf import Flat, Normal, Poisson
 
 
 def test_parameter():
@@ -21,7 +21,6 @@ def test_unconstrained():
     p = evm.FreeFloating()
     u = evm.effect.unconstrained()
 
-    assert p.is_valid_effect(u)
     assert p.constraint == Flat()
     assert u.scale_factor(p, jnp.array([1.0])) == SF(
         multiplicative=jnp.array([1.0]), additive=jnp.array([0.0])
@@ -29,32 +28,29 @@ def test_unconstrained():
 
 
 def test_gauss():
-    p = evm.GaussConstrained()
-    g = evm.effect.gauss(width=jnp.array(1.0))
+    p = evm.NormalConstrained()
+    g = evm.effect.normal(width=jnp.array(1.0))
 
-    assert p.is_valid_effect(g)
-    assert isinstance(p.constraint, Gauss)
+    assert isinstance(p.constraint, Normal)
     assert g.scale_factor(p, jnp.array([1.0])) == SF(
         multiplicative=jnp.array([1.0]), additive=jnp.array([0.0])
     )
 
 
 def test_lnN():
-    p = evm.GaussConstrained()
-    ln = evm.effect.lnN(up=jnp.array([1.1]), down=jnp.array([0.9]))
+    p = evm.NormalConstrained()
+    ln = evm.effect.log_normal(up=jnp.array([1.1]), down=jnp.array([0.9]))
 
-    assert p.is_valid_effect(ln)
-    assert p.constraint, Gauss
+    assert p.constraint, Normal
     assert ln.scale_factor(p, jnp.array([1.0])) == SF(
         multiplicative=jnp.array([1.0]), additive=jnp.array([0.0])
     )
 
 
 def test_poisson():
-    p = evm.PoissonConstrained(hist=jnp.array([10]))
-    po = evm.effect.poisson(lamb=jnp.array(10))
+    p = evm.PoissonConstrained(lamb=jnp.array([10]))
+    # po = evm.effect.poisson(lamb=jnp.array(10))
 
-    assert p.is_valid_effect(po)
     assert isinstance(p.constraint, Poisson)
     # assert po.scale_factor(p, jnp.array(1.0)) == pytest.approx(1.0) # FIXME
     # assert po.scale_factor(p.update(jnp.array(2.0)), jnp.array(1.0)) == pytest.approx(1.1) # FIXME
@@ -66,20 +62,20 @@ def test_shape():
 
 def test_modifier():
     mu = evm.FreeFloating(value=jnp.array(1.1))
-    norm = evm.GaussConstrained(value=jnp.array(0.0))
+    norm = evm.NormalConstrained(value=jnp.array(0.0))
 
     # unconstrained effect
     m_unconstrained = evm.Modifier(parameter=mu, effect=evm.effect.unconstrained())
     assert m_unconstrained(jnp.array([10])) == pytest.approx(11)
 
-    # gauss effect
-    m_gauss = evm.Modifier(parameter=norm, effect=evm.effect.gauss(jnp.array(0.1)))
+    # normal effect
+    m_gauss = evm.Modifier(parameter=norm, effect=evm.effect.normal(jnp.array(0.1)))
     assert m_gauss(jnp.array([10])) == pytest.approx(10)
 
-    # lnN effect
+    # log_normal effect
     m_lnN = evm.Modifier(
         parameter=norm,
-        effect=evm.effect.lnN(up=jnp.array([1.1]), down=jnp.array([0.9])),
+        effect=evm.effect.log_normal(up=jnp.array([1.1]), down=jnp.array([0.9])),
     )
     assert m_lnN(jnp.array([10])) == pytest.approx(10)
 
@@ -95,12 +91,12 @@ def test_modifier():
 
 def test_compose():
     mu = evm.FreeFloating(value=jnp.array(1.1))
-    norm = evm.GaussConstrained(value=jnp.array(0.0))
+    norm = evm.NormalConstrained(value=jnp.array(0.0))
 
     # unconstrained effect
     m_unconstrained = evm.Modifier(parameter=mu, effect=evm.effect.unconstrained())
-    # gauss effect
-    m_gauss = evm.Modifier(parameter=norm, effect=evm.effect.gauss(jnp.array(0.1)))
+    # normal effect
+    m_gauss = evm.Modifier(parameter=norm, effect=evm.effect.normal(jnp.array(0.1)))
 
     # compose
     m = evm.modifier.compose(m_unconstrained, m_gauss)
