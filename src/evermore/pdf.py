@@ -89,9 +89,5 @@ class Poisson(PDF):
         return jax.scipy.stats.poisson.cdf((x + 1) * self.lamb, mu=self.lamb)
 
     def sample(self, key: PRNGKeyArray) -> Array:
-        # sample parameter from pdf
-        # some problems with this:
-        #  - this samples only integers, do we want that?
-        #  - this breaks for 0 in self.lamb
-        #  - if jax.random.poisson(key, self.lamb) == 0 then what do we know about the parameter?
-        return (jax.random.poisson(key, self.lamb) / self.lamb) - 1
+        # this samples only integers, do we want that?
+        return jax.random.poisson(key, self.lamb)

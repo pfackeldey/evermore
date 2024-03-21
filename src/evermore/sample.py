@@ -7,6 +7,7 @@ from jaxtyping import Array, PRNGKeyArray, PyTree
 
 from evermore.custom_types import PDFLike
 from evermore.parameter import Parameter
+from evermore.pdf import Poisson
 from evermore.util import is_parameter
 
 __all__ = [
@@ -36,10 +37,14 @@ def sample_parameters(tree: PyTree, key: PRNGKeyArray) -> PyTree:
         pdf = cast(PDFLike, pdf)
 
         # sample new value from the constraint pdf
-        sampled_param_value = pdf.sample(key.value)
+        sampled_value = pdf.sample(key.value)
+
+        # TODO: make this compatible with externally provided Poisson PDFs
+        if isinstance(pdf, Poisson):
+            sampled_value = (sampled_value / pdf.lamb) - 1
 
         # replace the sampled parameter value and return new parameter
-        return eqx.tree_at(lambda p: p.value, param, sampled_param_value)
+        return eqx.tree_at(lambda p: p.value, param, sampled_value)
 
     # sample for each parameter
     sampled_params_tree = jtu.tree_map(
