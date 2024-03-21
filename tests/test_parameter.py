@@ -13,7 +13,7 @@ def test_parameter():
     assert p.value == 1.0
     assert p.lower == 0.0
     assert p.upper == 2.0
-    assert p.boundary_penalty == 0.0
+    assert p.boundary_constraint == 0.0
     assert p.constraint is _NoValue
 
 

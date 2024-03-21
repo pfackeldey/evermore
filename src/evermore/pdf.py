@@ -24,24 +24,12 @@ class PDF(eqx.Module):
     def log_prob(self, x: Array) -> Array: ...
 
     @abstractmethod
-    def prob(self, x: Array) -> Array: ...
-
-    @abstractmethod
-    def cdf(self, x: Array) -> Array: ...
-
-    @abstractmethod
     def sample(self, key: PRNGKeyArray) -> Array: ...
 
 
 class Flat(PDF):
     def log_prob(self, x: Array) -> Array:
         return jnp.zeros_like(x)
-
-    def prob(self, x: Array) -> Array:
-        return jnp.ones_like(x)
-
-    def cdf(self, x: Array) -> Array:
-        return jnp.ones_like(x)
 
     def sample(self, key: PRNGKeyArray) -> Array:
         # sample parameter from pdf
@@ -63,12 +51,6 @@ class Normal(PDF):
         unnormalized = jax.scipy.stats.norm.logpdf(x, loc=self.mean, scale=self.width)
         return unnormalized - logpdf_max
 
-    def prob(self, x: Array) -> Array:
-        return jax.scipy.stats.norm.pdf(x, loc=self.mean, scale=self.width)
-
-    def cdf(self, x: Array) -> Array:
-        return jax.scipy.stats.norm.cdf(x, loc=self.mean, scale=self.width)
-
     def sample(self, key: PRNGKeyArray) -> Array:
         # sample parameter from pdf
         return self.mean + self.width * jax.random.normal(key)
@@ -81,12 +63,6 @@ class Poisson(PDF):
         logpdf_max = jax.scipy.stats.poisson.logpmf(self.lamb, mu=self.lamb)
         unnormalized = jax.scipy.stats.poisson.logpmf((x + 1) * self.lamb, mu=self.lamb)
         return unnormalized - logpdf_max
-
-    def prob(self, x: Array) -> Array:
-        return jax.scipy.stats.poisson.pmf((x + 1) * self.lamb, mu=self.lamb)
-
-    def cdf(self, x: Array) -> Array:
-        return jax.scipy.stats.poisson.cdf((x + 1) * self.lamb, mu=self.lamb)
 
     def sample(self, key: PRNGKeyArray) -> Array:
         # this samples only integers, do we want that?
