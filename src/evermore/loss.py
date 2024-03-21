@@ -30,11 +30,11 @@ def get_log_probs(module: PyTree) -> PyTree:
         return jnp.array([0.0])
 
     # constraints from pdfs
-    return _params_map(module, _constraint)
+    return _params_map(_constraint, module)
 
 
 def get_boundary_constraints(module: PyTree) -> PyTree:
-    return _params_map(module, lambda p: p.boundary_penalty)
+    return _params_map(lambda p: p.boundary_penalty, module)
 
 
 class PoissonNLL(eqx.Module):

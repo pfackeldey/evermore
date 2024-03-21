@@ -32,8 +32,8 @@ def is_parameter(leaf: Any) -> bool:
 
 
 def _filtered_module_map(
-    module: eqx.Module,
     fun: Callable,
+    module: eqx.Module,
     filter: Callable,
 ) -> eqx.Module:
     params = eqx.filter(module, filter, is_leaf=filter)
