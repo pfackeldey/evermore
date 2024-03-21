@@ -37,9 +37,9 @@ class StatErrors(eqx.Module):
 
             staterrors = evm.staterror.StatErrors(hists, histsw2, threshold=10.0)
 
-            # Create a modifier for the qcd process, `get` is a function
+            # Create a modifier for the qcd process, `where` is a function
             # that finds the corresponding parameter from `staterrors.params_per_process`
-            mod = staterrors(get=lambda x: x["qcd"])
+            mod = staterrors.get(where=lambda x: x["qcd"])
             # apply the modifier to the parameter
             mod(hists["qcd"])
     """
