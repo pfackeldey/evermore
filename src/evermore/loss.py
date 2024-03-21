@@ -34,7 +34,7 @@ def get_log_probs(module: PyTree) -> PyTree:
 
 
 def get_boundary_constraints(module: PyTree) -> PyTree:
-    return _params_map(lambda p: p.boundary_penalty, module)
+    return _params_map(lambda p: p.boundary_constraint, module)
 
 
 class PoissonNLL(eqx.Module):

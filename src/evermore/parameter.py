@@ -45,7 +45,7 @@ class Parameter(eqx.Module):
         self.constraint = constraint
 
     @property
-    def boundary_penalty(self) -> Array:
+    def boundary_constraint(self) -> Array:
         return jnp.where(
             (self.value < self.lower) | (self.value > self.upper),
             jnp.inf,
