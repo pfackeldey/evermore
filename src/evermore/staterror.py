@@ -46,6 +46,7 @@ class StatErrors(eqx.Module):
 
     params_global: PyTree
     params_per_process: PyTree
+    ntot: Array = eqx.field(static=True)
     etot: Array = eqx.field(static=True)
     mask: Array = eqx.field(static=True)
 
@@ -60,12 +61,12 @@ class StatErrors(eqx.Module):
         self.params_per_process = jtu.tree_map(
             lambda hist: PoissonConstrained(lamb=hist), hists
         )
-        wtot = sum_leaves(hists)
+        self.ntot = sum_leaves(hists)
         self.etot = jnp.sqrt(sum_leaves(histsw2))
-        wtot_eff = jnp.round(wtot**2 / self.etot**2, decimals=0)
-        self.mask = wtot_eff > threshold
+        ntot_eff = jnp.round(self.ntot**2 / self.etot**2, decimals=0)
+        self.mask = ntot_eff > threshold
 
     def get(self, where: Callable) -> ModifierLike:
         poisson_mod = where(self.params_per_process).poisson()
-        normal_mod = self.params_global.normal(width=self.etot)
+        normal_mod = self.params_global.normal(width=self.etot / self.ntot)
         return modifier_where(self.mask, normal_mod, poisson_mod)
