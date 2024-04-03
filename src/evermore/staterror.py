@@ -132,7 +132,7 @@ class StatErrors(eqx.Module):
         # pseudo-code:
         #
         # if n_tot_eff > threshold:
-        #       apply global gaussian(width=e_tot/n_tot)
+        #   apply global gaussian(width=e_tot/n_tot)
         # else:
         #   if n_i_eff > threshold or e_i > n_i or n_i <= 0.0:
         #       apply per process gaussian(width=e_i/n_i)
