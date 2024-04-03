@@ -121,10 +121,10 @@ class StatErrors(eqx.Module):
         # combine all, logic as here: https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/main/src/CMSHistErrorPropagator.cc#L320-L434
         #
         # legend:
-        # - n_tot_eff: effective number of events summed over all processes per bin
+        # - n_tot_eff: effective number of events summed over all processes per bin, `n_tot_eff = n_tot^2 / e_tot^2`
         # - e_tot: error summed over all processes per bin
         # - n_tot: number of events summed over all processes per bin
-        # - n_i_eff: effective number of events for process i per bin
+        # - n_i_eff: effective number of events for process i per bin, `n_i_eff = n_i^2 / e_i^2`
         # - e_i: error for process i per bin
         # - n_i: number of events for process i per bin
         # - threshold: threshold for applying gaussian
@@ -132,12 +132,12 @@ class StatErrors(eqx.Module):
         # pseudo-code:
         #
         # if n_tot_eff > threshold:
-        #   then apply global gaussian(width=e_tot/n_tot)
+        #       apply global gaussian(width=e_tot/n_tot)
         # else:
         #   if n_i_eff > threshold or e_i > n_i or n_i <= 0.0:
         #       apply per process gaussian(width=e_i/n_i)
         #   else:
-        #       apply per process poisson
+        #       apply per process poisson(lamb=n_i)
         per_process_mask = (
             ((w**2 / w2**2) > self.threshold) | (jnp.sqrt(w2) > w) | (w <= 0)
         )
