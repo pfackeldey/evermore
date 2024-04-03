@@ -92,7 +92,7 @@ class StatErrors(eqx.Module):
         # see: https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/pull/929
         # and: https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/latest/part2/bin-wise-stats/#usage-instructions
 
-        # poisson case
+        # poisson case per process
         # if w > 0.0, then poisson, else noop (no effect)
         # since w <= 0 leads to NaNs in derivatives, we need to mask them
         w = where(self.hists)
