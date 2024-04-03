@@ -373,7 +373,7 @@ class compose(ModifierBase):
             if len(group_mods) == 1:
                 _, sf = calc_sf(hist, dynamic_stack, static_stack)
                 multiplicative_sf *= sf.multiplicative
-                additive_sf *= sf.additive
+                additive_sf += sf.additive
             else:
                 _, sf = jax.lax.scan(
                     partial(calc_sf, _static_stack=static_stack),
