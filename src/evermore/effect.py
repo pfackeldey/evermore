@@ -10,6 +10,7 @@ from evermore.util import as1darray
 
 __all__ = [
     "Effect",
+    "noop",
     "unconstrained",
     "normal",
     "log_normal",
@@ -25,6 +26,11 @@ def __dir__():
 class Effect(eqx.Module):
     @abc.abstractmethod
     def scale_factor(self, parameter: Parameter, hist: Array) -> SF: ...
+
+
+class noop(Effect):
+    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
+        return SF(multiplicative=jnp.ones_like(hist), additive=jnp.zeros_like(hist))
 
 
 class unconstrained(Effect):

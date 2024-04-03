@@ -184,9 +184,9 @@ class where(ModifierBase):
             # -> Array([ 5.1593127, 20.281374 , 30.181376 ], dtype=float32)
     """
 
-    condition: Array
-    modifier_true: Modifier
-    modifier_false: Modifier
+    condition: Array = eqx.field(static=True)
+    modifier_true: ModifierLike
+    modifier_false: ModifierLike
 
     def scale_factor(self, hist: Array) -> SF:
         true_sf = self.modifier_true.scale_factor(hist)
@@ -225,8 +225,8 @@ class mask(ModifierBase):
             # -> Array([ 5.049494, 20.      , 30.296963], dtype=float32)
     """
 
-    where: Array
-    modifier: Modifier
+    where: Array = eqx.field(static=True)
+    modifier: ModifierLike
 
     def scale_factor(self, hist: Array) -> SF:
         sf = self.modifier.scale_factor(hist)
@@ -270,7 +270,7 @@ class transform(ModifierBase):
     """
 
     transform_fn: Callable = eqx.field(static=True)
-    modifier: Modifier
+    modifier: ModifierLike
 
     def scale_factor(self, hist: Array) -> SF:
         sf = self.modifier.scale_factor(hist)
