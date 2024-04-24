@@ -58,7 +58,7 @@ class Linear(Effect):
     offset: Array = eqx.field(converter=jnp.atleast_1d)
     slope: Array = eqx.field(converter=jnp.atleast_1d)
 
-    @jax.named_scope("evm.effect.Lambda")
+    @jax.named_scope("evm.effect.Linear")
     def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
         assert isinstance(parameter, Parameter)
         sf = parameter.value * self.slope + self.offset
