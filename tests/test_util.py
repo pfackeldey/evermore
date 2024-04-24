@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import jax
-
-from evermore.util import as1darray
+from evermore.util import sum_over_leaves
 
 
-def test_as1darray():
-    arr = as1darray(jax.numpy.array(1.0))
-
-    assert isinstance(arr, jax.Array)
-    assert arr.ndim == 1
+def test_sum_over_leaves():
+    tree = {"a": 1, "b": {"c": 2, "d": 3}}
+    assert sum_over_leaves(tree) == 6

@@ -25,9 +25,12 @@ flax = "*"
 [host-dependencies]
 pip = "*"
 sphinx = "*"
+sphinx-copybutton = "*"
+sphinx-book-theme = "*"
 
 [tasks]
 postinstall = "pip install -e '.[dev]' && pip install pre-commit && pre-commit install"
 test = "pytest"
 lint = "ruff check . --fix --show-fixes"
 checkall = "pre-commit run --all-files"
+builddocs = "sphinx-build -M html ./docs ./build -W --keep-going"

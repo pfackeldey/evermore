@@ -4,19 +4,19 @@ from model import hists, model, observation
 
 import evermore as evm
 
-nll = evm.loss.PoissonNLL()
+log_likelihood = evm.loss.PoissonLogLikelihood()
 
 
 @eqx.filter_jit
 def loss(model, hists, observation):
     expectations = model(hists)
     constraints = evm.loss.get_log_probs(model)
-    loss_val = nll(
-        expectation=evm.util.sum_leaves(expectations),
+    loss_val = log_likelihood(
+        expectation=evm.util.sum_over_leaves(expectations),
         observation=observation,
     )
     # add constraint
-    loss_val += evm.util.sum_leaves(constraints)
+    loss_val += evm.util.sum_over_leaves(constraints)
     return -jnp.sum(loss_val)
 
 

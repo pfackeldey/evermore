@@ -9,13 +9,13 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
-from jaxtyping import Array, ArrayLike, PyTree
+from jaxtyping import Array, PyTree
 
 __all__ = [
-    "is_parameter",
-    "sum_leaves",
+    "filter_tree_map",
+    "sum_over_leaves",
     "tree_stack",
-    "as1darray",
+    "dataclass_auto_init",
     "dump_hlo_graph",
     "dump_jaxpr",
 ]
@@ -25,13 +25,7 @@ def __dir__():
     return __all__
 
 
-def is_parameter(leaf: Any) -> bool:
-    from evermore.parameter import Parameter
-
-    return isinstance(leaf, Parameter)
-
-
-def _filtered_module_map(
+def filter_tree_map(
     fun: Callable,
     module: eqx.Module,
     filter: Callable,
@@ -44,10 +38,7 @@ def _filtered_module_map(
     )
 
 
-_params_map = partial(_filtered_module_map, filter=is_parameter)
-
-
-def sum_leaves(tree: PyTree) -> Array:
+def sum_over_leaves(tree: PyTree) -> Array:
     return jtu.tree_reduce(operator.add, tree)
 
 
@@ -55,32 +46,33 @@ def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
     """
     Turn an array of evm.Modifier(s) into a evm.Modifier of arrays.
 
-    It is important that the jax.Array(s) of the underlying evm.Parameter have the same shape.
+    It is important that the jax.Array(s) of the underlying Arrays have the same shape.
     Same applies for the effect leaves (e.g. width). However, the effect leaves can be
     broadcasted to the same shape if broadcast_effect_leaves is set to True.
 
     Example:
 
-        .. code-block:: python
+    .. code-block:: python
 
-            import evermore as evm
-            import jax
-            import jax.numpy as jnp
+        import evermore as evm
+        import jax
+        import jax.numpy as jnp
 
-            modifier = [
-                evm.NormalConstrained().log_normal(up=jnp.array([0.9, 0.95]), down=jnp.array([1.1, 1.14])),
-                evm.NormalConstrained().log_normal(up=jnp.array([0.8]), down=jnp.array([1.2])),
-            ]
-            print(modifier_stack2(modifier))
-            # -> Modifier(
-            #      parameter=NormalConstrained(
-            #        value=f32[2,1], # <- stacked dimension (2, 1)
-            #        lower=f32[1],
-            #        upper=f32[1],
-            #        constraint=Gauss(mean=f32[1], width=f32[1])
-            #      ),
-            #      effect=log_normal(up=f32[2,1], down=f32[2,1]) # <- stacked dimension (2, 1)
-            #    )
+        modifiers = [
+            evm.NormalParameter().scale_log(up=jnp.array([1.1]), down=jnp.array([0.9])),
+            evm.NormalParameter().scale_log(up=jnp.array([1.2]), down=jnp.array([0.8])),
+        ]
+        print(evm.util.tree_stack(modifiers))
+        # -> Modifier(
+        #      parameter=NormalParameter(
+        #        value=f32[2,1], # <- stacked dimension (2, 1)
+        #        lower=f32[2,1], # <- stacked dimension (2, 1)
+        #        upper=f32[2,1], # <- stacked dimension (2, 1)
+        #        prior=Normal(mean=f32[2], width=f32[2]), # <- stacked dimension (2,)
+        #        frozen=False
+        #      ),
+        #      effect=AsymmetricExponential(up=f32[2,1], down=f32[2,1]) # <- stacked dimension (2, 1)
+        #    )
     """
     # If there is only one modifier, we can return it directly
     if len(trees) == 1:
@@ -105,25 +97,20 @@ def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
     return jtu.tree_unflatten(treedef_list[0], stacked_leaves)
 
 
-def as1darray(x: ArrayLike) -> Array:
-    """
-    Converts `x` to a 1d array.
+def dataclass_auto_init(module: eqx.Module) -> eqx.Module:
+    import dataclasses
+    import typing
 
-    Example:
+    from evermore.parameter import NormalParameter, Parameter
 
-    .. code-block:: python
-
-        import jax.numpy as jnp
-
-
-        as1darray(1.0)
-        # -> Array([1.], dtype=float32, weak_type=True)
-
-        as1darray(jnp.array(1.0))
-        # -> Array([1.], dtype=float32, weak_type=True)
-    """
-
-    return jnp.atleast_1d(jnp.asarray(x))
+    type_hints = typing.get_type_hints(module.__class__)
+    for field in dataclasses.fields(module):
+        name = field.name
+        hint = type_hints[name]
+        # we only have reasonable defaults for `FreeFloating` and `NormalConstrained`
+        if issubclass(hint, Parameter | NormalParameter) and not hasattr(module, name):
+            setattr(module, name, hint())
+    return module
 
 
 def dump_jaxpr(fun: Callable, *args: Any, **kwargs: Any) -> str:

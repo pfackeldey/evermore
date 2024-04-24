@@ -1,24 +1,31 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from functools import partial
+from typing import TYPE_CHECKING, Any, cast
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
-from jaxtyping import Array, ArrayLike
+import jax.tree_util as jtu
+from jaxtyping import Array, ArrayLike, PRNGKeyArray, PyTree
 
-from evermore.custom_types import PDFLike, Sentinel, _NoValue
-from evermore.pdf import Flat, Normal, Poisson
-from evermore.util import as1darray
+from evermore.custom_types import PDFLike
+from evermore.pdf import Normal, Poisson
+from evermore.util import filter_tree_map
 
 if TYPE_CHECKING:
     from evermore.modifier import Modifier
 
+
 __all__ = [
     "Parameter",
-    "FreeFloating",
-    "NormalConstrained",
-    "PoissonConstrained",
-    "auto_init",
+    "NormalParameter",
+    "is_parameter",
+    "params_map",
+    "value_filter_spec",
+    "partition",
+    "sample",
+    "correlate",
 ]
 
 
@@ -27,22 +34,30 @@ def __dir__():
 
 
 class Parameter(eqx.Module):
-    value: Array = eqx.field(converter=as1darray)
-    lower: Array = eqx.field(converter=as1darray)
-    upper: Array = eqx.field(converter=as1darray)
-    constraint: PDFLike | Sentinel = eqx.field(static=True)
+    """
+    Implementation of a general Parameter class. The class is used to define the parameters of a statistical model.
+    Key is the value attribute, which holds the actual value of the parameter. In additon,
+    the lower and upper attributes define the boundaries of the parameter. The prior attribute
+    is used to define the prior distribution of the parameter. The frozen attribute is used to
+    freeze the parameter during optimization.
 
-    def __init__(
-        self,
-        value: ArrayLike,
-        lower: ArrayLike,
-        upper: ArrayLike,
-        constraint: PDFLike | Sentinel = _NoValue,
-    ) -> None:
-        self.value = as1darray(value)
-        self.lower = jnp.broadcast_to(as1darray(lower), self.value.shape)
-        self.upper = jnp.broadcast_to(as1darray(upper), self.value.shape)
-        self.constraint = constraint
+    Usage:
+
+    .. code-block:: python
+
+        import evermore as evm
+
+        simple_param = evm.Parameter(value=1.0)
+        bounded_param = evm.Parameter(value=1.0, lower=0.0, upper=2.0)
+        constrained_parameter = evm.Parameter(value=1.0, prior=evm.pdf.Normal(mean=1.0, width=0.1))
+        frozen_parameter = evm.Parameter(value=1.0, frozen=True)
+    """
+
+    value: Array = eqx.field(converter=jnp.atleast_1d, default=0.0)
+    lower: Array = eqx.field(converter=jnp.atleast_1d, default=-jnp.inf)
+    upper: Array = eqx.field(converter=jnp.atleast_1d, default=jnp.inf)
+    prior: PDFLike | None = eqx.field(default=None)
+    frozen: bool = eqx.field(static=True, default=False)
 
     @property
     def boundary_constraint(self) -> Array:
@@ -52,92 +67,197 @@ class Parameter(eqx.Module):
             0,
         )
 
+    def scale(self, slope: ArrayLike = 1.0, offset: ArrayLike = 0.0) -> Modifier:
+        from evermore.effect import Linear
+        from evermore.modifier import Modifier
 
-class FreeFloating(Parameter):
-    def __init__(
-        self,
-        value: ArrayLike = 1.0,
-        lower: ArrayLike = -jnp.inf,
-        upper: ArrayLike = jnp.inf,
-    ) -> None:
-        super().__init__(value=value, lower=lower, upper=upper, constraint=Flat())
-
-    def unconstrained(self) -> Modifier:
-        import evermore as evm
-
-        return evm.Modifier(parameter=self, effect=evm.effect.unconstrained())
+        return Modifier(
+            parameter=self,
+            effect=Linear(slope=slope, offset=offset),
+        )
 
 
-class NormalConstrained(Parameter):
-    def __init__(
-        self,
-        value: ArrayLike = 0.0,
-        lower: ArrayLike = -jnp.inf,
-        upper: ArrayLike = jnp.inf,
-    ) -> None:
-        super().__init__(
-            value=value,
-            lower=lower,
-            upper=upper,
-            constraint=Normal(
-                mean=jnp.zeros_like(as1darray(value)),
-                width=jnp.ones_like(as1darray(value)),
+class NormalParameter(Parameter):
+    prior: PDFLike | None = Normal(mean=0.0, width=1.0)
+
+    def scale_log(self, up: ArrayLike, down: ArrayLike) -> Modifier:
+        from evermore.effect import AsymmetricExponential
+        from evermore.modifier import Modifier
+
+        return Modifier(parameter=self, effect=AsymmetricExponential(up=up, down=down))
+
+    def morphing(self, up_template: Array, down_template: Array) -> Modifier:
+        from evermore.effect import VerticalTemplateMorphing
+        from evermore.modifier import Modifier
+
+        return Modifier(
+            parameter=self,
+            effect=VerticalTemplateMorphing(
+                up_template=up_template, down_template=down_template
             ),
         )
 
-    def normal(self, width: Array) -> Modifier:
+
+def is_parameter(leaf: Any) -> bool:
+    return isinstance(leaf, Parameter)
+
+
+params_map = partial(filter_tree_map, filter=is_parameter)
+
+
+def value_filter_spec(tree: PyTree) -> PyTree:
+    """
+    Used to split a PyTree of evm.Parameters into two PyTrees: one containing the values of the parameters
+    and the other containing the rest of the PyTree. This is useful for defining which components are to be optimized
+    and which to keep fixed during optimization.
+
+    Usage:
+
+    .. code-block:: python
+
+        from jaxtyping import Array
         import evermore as evm
 
-        return evm.Modifier(parameter=self, effect=evm.effect.normal(width=width))
+        # define a PyTree of parameters
+        params = {
+            "a": evm.Parameter(value=1.0),
+            "b": evm.Parameter(value=2.0),
+        }
 
-    def log_normal(self, up: Array, down: Array) -> Modifier:
+        # split the PyTree into diffable and the static parts
+        filter_spec = evm.parameter.value_filter_spec(params)
+        diffable, static = eqx.partition(params, filter_spec)
+
+        # model's first argument is only the diffable part of the parameter Pytree!!
+        def model(diffable, static, hists) -> Array:
+            # combine the diffable and static parts of the parameter PyTree
+            parameters = eqx.combine(diffable, static)
+            assert parameters == params
+            # use the parameters to calculate the model as usual
+            ...
+    """
+    # 1. set the filter_spec to False for all non-static leaves
+    filter_spec = jtu.tree_map(lambda _: False, tree)
+
+    # 2. set the filter_spec to True for each parameter value
+    def _replace_value(leaf: Any) -> Any:
+        if isinstance(leaf, Parameter):
+            leaf = eqx.tree_at(lambda p: p.value, leaf, not leaf.frozen)
+        return leaf
+
+    return params_map(_replace_value, filter_spec)
+
+
+def partition(tree: PyTree) -> tuple[PyTree, PyTree]:
+    """
+    Short hand for:
+
+    .. code-block:: python
+
         import evermore as evm
 
-        return evm.Modifier(
-            parameter=self, effect=evm.effect.log_normal(up=up, down=down)
-        )
+        # Verbose:
+        filter_spec = evm.parameter.value_filter_spec(params)
+        diffable, static = eqx.partition(params, filter_spec)
 
-    def shape(self, up: Array, down: Array) -> Modifier:
+        # Short hand:
+        diffable, static = evm.parameter.partition(params)
+    """
+    return eqx.partition(tree, filter_spec=value_filter_spec(tree))
+
+
+def sample(tree: PyTree, key: PRNGKeyArray) -> PyTree:
+    """
+    Sample from the individual prior (no correlations taken into account!) of the parameters in the PyTree.
+    See examples/toy_generation.py for an example.
+    """
+    # partition the tree into parameters and the rest
+    params_tree, rest_tree = eqx.partition(tree, is_parameter, is_leaf=is_parameter)
+    params_structure = jax.tree_util.tree_structure(params_tree)
+    n_params = params_structure.num_leaves  # type: ignore[attr-defined]
+
+    keys = jax.random.split(key, n_params)
+    keys_tree = jax.tree_util.tree_unflatten(params_structure, keys)
+
+    def _sample(param: Parameter, key: Parameter) -> Array:
+        if isinstance(param.prior, PDFLike):
+            pdf = param.prior
+            pdf = cast(PDFLike, pdf)
+
+            # sample new value from the prior pdf
+            sampled_value = pdf.sample(key.value)
+
+            # TODO: make this compatible with externally provided Poisson PDFs
+            if isinstance(pdf, Poisson):
+                sampled_value = (sampled_value / pdf.lamb) - 1
+        elif param.prior is None:
+            if not jnp.isfinite(param.lower) and jnp.isfinite(param.upper):
+                msg = f"Can't sample uniform from {param} (no given prior), because of non-finite bounds. "
+                msg += "Please provide a prior or make the bounds finite."
+                raise RuntimeError(msg)
+            sampled_value = jax.random.uniform(
+                key.value,
+                shape=param.value.shape,
+                minval=param.lower,
+                maxval=param.upper,
+            )
+
+        # replace the sampled parameter value and return new parameter
+        return eqx.tree_at(lambda p: p.value, param, sampled_value)
+
+    # sample for each parameter
+    sampled_params_tree = jtu.tree_map(
+        _sample, params_tree, keys_tree, is_leaf=is_parameter
+    )
+
+    # combine the sampled parameters with the rest of the model and return it
+    return eqx.combine(sampled_params_tree, rest_tree, is_leaf=is_parameter)
+
+
+def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
+    """
+    Correlate parameters by sharing the value of the *first* given parameter.
+
+    It is preferred to just use the same parameter if possible, this function should be used if that is not doable.
+
+    Example:
+
+    .. code-block:: python
+
+        from jaxtyping import PyTree
         import evermore as evm
 
-        return evm.Modifier(parameter=self, effect=evm.effect.shape(up=up, down=down))
+        p1 = evm.Parameter(value=1.0)
+        p2 = evm.Parameter(value=0.0)
+        p3 = evm.Parameter(value=0.5)
 
+        def model(*parameters: PyTree[evm.Parameter]):
+            # correlate them inside the model
+            p1, p2, p3 = evm.parameter.correlate(*parameters)
 
-class PoissonConstrained(Parameter):
-    lamb: Array = eqx.field(converter=as1darray)
+            # now p1, p2, p3 are correlated, i.e., they share the same value
+            assert p1.value == p2.value == p3.value
+    """
 
-    def __init__(
-        self,
-        lamb: ArrayLike,
-        value: ArrayLike = 0.0,
-        lower: ArrayLike = -jnp.inf,
-        upper: ArrayLike = jnp.inf,
-    ) -> None:
-        self.lamb = as1darray(lamb)
-        super().__init__(
-            value=value,
-            lower=lower,
-            upper=upper,
-            constraint=Poisson(lamb=self.lamb),
-        )
+    first, *rest = parameters
 
-    def poisson(self) -> Modifier:
-        import evermore as evm
+    def _correlate(parameter: Parameter) -> tuple[Parameter, Parameter]:
+        ps = (first, parameter)
 
-        return evm.Modifier(parameter=self, effect=evm.effect.poisson(lamb=self.lamb))
+        def where(ps: tuple[Parameter, Parameter]) -> Array:
+            return ps[1].value
 
+        def get(ps: tuple[Parameter, Parameter]) -> Array:
+            return ps[0].value
 
-def auto_init(module: eqx.Module) -> eqx.Module:
-    import dataclasses
-    import typing
+        shared = eqx.nn.Shared(ps, where, get)
+        return shared()
 
-    type_hints = typing.get_type_hints(module.__class__)
-    for field in dataclasses.fields(module):
-        name = field.name
-        hint = type_hints[name]
-        # we only have reasonable defaults for `FreeFloating` and `NormalConstrained`
-        if issubclass(hint, FreeFloating | NormalConstrained) and not hasattr(
-            module, name
-        ):
-            setattr(module, name, hint())
-    return module
+    correlated = [first]
+    for p in rest:
+        if p.value.shape != first.value.shape:
+            msg = f"Can't correlate parameters {first} and {p}! Must have the same shape, got {first.value.shape} and {p.value.shape}."
+            raise ValueError(msg)
+        _, p_corr = _correlate(p)
+        correlated.append(p_corr)
+    return tuple(correlated)

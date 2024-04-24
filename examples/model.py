@@ -2,42 +2,42 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array
+from jaxtyping import Array, PyTree
 
 import evermore as evm
 
 
 class SPlusBModel(eqx.Module):
-    mu: evm.FreeFloating
-    norm1: evm.NormalConstrained
-    norm2: evm.NormalConstrained
-    shape1: evm.NormalConstrained
+    mu: evm.Parameter
+    norm1: evm.NormalParameter
+    norm2: evm.NormalParameter
+    shape1: evm.NormalParameter
 
-    def __init__(self, hist: dict[str, Array], histw2: dict[str, Array]) -> None:
-        self = evm.parameter.auto_init(self)
+    def __init__(self, hist: PyTree, histw2: PyTree) -> None:
+        evm.util.dataclass_auto_init(self)
 
     def __call__(self, hists: dict) -> dict[str, Array]:
         expectations = {}
 
         # signal process
-        sig_mod = self.mu.unconstrained()
+        sig_mod = self.mu.scale()
         expectations["signal"] = sig_mod(hists["nominal"]["signal"])
 
         # bkg1 process
-        bkg1_lnN = self.norm1.log_normal(up=jnp.array([1.1]), down=jnp.array([0.9]))
-        bkg1_shape = self.shape1.shape(
-            up=hists["shape_up"]["bkg1"],
-            down=hists["shape_down"]["bkg1"],
+        bkg1_lnN = self.norm1.scale_log(up=jnp.array([1.1]), down=jnp.array([0.9]))
+        bkg1_shape = self.shape1.morphing(
+            up_template=hists["shape_up"]["bkg1"],
+            down_template=hists["shape_down"]["bkg1"],
         )
         # combine modifiers
         bkg1_mod = bkg1_lnN @ bkg1_shape
         expectations["bkg1"] = bkg1_mod(hists["nominal"]["bkg1"])
 
         # bkg2 process
-        bkg2_lnN = self.norm2.log_normal(up=jnp.array([1.05]), down=jnp.array([0.95]))
-        bkg2_shape = self.shape1.shape(
-            up=hists["shape_up"]["bkg2"],
-            down=hists["shape_down"]["bkg2"],
+        bkg2_lnN = self.norm2.scale_log(up=jnp.array([1.05]), down=jnp.array([0.95]))
+        bkg2_shape = self.shape1.morphing(
+            up_template=hists["shape_up"]["bkg2"],
+            down_template=hists["shape_down"]["bkg2"],
         )
         # combine modifiers
         bkg2_mod = bkg2_lnN @ bkg2_shape

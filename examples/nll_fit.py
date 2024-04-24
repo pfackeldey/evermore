@@ -9,26 +9,30 @@ import evermore as evm
 optim = optax.sgd(learning_rate=1e-2)
 opt_state = optim.init(eqx.filter(model, eqx.is_inexact_array))
 
-nll = evm.loss.PoissonNLL()
+log_likelihood = evm.loss.PoissonLogLikelihood()
 
 
 @eqx.filter_jit
-def loss(model, hists, observation):
+def loss(dynamic_model, static_model, hists, observation):
+    model = eqx.combine(dynamic_model, static_model)
     expectations = model(hists)
     constraints = evm.loss.get_log_probs(model)
-    loss_val = nll(
-        expectation=evm.util.sum_leaves(expectations),
+    loss_val = log_likelihood(
+        expectation=evm.util.sum_over_leaves(expectations),
         observation=observation,
     )
     # add constraint
-    loss_val += evm.util.sum_leaves(constraints)
+    loss_val += evm.util.sum_over_leaves(constraints)
     return -jnp.sum(loss_val)
 
 
 @eqx.filter_jit
 def make_step(model, opt_state, events, observation):
     # differentiate full analysis
-    grads = eqx.filter_grad(loss)(model, events, observation)
+    dynamic_model, static_model = eqx.partition(
+        model, evm.parameter.value_filter_spec(model)
+    )
+    grads = eqx.filter_grad(loss)(dynamic_model, static_model, events, observation)
     updates, opt_state = optim.update(grads, opt_state)
     # apply nuisance parameter and DNN weight updates
     model = eqx.apply_updates(model, updates)
@@ -38,7 +42,10 @@ def make_step(model, opt_state, events, observation):
 # minimize model with 1000 steps
 for step in range(1000):
     if step % 100 == 0:
-        loss_val = loss(model, hists, observation)
+        dynamic_model, static_model = eqx.partition(
+            model, evm.parameter.value_filter_spec(model)
+        )
+        loss_val = loss(dynamic_model, static_model, hists, observation)
         print(f"{step=} - {loss_val=:.6f}")
     model, opt_state = make_step(model, opt_state, hists, observation)
 

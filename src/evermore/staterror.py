@@ -9,11 +9,11 @@ import jax.tree_util as jtu
 from jaxtyping import Array, PyTree
 
 from evermore.custom_types import ModifierLike
-from evermore.effect import noop
-from evermore.modifier import Modifier
-from evermore.modifier import where as modifier_where
-from evermore.parameter import NormalConstrained, PoissonConstrained
-from evermore.util import sum_leaves
+from evermore.effect import Identity
+from evermore.modifier import Modifier, Where
+from evermore.parameter import NormalParameter, Parameter
+from evermore.pdf import Poisson
+from evermore.util import sum_over_leaves
 
 __all__ = [
     "StatErrors",
@@ -30,21 +30,23 @@ class StatErrors(eqx.Module):
 
     Example:
 
-        .. code-block:: python
+    .. code-block:: python
 
-            import jax.numpy as jnp
-            import evermore as evm
+        from operator import itemgetter
+        import jax.numpy as jnp
+        import evermore as evm
 
-            hists = {"qcd": jnp.array([10, 20, 30]), "signal": jnp.array([5, 10, 15])}
-            histsw2 = {"qcd": jnp.array([12, 21, 29]), "signal": jnp.array([5, 8, 11])}
 
-            staterrors = evm.staterror.StatErrors(hists, histsw2, threshold=10.0)
+        hists = {"qcd": jnp.array([10, 20, 30]), "signal": jnp.array([5, 10, 15])}
+        histsw2 = {"qcd": jnp.array([12, 21, 29]), "signal": jnp.array([5, 8, 11])}
 
-            # Create a modifier for the qcd process, `where` is a function
-            # that finds the corresponding parameter from `staterrors.params_per_process`
-            mod = staterrors.get(where=lambda x: x["qcd"])
-            # apply the modifier to the parameter
-            mod(hists["qcd"])
+        staterrors = evm.staterror.StatErrors(hists, histsw2, threshold=10.0)
+
+        # Create a modifier for the qcd process, `where` is a function
+        # that finds the corresponding parameter from `staterrors.params_per_process`
+        mod = staterrors.modifier(getter=itemgetter("qcd"))
+        # apply the modifier to the parameter
+        mod(hists["qcd"])
     """
 
     gaussians_global: PyTree
@@ -70,53 +72,55 @@ class StatErrors(eqx.Module):
         self.histsw2 = histsw2
         self.threshold = threshold
 
-        self.ntot = sum_leaves(self.hists)
-        self.etot = jnp.sqrt(sum_leaves(self.histsw2))
+        self.ntot = sum_over_leaves(self.hists)
+        self.etot = jnp.sqrt(sum_over_leaves(self.histsw2))
         ntot_eff = jnp.round(self.ntot**2 / self.etot**2, decimals=0)
         self.mask = ntot_eff > self.threshold
 
         # setup params
-        self.gaussians_global = NormalConstrained(value=jnp.zeros_like(self.ntot))
+        self.gaussians_global = NormalParameter(value=jnp.zeros_like(self.ntot))
         self.gaussians_per_process = jtu.tree_map(
-            lambda hist: NormalConstrained(value=jnp.zeros_like(hist)), self.hists
+            lambda hist: NormalParameter(value=jnp.zeros_like(hist)), self.hists
         )
         self.poissons_per_process = jtu.tree_map(
-            lambda hist: PoissonConstrained(
-                lamb=cast(Array, jnp.where(hist > 0.0, hist, 1.0)),
+            lambda hist: Parameter(
                 value=jnp.zeros_like(hist),
+                prior=Poisson(lamb=cast(Array, jnp.where(hist > 0.0, hist, 1.0))),
             ),
             self.hists,
         )
 
-    def get(self, where: Callable) -> ModifierLike:
+    def modifier(self, getter: Callable) -> ModifierLike:
         # see: https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/pull/929
         # and: https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/latest/part2/bin-wise-stats/#usage-instructions
 
         # poisson case per process
         # if w > 0.0, then poisson, else noop (no effect)
         # since w <= 0 leads to NaNs in derivatives, we need to mask them
-        w = where(self.hists)
-        poisson_params = where(self.poissons_per_process)
-        poisson_noop_mod = Modifier(parameter=poisson_params, effect=noop())
-        poisson_mod = modifier_where(
-            w > 0.0, poisson_params.poisson(), poisson_noop_mod
+        w = getter(self.hists)
+        poisson_params = getter(self.poissons_per_process)
+        poisson_identity_mod = Modifier(parameter=poisson_params, effect=Identity())
+        poisson_mod = Where(
+            w > 0.0, poisson_params.scale(slope=1.0, offset=1.0), poisson_identity_mod
         )
 
         # gaussian case per process
         # if w == 0.0, guard for division by zero
         # gaussians with width 0 also lead to nans, so we need to guard this aswell
-        w2 = where(self.histsw2)
+        w2 = getter(self.histsw2)
         relerr = jnp.where(w == 0.0, 0.0, jnp.sqrt(w2) / jnp.where(w == 0.0, 1.0, w))
         mask = relerr == 0.0
         relerr = jnp.where(mask, relerr, 1.0)
-        gauss_params = where(self.gaussians_per_process)
-        gauss_noop_mod = Modifier(parameter=gauss_params, effect=noop())
-        gauss_mod = modifier_where(
-            mask, gauss_noop_mod, gauss_params.normal(width=relerr)
+        gauss_params = getter(self.gaussians_per_process)
+        gauss_identity_mod = Modifier(parameter=gauss_params, effect=Identity())
+        gauss_mod = Where(
+            mask, gauss_identity_mod, gauss_params.scale(slope=relerr, offset=1.0)
         )
 
         # gaussian case global
-        gauss_global_mod = self.gaussians_global.normal(width=self.etot / self.ntot)
+        gauss_global_mod = self.gaussians_global.scale(
+            slope=self.etot / self.ntot, offset=1.0
+        )
 
         # combine all, logic as here: https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/main/src/CMSHistErrorPropagator.cc#L320-L434
         #
@@ -141,8 +145,8 @@ class StatErrors(eqx.Module):
         per_process_mask = (
             ((w**2 / w2**2) > self.threshold) | (jnp.sqrt(w2) > w) | (w <= 0)
         )
-        return modifier_where(
+        return Where(
             self.mask,
             gauss_global_mod,
-            modifier_where(per_process_mask, gauss_mod, poisson_mod),
+            Where(per_process_mask, gauss_mod, poisson_mod),
         )

@@ -20,7 +20,7 @@ class LinearConstrained(eqx.Module):
             value=jax.random.normal(wkey, (out_size, in_size)),
             lower=-jnp.inf,
             upper=jnp.inf,
-            constraint=normal,
+            prior=normal,
         )
 
         # biases
@@ -37,7 +37,7 @@ def loss_fn(model, x, y):
     constraints = evm.loss.get_log_probs(model)
     # sum them all up for each weight
     constraints = jax.tree_util.tree_map(jnp.sum, constraints)
-    return mse + evm.util.sum_leaves(constraints)
+    return mse + evm.util.sum_over_leaves(constraints)
 
 
 batch_size, in_size, out_size = 32, 2, 3

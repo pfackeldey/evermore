@@ -1,21 +1,21 @@
 import abc
+from collections.abc import Callable
+from typing import Literal
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
-from jaxtyping import Array
+from jaxtyping import Array, PyTree
 
-from evermore.custom_types import SF
+from evermore.custom_types import OffsetAndScale
 from evermore.parameter import Parameter
-from evermore.util import as1darray
 
 __all__ = [
     "Effect",
-    "noop",
-    "unconstrained",
-    "normal",
-    "log_normal",
-    "poisson",
-    "shape",
+    "Identity",
+    "Linear",
+    "VerticalTemplateMorphing",
+    "AsymmetricExponential",
 ]
 
 
@@ -25,83 +25,84 @@ def __dir__():
 
 class Effect(eqx.Module):
     @abc.abstractmethod
-    def scale_factor(self, parameter: Parameter, hist: Array) -> SF: ...
+    def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale: ...
 
 
-class noop(Effect):
-    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
-        return SF(multiplicative=jnp.ones_like(hist), additive=jnp.zeros_like(hist))
+class Identity(Effect):
+    @jax.named_scope("evm.effect.Identity")
+    def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
+        return OffsetAndScale(offset=0.0, scale=1.0)
 
 
-class unconstrained(Effect):
-    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
-        sf = jnp.broadcast_to(parameter.value, hist.shape)
-        return SF(multiplicative=sf, additive=jnp.zeros_like(hist))
+class Lambda(Effect):
+    fun: Callable[[PyTree[Parameter], Array], OffsetAndScale | Array]
+    normalize_by: Literal["offset", "scale"] | None = eqx.field(
+        static=True, default=None
+    )
+
+    @jax.named_scope("evm.effect.Lambda")
+    def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
+        res = self.fun(parameter, hist)
+        if isinstance(res, OffsetAndScale) and self.normalize_by is None:
+            return res
+        if isinstance(res, Array):
+            if self.normalize_by == "offset":
+                return OffsetAndScale(offset=(res - hist), scale=1.0)
+            if self.normalize_by == "scale":
+                return OffsetAndScale(offset=0.0, scale=(res / hist))
+        msg = f"Unknown normalization type '{self.normalize_by}' for '{res}'"
+        raise ValueError(msg)
 
 
-DEFAULT_EFFECT = unconstrained()
+class Linear(Effect):
+    offset: Array = eqx.field(converter=jnp.atleast_1d)
+    slope: Array = eqx.field(converter=jnp.atleast_1d)
+
+    @jax.named_scope("evm.effect.Lambda")
+    def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
+        assert isinstance(parameter, Parameter)
+        sf = parameter.value * self.slope + self.offset
+        return OffsetAndScale(offset=0.0, scale=sf)
 
 
-class normal(Effect):
-    width: Array = eqx.field(converter=as1darray)
-
-    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
-        """
-        Implementation with (inverse) CDFs is defined as follows:
-
-            .. code-block:: python
-
-                gx = Normal(mean=1.0, width=self.width)  # type: ignore[arg-type]
-                g1 = Normal(mean=1.0, width=1.0)
-
-                return gx.inv_cdf(g1.cdf(parameter.value + 1))
-
-        But we can use the fast analytical solution instead:
-
-            .. code-block:: python
-
-                return (parameter.value * self.width) + 1
-
-        """
-        sf = jnp.broadcast_to((parameter.value * self.width) + 1, hist.shape)
-        return SF(multiplicative=sf, additive=jnp.zeros_like(hist))
+DEFAULT_EFFECT: Linear = Linear(offset=0.0, slope=1.0)
 
 
-class shape(Effect):
-    up: Array = eqx.field(converter=as1darray)  # + 1 sigma
-    down: Array = eqx.field(converter=as1darray)  # - 1 sigma
+class VerticalTemplateMorphing(Effect):
+    up_template: Array = eqx.field(converter=jnp.atleast_1d)  # + 1 sigma
+    down_template: Array = eqx.field(converter=jnp.atleast_1d)  # - 1 sigma
 
-    def vshift(self, sf: Array, hist: Array) -> Array:
-        factor = sf
-        dx_sum = self.up + self.down - 2 * hist
-        dx_diff = self.up - self.down
+    def vshift(self, x: Array, hist: Array) -> Array:
+        dx_sum = self.up_template + self.down_template - 2 * hist
+        dx_diff = self.up_template - self.down_template
 
         # taken from https://github.com/nsmith-/jaxfit/blob/8479cd73e733ba35462287753fab44c0c560037b/src/jaxfit/roofit/combine.py#L173C6-L192
         _asym_poly = jnp.array([3.0, -10.0, 15.0, 0.0]) / 8.0
 
-        abs_value = jnp.abs(factor)
+        abs_value = jnp.abs(x)
         return 0.5 * (
-            dx_diff * factor
+            dx_diff * x
             + dx_sum
             * jnp.where(
                 abs_value > 1.0,
                 abs_value,
-                jnp.polyval(_asym_poly, factor * factor),
+                jnp.polyval(_asym_poly, x * x),
             )
         )
 
-    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
-        sf = self.vshift(sf=parameter.value, hist=hist)
-        return SF(multiplicative=jnp.ones_like(hist), additive=sf)
+    @jax.named_scope("evm.effect.VerticalTemplateMorphing")
+    def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
+        assert isinstance(parameter, Parameter)
+        offset = self.vshift(parameter.value, hist=hist)
+        return OffsetAndScale(offset=offset, scale=1.0)
 
 
-class log_normal(Effect):
-    up: Array = eqx.field(converter=as1darray)
-    down: Array = eqx.field(converter=as1darray)
+class AsymmetricExponential(Effect):
+    up: Array = eqx.field(converter=jnp.atleast_1d)
+    down: Array = eqx.field(converter=jnp.atleast_1d)
 
-    def interpolate(self, parameter: Parameter) -> Array:
+    def interpolate(self, x: Array) -> Array:
         # https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/be488af288361ef101859a398ae618131373cad7/src/ProcessNormalization.cc#L112-L129
-        x = parameter.value
         lo, hi = self.down, self.up
         hi = jnp.log(hi)
         lo = jnp.log(lo)
@@ -115,32 +116,8 @@ class log_normal(Effect):
             jnp.abs(x) >= 0.5, jnp.where(x >= 0, hi, lo), avg + alpha * halfdiff
         )
 
-    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
-        """
-        Implementation with (inverse) CDFs is defined as follows:
-
-            .. code-block:: python
-
-                gx = Normal(mean=jnp.exp(parameter.value), width=width)  # type: ignore[arg-type]
-                g1 = Normal(mean=1.0, width=1.0)
-
-                return gx.inv_cdf(g1.cdf(parameter.value + 1))
-
-        But we can use the fast analytical solution instead:
-
-            .. code-block:: python
-
-                return jnp.exp(parameter.value * self.interpolate(parameter=parameter))
-
-        """
-        interp = self.interpolate(parameter=parameter)
-        sf = jnp.broadcast_to(jnp.exp(parameter.value * interp), hist.shape)
-        return SF(multiplicative=sf, additive=jnp.zeros_like(hist))
-
-
-class poisson(Effect):
-    lamb: Array = eqx.field(converter=as1darray)
-
-    def scale_factor(self, parameter: Parameter, hist: Array) -> SF:
-        sf = jnp.broadcast_to(parameter.value + 1, hist.shape)
-        return SF(multiplicative=sf, additive=jnp.zeros_like(hist))
+    @jax.named_scope("evm.effect.AsymmetricExponential")
+    def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
+        assert isinstance(parameter, Parameter)
+        interp = self.interpolate(parameter.value)
+        return OffsetAndScale(offset=0.0, scale=jnp.exp(parameter.value * interp))

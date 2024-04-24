@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from operator import itemgetter
+
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array
@@ -20,15 +22,15 @@ class SPlusBModel(eqx.Module):
         expectations = {}
 
         # signal process
-        signal_mcstat_mod = self.staterrors.get(where=lambda p: p["signal"])
+        signal_mcstat_mod = self.staterrors.modifier(getter=lambda p: p["signal"])
         expectations["signal"] = signal_mcstat_mod(hists["signal"])
 
         # bkg1 process
-        bkg1_mcstat_mod = self.staterrors.get(where=lambda p: p["bkg1"])
+        bkg1_mcstat_mod = self.staterrors.modifier(getter=lambda p: p["bkg1"])
         expectations["bkg1"] = bkg1_mcstat_mod(hists["bkg1"])
 
         # bkg2 process
-        bkg2_mcstat_mod = self.staterrors.get(where=lambda p: p["bkg2"])
+        bkg2_mcstat_mod = self.staterrors.modifier(getter=lambda p: p["bkg2"])
         expectations["bkg2"] = bkg2_mcstat_mod(hists["bkg2"])
 
         # return the modified expectations
@@ -58,10 +60,6 @@ expectations = model(hists)
 modified_histsw2 = {}
 
 
-def where(process):
-    return lambda x: x[process]
-
-
 for process, histw2 in histsw2.items():
-    mod = model.staterrors.get(where=where(process))
+    mod = model.staterrors.modifier(getter=itemgetter(process))
     modified_histsw2[process] = mod(histw2)

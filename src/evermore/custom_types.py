@@ -1,49 +1,38 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+import equinox as eqx
+import jax.numpy as jnp
 from jaxtyping import Array, PRNGKeyArray
 
 if TYPE_CHECKING:
-    from evermore.modifier import compose
+    from evermore.modifier import Compose
 
 
 __all__ = [
-    "SF",
-    "AddOrMul",
+    "OffsetAndScale",
     "ModifierLike",
     "PDFLike",
 ]
 
 
-AddOrMul = Callable[[Array, Array], Array]
+class OffsetAndScale(eqx.Module):
+    offset: Array = eqx.field(converter=jnp.atleast_1d, default=0.0)
+    scale: Array = eqx.field(converter=jnp.atleast_1d, default=1.0)
 
-
-class SF(NamedTuple):
-    multiplicative: Array
-    additive: Array
-
-
-class Sentinel:
-    __slots__ = ("repr",)
-
-    def __init__(self, repr: str) -> None:
-        self.repr = repr
-
-    def __repr__(self) -> str:
-        return self.repr
-
-    __str__ = __repr__
-
-
-_NoValue: Any = Sentinel("<NoValue>")
+    def broadcast(self) -> OffsetAndScale:
+        shape = jnp.broadcast_shapes(self.offset.shape, self.scale.shape)
+        return type(self)(
+            offset=jnp.broadcast_to(self.offset, shape),
+            scale=jnp.broadcast_to(self.scale, shape),
+        )
 
 
 class ModifierLike(Protocol):
-    def scale_factor(self, hist: Array) -> SF: ...
+    def offset_and_scale(self, hist: Array) -> OffsetAndScale: ...
     def __call__(self, hist: Array) -> Array: ...
-    def __matmul__(self, other: ModifierLike) -> compose: ...
+    def __matmul__(self, other: ModifierLike) -> Compose: ...
 
 
 @runtime_checkable

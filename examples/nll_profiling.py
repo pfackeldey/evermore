@@ -1,7 +1,6 @@
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 import optax
 from jaxtyping import Array
 
@@ -11,7 +10,7 @@ import evermore as evm
 def fixed_mu_fit(mu: Array) -> Array:
     from model import hists, model, observation
 
-    nll = evm.loss.PoissonNLL()
+    log_likelihood = evm.loss.PoissonLogLikelihood()
 
     optim = optax.sgd(learning_rate=1e-2)
     opt_state = optim.init(eqx.filter(model, eqx.is_inexact_array))
@@ -20,7 +19,7 @@ def fixed_mu_fit(mu: Array) -> Array:
 
     # filter out mu from the model (no gradients will be calculated for mu!)
     # see: https://github.com/patrick-kidger/equinox/blob/main/examples/frozen_layer.ipynb
-    filter_spec = jtu.tree_map(lambda _: True, model)
+    filter_spec = evm.parameter.value_filter_spec(model)
     filter_spec = eqx.tree_at(
         lambda tree: tree.mu.value,
         filter_spec,
@@ -28,23 +27,23 @@ def fixed_mu_fit(mu: Array) -> Array:
     )
 
     @eqx.filter_jit
-    def loss(diff_model, static_model, hists, observation):
-        model = eqx.combine(diff_model, static_model)
+    def loss(dynamic_model, static_model, hists, observation):
+        model = eqx.combine(dynamic_model, static_model)
         expectations = model(hists)
         constraints = evm.loss.get_log_probs(model)
-        loss_val = nll(
-            expectation=evm.util.sum_leaves(expectations),
+        loss_val = log_likelihood(
+            expectation=evm.util.sum_over_leaves(expectations),
             observation=observation,
         )
         # add constraint
-        loss_val += evm.util.sum_leaves(constraints)
+        loss_val += evm.util.sum_over_leaves(constraints)
         return -2 * jnp.sum(loss_val)
 
     @eqx.filter_jit
-    def make_step(model, opt_state, events, observation):
+    def make_step(model, opt_state, hists, observation):
         # differentiate
-        diff_model, static_model = eqx.partition(model, filter_spec)
-        grads = eqx.filter_grad(loss)(diff_model, static_model, events, observation)
+        dynamic_model, static_model = eqx.partition(model, filter_spec)
+        grads = eqx.filter_grad(loss)(dynamic_model, static_model, hists, observation)
         updates, opt_state = optim.update(grads, opt_state)
         # apply nuisance parameter and DNN weight updates
         model = eqx.apply_updates(model, updates)
@@ -53,8 +52,8 @@ def fixed_mu_fit(mu: Array) -> Array:
     # minimize model with 1000 steps
     for _ in range(1000):
         model, opt_state = make_step(model, opt_state, hists, observation)
-    diff_model, static_model = eqx.partition(model, filter_spec)
-    return loss(diff_model, static_model, hists, observation)
+    dynamic_model, static_model = eqx.partition(model, filter_spec)
+    return loss(dynamic_model, static_model, hists, observation)
 
 
 mus = jnp.linspace(0, 5, 11)

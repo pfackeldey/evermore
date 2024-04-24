@@ -9,9 +9,9 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
-from jaxtyping import Array
+from jaxtyping import Array, ArrayLike, PyTree
 
-from evermore.custom_types import SF, ModifierLike
+from evermore.custom_types import ModifierLike, OffsetAndScale
 from evermore.effect import DEFAULT_EFFECT
 from evermore.parameter import Parameter
 from evermore.util import tree_stack
@@ -22,10 +22,12 @@ if TYPE_CHECKING:
 __all__ = [
     "ModifierBase",
     "Modifier",
-    "compose",
-    "where",
-    "mask",
-    "transform",
+    "Compose",
+    "Where",
+    "BooleanMask",
+    "Transform",
+    "TransformOffset",
+    "TransformScale",
 ]
 
 
@@ -35,26 +37,25 @@ def __dir__():
 
 class AbstractModifier(eqx.Module):
     @abc.abstractmethod
-    def scale_factor(self: ModifierLike, hist: Array) -> SF: ...
+    def offset_and_scale(self: ModifierLike, hist: Array) -> OffsetAndScale: ...
 
     @abc.abstractmethod
     def __call__(self: ModifierLike, hist: Array) -> Array: ...
 
     @abc.abstractmethod
-    def __matmul__(self: ModifierLike, other: ModifierLike) -> compose: ...
+    def __matmul__(self: ModifierLike, other: ModifierLike) -> Compose: ...
 
 
 class ApplyFn(eqx.Module):
     @jax.named_scope("evm.modifier.ApplyFn")
     def __call__(self: ModifierLike, hist: Array) -> Array:
-        sf = self.scale_factor(hist=hist)
-        # apply
-        return sf.multiplicative * (hist + sf.additive)
+        os = self.offset_and_scale(hist=hist)
+        return os.scale * (hist + os.offset)
 
 
 class MatMulCompose(eqx.Module):
-    def __matmul__(self: ModifierLike, other: ModifierLike) -> compose:
-        return compose(self, other)
+    def __matmul__(self: ModifierLike, other: ModifierLike) -> Compose:
+        return Compose(self, other)
 
 
 class ModifierBase(ApplyFn, MatMulCompose, AbstractModifier):
@@ -67,34 +68,35 @@ class ModifierBase(ApplyFn, MatMulCompose, AbstractModifier):
 
     Example:
 
-        .. code-block:: python
+    .. code-block:: python
 
-            import equinox as eqx
-            import jax.numpy as jnp
-            import jax.tree_util as jtu
-            from jaxtyping import Array
+        import equinox as eqx
+        import jax.numpy as jnp
+        import jax.tree_util as jtu
+        from jaxtyping import Array
 
-            import evermore as evm
-
-            class clip(evm.ModifierBase):
-                modifier: evm.ModifierBase
-                min_sf: float = eqx.field(static=True)
-                max_sf: float = eqx.field(static=True)
-
-                def scale_factor(self, hist: Array) -> evm.custrom_types.SF:
-                    sf = self.modifier.scale_factor(hist)
-                    return jtu.tree_map(lambda x: jnp.clip(x, self.min_sf, self.max_sf), sf)
+        import evermore as evm
 
 
-            parameter = evm.Parameter(value=1.1)
-            modifier = parameter.unconstrained()
+        class Clip(evm.modifier.ModifierBase):
+            modifier: evm.custom_types.ModifierLike
+            min_sf: float = eqx.field(static=True)
+            max_sf: float = eqx.field(static=True)
 
-            clipped_modifier = clip(modifier=modifier, min_sf=0.8, max_sf=1.2)
+            def offset_and_scale(self, hist: Array) -> evm.custom_types.OffsetAndScale:
+                os = self.modifier.offset_and_scale(hist)
+                return jtu.tree_map(lambda x: jnp.clip(x, self.min_sf, self.max_sf), os)
 
-            # this example is trivial, because you can also implement it with `evm.modifier.transform`:
-            from functools import partial
 
-            clipped_modifier = evm.modifier.transform(partial(jnp.clip, a_min=0.8, a_max=1.2), modifier)
+        parameter = evm.Parameter(value=1.1)
+        modifier = parameter.scale()
+
+        clipped_modifier = Clip(modifier=modifier, min_sf=0.8, max_sf=1.2)
+
+        # this example is trivial, because you can also implement it with *evm.modifier.Transform*:
+        from functools import partial
+
+        clipped_modifier = evm.modifier.Transform(partial(jnp.clip, a_min=0.8, a_max=1.2), modifier)
     """
 
 
@@ -110,48 +112,51 @@ class Modifier(ModifierBase):
         import evermore as evm
 
         mu = evm.Parameter(value=1.1)
-        norm = evm.Parameter(value=0.0)
+        norm = evm.NormalParameter(value=0.0)
 
         # create a new parameter and a penalty
-        modify = evm.Modifier(parameter=mu, effect=evm.effect.unconstrained())
+        modify = evm.Modifier(parameter=mu, effect=evm.effect.Linear(offset=0, slope=1))
         # or shorthand
-        modify = mu.unconstrained()
+        modify = mu.scale(offset=0, slope=1)
 
         # apply the Modifier
         modify(jnp.array([10, 20, 30]))
         # -> Array([11., 22., 33.], dtype=float32, weak_type=True),
 
         # log_normal effect
-        modify = evm.Modifier(parameter=norm, effect=evm.effect.log_normal(jnp.array([0.8, 1.2])))
+        modify = evm.Modifier(parameter=norm, effect=evm.effect.AsymmetricExponential(up=1.2, down=0.8))
         # or shorthand
-        modify = norm.log_normal(jnp.array([0.8, 1.2]))
+        modify = norm.scale_log(up=1.2, down=0.8)
 
         # poisson effect
         hist = jnp.array([10, 20, 30])
-        modify = evm.Modifier(parameter=norm, effect=evm.effect.poisson(hist))
+        parameter = evm.Parameter(value=1.0, prior=evm.pdf.Poisson(lamb=hist))
+        modify = evm.Modifier(parameter=parameter, effect=evm.effect.Linear(offset=1, slope=1))
         # or shorthand
-        modify = norm.poisson(hist)
+        modify = norm.scale(offset=1, slope=1)
 
         # shape effect
-        up = jnp.array([12, 23, 35])
-        down = jnp.array([8, 19, 26])
-        modify = evm.Modifier(parameter=norm, effect=evm.effect.shape(up, down))
+        up_template = jnp.array([12, 23, 35])
+        down_template = jnp.array([8, 19, 26])
+        modify = evm.Modifier(parameter=norm, effect=evm.effect.VerticalTemplateMorphing(up_template=up_template, down_template=down_template))
         # or shorthand
-        modify = norm.shape(up, down)
+        modify = norm.morphing(up_template=up_template, down_template=down_template)
     """
 
-    parameter: Parameter
+    parameter: PyTree[Parameter]
     effect: Effect
 
-    def __init__(self, parameter: Parameter, effect: Effect = DEFAULT_EFFECT) -> None:
+    def __init__(
+        self, parameter: PyTree[Parameter], effect: Effect = DEFAULT_EFFECT
+    ) -> None:
         self.parameter = parameter
         self.effect = effect
 
-    def scale_factor(self, hist: Array) -> SF:
-        return self.effect.scale_factor(parameter=self.parameter, hist=hist)
+    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
+        return self.effect(parameter=self.parameter, hist=hist)
 
 
-class where(ModifierBase):
+class Where(ModifierBase):
     """
     Combine two modifiers based on a condition.
 
@@ -159,46 +164,46 @@ class where(ModifierBase):
 
     Example:
 
-        .. code-block:: python
+    .. code-block:: python
 
-            import jax.numpy as jnp
-            import evermore as evm
+        import jax.numpy as jnp
+        import evermore as evm
 
-            hist = jnp.array([5, 20, 30])
-            syst = evm.Parameter(value=0.1)
+        hist = jnp.array([5, 20, 30])
+        syst = evm.NormalParameter(value=0.1)
 
-            norm = syst.log_normal(up=jnp.array([1.1]), down=jnp.array([0.9]))
-            shape = syst.shape(up=jnp.array([7, 22, 31]), down=jnp.array([4, 16, 27]))
+        norm = syst.scale_log(up=jnp.array([1.1]), down=jnp.array([0.9]))
+        shape = syst.morphing(up_template=jnp.array([7, 22, 31]), down_template=jnp.array([4, 16, 27]))
 
-            # apply norm if hist < 10, else apply shape
-            modifier = evm.modifier.where(hist < 10, norm, shape)
+        # apply norm if hist < 10, else apply shape
+        modifier = evm.modifier.Where(hist < 10, norm, shape)
 
-            # apply
-            modifier(hist)
-            # -> Array([ 5.049494, 20.281374, 30.181376], dtype=float32)
+        # apply
+        modifier(hist)
+        # -> Array([ 5.049494, 20.281374, 30.181376], dtype=float32)
 
-            # for comparison:
-            norm(hist)
-            # -> Array([ 5.049494, 20.197975, 30.296963], dtype=float32)
-            shape(hist)
-            # -> Array([ 5.1593127, 20.281374 , 30.181376 ], dtype=float32)
+        # for comparison:
+        norm(hist)
+        # -> Array([ 5.049494, 20.197975, 30.296963], dtype=float32)
+        shape(hist)
+        # -> Array([ 5.1593127, 20.281374 , 30.181376 ], dtype=float32)
     """
 
-    condition: Array = eqx.field(static=True)
+    condition: Array
     modifier_true: ModifierLike
     modifier_false: ModifierLike
 
-    def scale_factor(self, hist: Array) -> SF:
-        true_sf = self.modifier_true.scale_factor(hist)
-        false_sf = self.modifier_false.scale_factor(hist)
+    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
+        true_os = self.modifier_true.offset_and_scale(hist)
+        false_os = self.modifier_false.offset_and_scale(hist)
 
         def _where(true: Array, false: Array) -> Array:
             return jnp.where(self.condition, true, false)
 
-        return jtu.tree_map(_where, true_sf, false_sf)
+        return jtu.tree_map(_where, true_os, false_os)
 
 
-class mask(ModifierBase):
+class BooleanMask(ModifierBase):
     """
     Mask a modifier for specific bins.
 
@@ -207,40 +212,40 @@ class mask(ModifierBase):
 
     Example:
 
-        .. code-block:: python
+    .. code-block:: python
 
-            import jax.numpy as jnp
-            import evermore as evm
+        import jax.numpy as jnp
+        import evermore as evm
 
-            hist = jnp.array([5, 20, 30])
-            syst = evm.Parameter(value=0.1)
+        hist = jnp.array([5, 20, 30])
+        syst = evm.NormalParameter(value=0.1)
 
-            norm = syst.log_normal(jnp.array([0.9, 1.1]))
-            mask = jnp.array([True, False, True])
+        norm = syst.scale_log(up=1.1, down=0.9)
+        mask = jnp.array([True, False, True])
 
-            modifier = evm.modifier.mask(mask, norm)
+        modifier = evm.modifier.BooleanMask(mask, norm)
 
-            # apply
-            modifier(hist)
-            # -> Array([ 5.049494, 20.      , 30.296963], dtype=float32)
+        # apply
+        modifier(hist)
+        # -> Array([ 5.049494, 20.      , 30.296963], dtype=float32)
     """
 
-    where: Array = eqx.field(static=True)
+    mask: Array
     modifier: ModifierLike
 
-    def scale_factor(self, hist: Array) -> SF:
-        sf = self.modifier.scale_factor(hist)
+    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
+        os = self.modifier.offset_and_scale(hist)
 
-        def _mask(true: Array, false: Array) -> Array:
-            return jnp.where(self.where, true, false)
+        def _mask(true: ArrayLike, false: ArrayLike) -> Array:
+            return jnp.where(self.mask, true, false)
 
-        return SF(
-            multiplicative=_mask(sf.multiplicative, jnp.ones_like(hist)),
-            additive=_mask(sf.additive, jnp.zeros_like(hist)),
+        return OffsetAndScale(
+            offset=_mask(os.offset, 0.0),
+            scale=_mask(os.scale, 1.0),
         )
 
 
-class transform(ModifierBase):
+class Transform(ModifierBase):
     """
     Transform the scale factors of a modifier.
 
@@ -248,38 +253,56 @@ class transform(ModifierBase):
 
     Example:
 
-        .. code-block:: python
+    .. code-block:: python
 
-            import jax.numpy as jnp
-            import evermore as evm
+        import jax.numpy as jnp
+        import evermore as evm
 
-            hist = jnp.array([5, 20, 30])
-            syst = evm.Parameter(value=0.1)
+        hist = jnp.array([5, 20, 30])
+        syst = evm.NormalParameter(value=0.1)
 
-            norm = syst.log_normal(jnp.array([0.9, 1.1]))
+        norm = syst.scale_log(up=1.1, down=0.9)
 
-            transformed_norm = evm.modifier.transform(jnp.sqrt, norm)
+        transformed_norm = evm.modifier.Transform(jnp.sqrt, norm)
 
-            # apply
-            transformed_norm(hist)
-            # -> Array([ 5.024686, 20.098743, 30.148115], dtype=float32)
+        # apply
+        transformed_norm(hist)
+        # -> Array([ 5.024686, 20.098743, 30.148115], dtype=float32)
 
-            # for comparison:
-            norm(hist)
-            # -> Array([ 5.049494, 20.197975, 30.296963], dtype=float32)
+        # for comparison:
+        norm(hist)
+        # -> Array([ 5.049494, 20.197975, 30.296963], dtype=float32)
     """
 
-    transform_fn: Callable = eqx.field(static=True)
+    transform_fn: Callable[[OffsetAndScale], OffsetAndScale] = eqx.field(static=True)
     modifier: ModifierLike
 
-    def scale_factor(self, hist: Array) -> SF:
-        sf = self.modifier.scale_factor(hist)
-        return jtu.tree_map(self.transform_fn, sf)
+    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
+        os = self.modifier.offset_and_scale(hist)
+        return jtu.tree_map(self.transform_fn, os)
 
 
-class compose(ModifierBase):
+class TransformOffset(ModifierBase):
+    transform_fn: Callable[[Array], Array] = eqx.field(static=True)
+    modifier: ModifierLike
+
+    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
+        os = self.modifier.offset_and_scale(hist)
+        return OffsetAndScale(offset=self.transform_fn(os.offset), scale=os.scale)
+
+
+class TransformScale(ModifierBase):
+    transform_fn: Callable[[Array], Array] = eqx.field(static=True)
+    modifier: ModifierLike
+
+    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
+        os = self.modifier.offset_and_scale(hist)
+        return OffsetAndScale(offset=os.offset, scale=self.transform_fn(os.scale))
+
+
+class Compose(ModifierBase):
     """
-    Composition of multiple modifiers, i.e.: `(f ∘ g ∘ h)(hist) = f(hist) * g(hist) * h(hist)`
+    Composition of multiple modifiers, in order to correctly apply them *together*.
     It behaves like a single modifier, but it is composed of multiple modifiers; it can be arbitrarly nested.
 
     Example:
@@ -290,32 +313,32 @@ class compose(ModifierBase):
         import evermore as evm
 
         mu = evm.Parameter(value=1.1)
-        sigma = evm.Parameter(value=0.1)
-        sigma2 = evm.Parameter(value=0.2)
+        sigma = evm.NormalParameter(value=0.1)
+        sigma2 = evm.NormalParameter(value=0.2)
 
         hist = jnp.array([10, 20, 30])
 
         # all bins with bin content below 10 (threshold) are treated as poisson, else normal
 
         # create a new parameter and a composition of modifiers
-        mu_mod = mu.unconstrained()
-        sigma_mod = sigma.log_normal(up=jnp.array([1.1]), down=jnp.array([0.9]))
-        sigma2_mod = sigma2.log_normal(up=jnp.array([1.05]), down=jnp.array([0.95]))
-        composition = evm.modifier.compose(
+        mu_mod = mu.scale(offset=0, slope=1)
+        sigma_mod = sigma.scale_log(up=1.1, down=0.9)
+        sigma2_mod = sigma2.scale_log(up=1.05, down=0.95)
+        composition = evm.modifier.Compose(
             mu_mod,
             sigma_mod,
-            evm.modifier.where(hist < 15, sigma2_mod, sigma_mod),
+            evm.modifier.Where(hist < 15, sigma2_mod, sigma_mod),
         )
         # or shorthand
-        composition = mu_mod @ sigma_mod @ evm.modifier.where(hist < 15, sigma2_mod, sigma_mod)
+        composition = mu_mod @ sigma_mod @ evm.modifier.Where(hist < 15, sigma2_mod, sigma_mod)
 
         # apply the composition
         composition(hist)
 
         # nest compositions
-        composition = evm.modifier.compose(
+        composition = evm.modifier.Compose(
             composition,
-            evm.Modifier(parameter=sigma, effect=evm.effect.log_normal(up=jnp.array([1.2]), down=jnp.array([0.8]))),
+            evm.Modifier(parameter=sigma, effect=evm.effect.AsymmetricExponential(up=1.2, down=0.8)),
         )
 
         # jit
@@ -331,7 +354,7 @@ class compose(ModifierBase):
         # unroll nested compositions
         _modifiers = []
         for mod in self.modifiers:
-            if isinstance(mod, compose):
+            if isinstance(mod, Compose):
                 _modifiers.extend(mod.modifiers)
             else:
                 assert isinstance(mod, ModifierBase)
@@ -342,11 +365,12 @@ class compose(ModifierBase):
     def __len__(self) -> int:
         return len(self.modifiers)
 
-    def scale_factor(self, hist: Array) -> SF:
+    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
         from collections import defaultdict
 
-        multiplicative_sf = jnp.ones_like(hist)
-        additive_sf = jnp.zeros_like(hist)
+        # initial scale and offset
+        scale = jnp.ones_like(hist)
+        offset = jnp.zeros_like(hist)
 
         groups = defaultdict(list)
         # first group modifiers into same tree structures
@@ -366,21 +390,21 @@ class compose(ModifierBase):
 
             def calc_sf(_hist, _dynamic_stack, _static_stack):
                 stack = eqx.combine(_dynamic_stack, _static_stack)
-                sf = stack.scale_factor(_hist)
-                return _hist, sf
+                os = stack.offset_and_scale(_hist)
+                return _hist, os
 
             # if there is only one modifier in the group, we can skip the scan
             if len(group_mods) == 1:
-                _, sf = calc_sf(hist, dynamic_stack, static_stack)
-                multiplicative_sf *= sf.multiplicative
-                additive_sf += sf.additive
+                _, os = calc_sf(hist, dynamic_stack, static_stack)
+                scale *= os.scale
+                offset += os.offset
             else:
-                _, sf = jax.lax.scan(
+                _, os = jax.lax.scan(
                     partial(calc_sf, _static_stack=static_stack),
                     hist,
                     dynamic_stack,
                 )
-                multiplicative_sf *= jnp.prod(sf.multiplicative, axis=0)
-                additive_sf += jnp.sum(sf.additive, axis=0)
+                scale *= jnp.prod(os.scale, axis=0)
+                offset += jnp.sum(os.offset, axis=0)
 
-        return SF(multiplicative=multiplicative_sf, additive=additive_sf)
+        return OffsetAndScale(offset=offset, scale=scale)

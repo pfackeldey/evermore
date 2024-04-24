@@ -9,7 +9,6 @@ from jaxtyping import Array, PRNGKeyArray
 
 __all__ = [
     "PDF",
-    "Flat",
     "Normal",
     "Poisson",
 ]
@@ -27,22 +26,9 @@ class PDF(eqx.Module):
     def sample(self, key: PRNGKeyArray) -> Array: ...
 
 
-class Flat(PDF):
-    def log_prob(self, x: Array) -> Array:
-        return jnp.zeros_like(x)
-
-    def sample(self, key: PRNGKeyArray) -> Array:
-        # sample parameter from pdf
-        # what should be the ranges?
-        # +/-jnp.inf leads to nans...
-        # minval=??,
-        # maxval=??,
-        return jax.random.uniform(key)
-
-
 class Normal(PDF):
-    mean: Array
-    width: Array
+    mean: Array = eqx.field(converter=jnp.asarray)
+    width: Array = eqx.field(converter=jnp.asarray)
 
     def log_prob(self, x: Array) -> Array:
         logpdf_max = jax.scipy.stats.norm.logpdf(
