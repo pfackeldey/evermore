@@ -237,6 +237,33 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
 
             # now p1, p2, p3 are correlated, i.e., they share the same value
             assert p1.value == p2.value == p3.value
+
+        # use the model
+        model(p1, p2, p3)
+
+        # More general case of correlating any PyTree of parameters
+        from typing import NamedTuple
+        import jax.tree_util as jtu
+
+
+        class Params(NamedTuple):
+            mu: evm.Parameter
+            syst: evm.NormalParameter
+
+        params = Params(mu=evm.Parameter(1.0), syst=evm.NormalParameter(0.0))
+
+        def model(params: Params):
+            flat_params, tree_def = jtu.tree_flatten(params, evm.parameter.is_parameter)
+
+            # correlate the parameters
+            correlated_flat_params = evm.parameter.correlate(*flat_params)
+            correlated_params = jtu.tree_unflatten(tree_def, correlated_flat_params)
+
+            # now correlated_params.mu and correlated_params.syst are correlated, i.e., they share the same value
+            assert correlated_params.mu.value == correlated_params.syst.value
+
+        # use the model
+        model(params)
     """
 
     first, *rest = parameters
