@@ -32,10 +32,12 @@ See more in `examples/`
 _evermore_ in a nutshell:
 
 ```python3
+from typing import NamedTuple
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array
+from jaxtyping import Array, PyTree
 
 import evermore as evm
 
@@ -43,38 +45,46 @@ jax.config.update("jax_enable_x64", True)
 
 
 # define a simple model with two processes and two parameters
-class Model(eqx.Module):
-    mu: evm.FreeFloating
-    syst: evm.NormalConstrained
-
-    def __call__(self, hists: dict[str, Array]) -> Array:
-        mu_modifier = self.mu.unconstrained()
-        syst_modifier = self.syst.log_normal(up=jnp.array([1.1]), down=jnp.array([0.9]))
-        return mu_modifier(hists["signal"]) + syst_modifier(hists["bkg"])
+def model(params: PyTree, hists: dict[str, Array]) -> Array:
+  mu_modifier = params.mu.scale()
+  syst_modifier = params.syst.scale_log(up=1.1, down=0.9)
+  return mu_modifier(hists["signal"]) + syst_modifier(hists["bkg"])
 
 
-nll = evm.loss.PoissonNLL()
-
-
-def loss(model: Model, hists: dict[str, Array], observation: Array) -> Array:
-    expectation = model(hists)
+def loss(
+  diffable: PyTree,
+  static: PyTree,
+  hists: dict[str, Array],
+  observation: Array,
+) -> Array:
+    params = eqx.combine(diffable, static)
+    expectation = model(params, hists)
     # Poisson NLL of the expectation and observation
-    log_likelihood = nll(expectation, observation)
+    log_likelihood = evm.loss.PoissonLogLikelihood()(expectation, observation)
     # Add parameter constraints from logpdfs
-    constraints = evm.loss.get_log_probs(model)
-    log_likelihood += evm.util.sum_leaves(constraints)
+    constraints = evm.loss.get_log_probs(params)
+    log_likelihood += evm.util.sum_over_leaves(constraints)
     return -jnp.sum(log_likelihood)
 
 
-# setup model and data
+# setup data
 hists = {"signal": jnp.array([3]), "bkg": jnp.array([10])}
 observation = jnp.array([15])
-model = Model(mu=evm.FreeFloating(), syst=evm.NormalConstrained())
 
-# negative log-likelihood
-loss_val = loss(model, hists, observation)
-# gradients of negative log-likelihood w.r.t. model parameters
-grads = eqx.filter_grad(loss)(model, hists, observation)
+
+# define parameters, can be any PyTree of evm.Parameters
+class Params(NamedTuple):
+  mu: evm.Parameter
+  syst: evm.NormalParameter
+
+
+params = Params(mu=evm.Parameter(1.0), syst=evm.NormalParameter(0.0))
+diffable, static = evm.parameter.partition(params)
+
+# Calculate negative log-likelihood/loss
+loss_val = loss(diffable, static, hists, observation)
+# gradients of negative log-likelihood w.r.t. diffable parameters
+grads = eqx.filter_grad(loss)(diffable, static, hists, observation)
 print(f"{grads.mu.value=}, {grads.syst.value=}")
 # -> grads.mu.value=Array([-0.46153846]), grads.syst.value=Array([-0.15436207])
 ```
