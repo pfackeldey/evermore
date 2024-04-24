@@ -52,12 +52,12 @@ class StatErrors(eqx.Module):
     gaussians_global: PyTree
     gaussians_per_process: PyTree
     poissons_per_process: PyTree
-    hists: PyTree = eqx.field(static=True)
-    histsw2: PyTree = eqx.field(static=True)
-    ntot: Array = eqx.field(static=True)
-    etot: Array = eqx.field(static=True)
-    threshold: float = eqx.field(static=True)
-    mask: Array = eqx.field(static=True)
+    hists: PyTree
+    histsw2: PyTree
+    ntot: Array
+    etot: Array
+    threshold: float
+    mask: Array
 
     def __init__(
         self,
