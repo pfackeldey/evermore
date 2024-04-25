@@ -11,7 +11,8 @@ In the following, you will find a brief comparison how modifier types of
 This is a simple example of a signal process scaled by an unconstrained modifier
 {math}`\mu` and a background process with a normalization uncertainty (normsys).
 
-::::{tab-set} :::{tab-item} pyhf
+::::{tab-set}
+:::{tab-item} pyhf
 
 ```python
 import pyhf
@@ -84,7 +85,8 @@ model({"mu": evm.Parameter(value=0.5), "bkg_norm": evm.NormalParameter(value=1.1
 # -> Array([61.63265822, 63.35796454], dtype=float64)
 ```
 
-::: ::::
+:::
+::::
 
 ## Modifier types
 
@@ -97,7 +99,8 @@ the
 See
 [shapesys](https://pyhf.readthedocs.io/en/stable/likelihood.html#uncorrelated-shape-shapesys).
 
-::::{tab-set} :::{tab-item} pyhf
+::::{tab-set}
+:::{tab-item} pyhf
 
 ```json
 {
@@ -126,14 +129,16 @@ modifier = evm.Modifier(
 )
 ```
 
-::: ::::
+:::
+::::
 
 ### Correlated Shape (histosys)
 
 See
 [histosys](https://pyhf.readthedocs.io/en/stable/likelihood.html#correlated-shape-histosys).
 
-::::{tab-set} :::{tab-item} pyhf
+::::{tab-set}
+:::{tab-item} pyhf
 
 ```json
 {
@@ -169,7 +174,8 @@ modifier = param.morphing(
 )
 ```
 
-::: ::::
+:::
+::::
 
 (sec-normsys)=
 
@@ -178,7 +184,8 @@ modifier = param.morphing(
 See
 [normsys](https://pyhf.readthedocs.io/en/stable/likelihood.html#normalisation-uncertainty-normsys).
 
-::::{tab-set} :::{tab-item} pyhf
+::::{tab-set}
+:::{tab-item} pyhf
 
 ```json
 {
@@ -208,14 +215,16 @@ modifier = evm.Modifier(
 modifier = param.scale_log(up=1.1, down=0.9)
 ```
 
-::: ::::
+:::
+::::
 
 ### MC Statistical Uncertainty (staterror)
 
 See
 [staterror](https://pyhf.readthedocs.io/en/stable/likelihood.html#mc-statistical-uncertainty-staterror).
 
-::::{tab-set} :::{tab-item} pyhf
+::::{tab-set}
+:::{tab-item} pyhf
 
 ```json
 {
@@ -249,7 +258,8 @@ modifier = evm.Modifier(
 modifier = param.scale(offset=1, slope=rel_unc)
 ```
 
-::: ::::
+:::
+::::
 
 ### Luminosity (lumi)
 
@@ -294,7 +304,8 @@ modifier = evm.Modifier(
 modifier = param.scale()
 ```
 
-::: ::::
+:::
+::::
 
 # Data-driven Shape (shapefactor)
 
@@ -335,4 +346,5 @@ modifier = evm.Modifier(
 modifier = param.scale()
 ```
 
-::: ::::
+:::
+::::
