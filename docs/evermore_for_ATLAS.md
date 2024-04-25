@@ -124,7 +124,7 @@ def fun(parameter: evm.Parameter, hist: Array) -> Array:
     return hist + parameter.value * jnp.array([1.0, 1.5, 2.0])
 
 modifier = evm.Modifier(
-    parameter=evm.Parameter(value=jnp.array([0.0, 0.0, 0.0])),
+    parameter=evm.NormalParameter(value=jnp.array([0.0, 0.0, 0.0])),
     effect=evm.effect.Lambda(fun, normalize_by="offset")
 )
 ```
@@ -157,7 +157,7 @@ import jax.numpy as jnp
 import evermore as evm
 
 
-param = evm.Parameter()
+param = evm.NormalParameter()
 
 modifier = evm.Modifier(
     parameter=param,
@@ -204,7 +204,7 @@ import jax.numpy as jnp
 import evermore as evm
 
 
-param = evm.Parameter()
+param = evm.NormalParameter()
 
 modifier = evm.Modifier(
     parameter=param,
@@ -243,7 +243,7 @@ import jax.numpy as jnp
 import evermore as evm
 
 
-param = evm.Parameter()
+param = evm.NormalParameter()
 
 # exemplary histogram with yield=10 and absolute uncertainty=0.1
 hist = jnp.array([10.0])
