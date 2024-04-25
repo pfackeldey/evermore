@@ -47,7 +47,7 @@ params = {"mu": evm.Parameter(value=1.0), "bkg_norm": evm.NormalParameter(value=
 
 hists = {"signal": jnp.array([12.0]), "background": jnp.array([50.0])}
 
-data = jnp.array([51.0)
+data = jnp.array([51.0])
 
 
 def model(params: dict, hists: dict) -> jnp.ndarray:
