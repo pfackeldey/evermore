@@ -307,7 +307,7 @@ modifier = param.scale()
 :::
 ::::
 
-# Data-driven Shape (shapefactor)
+### Data-driven Shape (shapefactor)
 
 See
 [shapefactor](https://pyhf.readthedocs.io/en/stable/likelihood.html#data-driven-shape-shapefactor).
