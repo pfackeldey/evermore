@@ -359,7 +359,7 @@ class Compose(ModifierBase):
             else:
                 assert isinstance(mod, ModifierBase)
                 _modifiers.append(mod)
-        # by now all modifiers are either modifier or staterror
+        # by now all are modifiers
         self.modifiers = _modifiers
 
     def __len__(self) -> int:
