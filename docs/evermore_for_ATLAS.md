@@ -6,7 +6,7 @@ If you are coming from the ATLAS experiment, you are probably familiar with the
 In the following, you will find a brief comparison how modifier types of
 {math}`\pyhf` can be implemented in evermore.
 
-## Simple Example
+## Simple Example (pyhf)
 
 This is a simple example of a signal process scaled by an unconstrained modifier
 {math}`\mu` and a background process with a normalization uncertainty (normsys).
@@ -14,7 +14,7 @@ This is a simple example of a signal process scaled by an unconstrained modifier
 ::::{tab-set}
 :::{tab-item} pyhf
 
-```python
+```{code-block} python
 import pyhf
 
 
@@ -56,7 +56,7 @@ model.expected_data([0.5, 1.12], include_auxdata=False)
 
 :::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
-```python
+```{code-block} python
 import jax
 import jax.numpy as jnp
 import evermore as evm
@@ -102,7 +102,7 @@ See
 ::::{tab-set}
 :::{tab-item} pyhf
 
-```json
+```{code-block} json
 {
   "name": "mod_name",
   "type": "shapesys",
@@ -114,7 +114,7 @@ See
 
 :::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
-```python
+```{code-block} python
 from jaxtyping import Array
 import jax.numpy as jnp
 import evermore as evm
@@ -140,7 +140,7 @@ See
 ::::{tab-set}
 :::{tab-item} pyhf
 
-```json
+```{code-block} json
 {
   "name": "mod_name",
   "type": "histosys",
@@ -152,7 +152,7 @@ See
 
 :::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
-```python
+```{code-block} python
 import jax.numpy as jnp
 import evermore as evm
 
@@ -187,7 +187,7 @@ See
 ::::{tab-set}
 :::{tab-item} pyhf
 
-```json
+```{code-block} json
 {
   "name": "mod_name",
   "type": "normsys",
@@ -199,7 +199,7 @@ See
 
 :::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
-```python
+```{code-block} python
 import jax.numpy as jnp
 import evermore as evm
 
@@ -226,7 +226,7 @@ See
 ::::{tab-set}
 :::{tab-item} pyhf
 
-```json
+```{code-block} json
 {
   "name": "mod_name",
   "type": "staterror",
@@ -238,7 +238,7 @@ See
 
 :::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
-```python
+```{code-block} python
 import jax.numpy as jnp
 import evermore as evm
 
@@ -276,7 +276,7 @@ See
 
 :::{tab-item} pyhf
 
-```json
+```{code-block} json
 {
   "name": "mod_name",
   "type": "normfactor",
@@ -288,7 +288,7 @@ See
 
 :::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
-```python
+```{code-block} python
 import jax.numpy as jnp
 import evermore as evm
 
@@ -316,7 +316,7 @@ See
 
 :::{tab-item} pyhf
 
-```json
+```{code-block} json
 {
   "name": "mod_name",
   "type": "shapefactor",
@@ -328,7 +328,7 @@ See
 
 :::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
-```python
+```{code-block} python
 import jax.numpy as jnp
 import evermore as evm
 

@@ -42,13 +42,13 @@ html_logo = "../assets/favicon.png"
 html_favicon = "../assets/favicon.png"
 
 extensions = [
+    "myst_parser",
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
     "sphinx.ext.autosectionlabel",
-    "myst_parser",
     "sphinx_copybutton",
     "sphinx_design",
 ]
