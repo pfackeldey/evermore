@@ -41,6 +41,7 @@ docs = [
     "sphinx_copybutton",
     "sphinx_autodoc_typehints",
     "sphinx-book-theme",
+    "sphinx-design",
 ]
 
 [project.urls]
