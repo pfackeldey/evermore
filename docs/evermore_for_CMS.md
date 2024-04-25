@@ -226,8 +226,6 @@ See [rateParam](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/lates
 sys   rateParam   bin1   process1  1.0   [0.0,2.0]
 ```
 
-````
-
 :::
 
 :::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
@@ -246,7 +244,7 @@ sys = evm.Modifier(
 
 # or short-hand:
 sys = param.scale()
-````
+```
 
 :::
 ::::
