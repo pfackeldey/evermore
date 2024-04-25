@@ -53,8 +53,8 @@ class Parameter(eqx.Module):
         frozen_parameter = evm.Parameter(value=1.0, frozen=True)
     """
 
-    name: str | None = eqx.field(static=True, default=None)
     value: Array = eqx.field(converter=jnp.atleast_1d, default=0.0)
+    name: str | None = eqx.field(static=True, default=None)
     lower: Array = eqx.field(converter=jnp.atleast_1d, default=-jnp.inf)
     upper: Array = eqx.field(converter=jnp.atleast_1d, default=jnp.inf)
     prior: PDFLike | None = eqx.field(default=None)
