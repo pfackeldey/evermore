@@ -1,6 +1,6 @@
 # evermore for CMS
 
-If you are coming from the ATLAS experiment, you are probably familiar with the
+If you are coming from the CMS experiment, you are probably familiar with the
 [{math}`\Combine`](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/latest/) project.
 
 In the following, you will find a brief comparison how modifier types of
