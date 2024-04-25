@@ -53,6 +53,7 @@ class Parameter(eqx.Module):
         frozen_parameter = evm.Parameter(value=1.0, frozen=True)
     """
 
+    name: str | None = eqx.field(static=True, default=None)
     value: Array = eqx.field(converter=jnp.atleast_1d, default=0.0)
     lower: Array = eqx.field(converter=jnp.atleast_1d, default=-jnp.inf)
     upper: Array = eqx.field(converter=jnp.atleast_1d, default=jnp.inf)
@@ -190,11 +191,12 @@ def sample(tree: PyTree, key: PRNGKeyArray) -> PyTree:
             # TODO: make this compatible with externally provided Poisson PDFs
             if isinstance(pdf, Poisson):
                 sampled_value = (sampled_value / pdf.lamb) - 1
-        elif param.prior is None:
-            if not jnp.isfinite(param.lower) and jnp.isfinite(param.upper):
+        else:
+            assert param.prior is None, f"Unknown prior type: {param.prior}."
+            if not jnp.isfinite(param.lower) and not jnp.isfinite(param.upper):
                 msg = f"Can't sample uniform from {param} (no given prior), because of non-finite bounds. "
-                msg += "Please provide a prior or make the bounds finite."
-                raise RuntimeError(msg)
+                msg += "Please provide finite bounds."
+                raise ValueError(msg)
             sampled_value = jax.random.uniform(
                 key.value,
                 shape=param.value.shape,

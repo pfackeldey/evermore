@@ -27,8 +27,8 @@ class PDF(eqx.Module):
 
 
 class Normal(PDF):
-    mean: Array = eqx.field(converter=jnp.asarray)
-    width: Array = eqx.field(converter=jnp.asarray)
+    mean: Array = eqx.field(converter=jnp.atleast_1d)
+    width: Array = eqx.field(converter=jnp.atleast_1d)
 
     def log_prob(self, x: Array) -> Array:
         logpdf_max = jax.scipy.stats.norm.logpdf(
@@ -43,7 +43,7 @@ class Normal(PDF):
 
 
 class Poisson(PDF):
-    lamb: Array
+    lamb: Array = eqx.field(converter=jnp.atleast_1d)
 
     def log_prob(self, x: Array) -> Array:
         logpdf_max = jax.scipy.stats.poisson.logpmf(self.lamb, mu=self.lamb)

@@ -44,11 +44,13 @@ def sum_over_leaves(tree: PyTree) -> Array:
 
 def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
     """
-    Turn an array of evm.Modifier(s) into a evm.Modifier of arrays.
+    Turns e.g. an array of evm.Modifier(s) into a evm.Modifier of arrays.
 
     It is important that the jax.Array(s) of the underlying Arrays have the same shape.
     Same applies for the effect leaves (e.g. width). However, the effect leaves can be
     broadcasted to the same shape if broadcast_effect_leaves is set to True.
+
+    The stacked PyTree will have the static nodes of the first PyTree in the list.
 
     Example:
 
@@ -65,10 +67,11 @@ def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
         print(evm.util.tree_stack(modifiers))
         # -> Modifier(
         #      parameter=NormalParameter(
+        #        name=None,
         #        value=f32[2,1], # <- stacked dimension (2, 1)
         #        lower=f32[2,1], # <- stacked dimension (2, 1)
         #        upper=f32[2,1], # <- stacked dimension (2, 1)
-        #        prior=Normal(mean=f32[2], width=f32[2]), # <- stacked dimension (2,)
+        #        prior=Normal(mean=f32[2,1], width=f32[2,1]), # <- stacked dimension (2,1)
         #        frozen=False
         #      ),
         #      effect=AsymmetricExponential(up=f32[2,1], down=f32[2,1]) # <- stacked dimension (2, 1)
