@@ -50,6 +50,7 @@ extensions = [
     "sphinx.ext.autosectionlabel",
     "myst_parser",
     "sphinx_copybutton",
+    "sphinx_design",
 ]
 
 myst_enable_extensions = [
@@ -68,6 +69,20 @@ nitpick_ignore = [
 always_document_param_types = True
 
 autodoc_member_order = "bysource"
+
+
+mathjax3_config = {
+    "tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]]},
+    "tex": {
+        "macros": {
+            "bm": ["\\boldsymbol{#1}", 1],  # \usepackage{bm}, see mathjax/MathJax#1219
+            "pyhf": r"\texttt{pyhf}",
+            "Combine": r"\texttt{Combine}",
+            "JAX": r"\texttt{JAX}",
+            "PyTree": r"\texttt{PyTree}",
+        }
+    },
+}
 
 
 def setup(app):

@@ -27,6 +27,7 @@ pip = "*"
 sphinx = "*"
 sphinx-copybutton = "*"
 sphinx-book-theme = "*"
+sphinx-design = "*"
 
 [tasks]
 postinstall = "pip install -e '.[dev]' && pip install pre-commit && pre-commit install"
