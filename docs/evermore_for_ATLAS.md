@@ -54,7 +54,7 @@ model.expected_data([0.5, 1.12], include_auxdata=False)
 
 :::
 
-:::{tab-item} evermore
+:::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
 ```python
 import jax
@@ -112,7 +112,7 @@ See
 
 :::
 
-:::{tab-item} evermore
+:::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
 ```python
 from jaxtyping import Array
@@ -150,7 +150,7 @@ See
 
 :::
 
-:::{tab-item} evermore
+:::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
 ```python
 import jax.numpy as jnp
@@ -197,7 +197,7 @@ See
 
 :::
 
-:::{tab-item} evermore
+:::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
 ```python
 import jax.numpy as jnp
@@ -236,7 +236,7 @@ See
 
 :::
 
-:::{tab-item} evermore
+:::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
 ```python
 import jax.numpy as jnp
@@ -286,7 +286,7 @@ See
 
 :::
 
-:::{tab-item} evermore
+:::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
 ```python
 import jax.numpy as jnp
@@ -326,7 +326,7 @@ See
 
 :::
 
-:::{tab-item} evermore
+:::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
 ```python
 import jax.numpy as jnp

@@ -55,6 +55,7 @@ extensions = [
 
 myst_enable_extensions = [
     "colon_fence",
+    "html_image",
 ]
 
 intersphinx_mapping = {
