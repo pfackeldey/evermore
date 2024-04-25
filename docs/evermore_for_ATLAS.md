@@ -124,7 +124,7 @@ def fun(parameter: evm.Parameter, hist: Array) -> Array:
     return hist + parameter.value * jnp.array([1.0, 1.5, 2.0])
 
 modifier = evm.Modifier(
-    parameter=evm.NormalParameter(value=jnp.array([0.0, 0.0, 0.0])),
+    parameter=evm.NormalParameter(value=[0.0, 0.0, 0.0]),
     effect=evm.effect.Lambda(fun, normalize_by="offset")
 )
 ```
@@ -162,15 +162,15 @@ param = evm.NormalParameter()
 modifier = evm.Modifier(
     parameter=param,
     effect=evm.effect.VerticalTemplateMorphing(
-        up_template=jnp.array([20, 15]),
-        down_template=jnp.array([10, 10]),
+        up_template=[20, 15],
+        down_template=[10, 10],
     )
 )
 
 # or short-hand:
 modifier = param.morphing(
-    up_template=jnp.array([20, 15]),
-    down_template=jnp.array([10, 10]),
+    up_template=[20, 15],
+    down_template=[10, 10],
 )
 ```
 
@@ -247,7 +247,7 @@ param = evm.NormalParameter()
 
 # exemplary histogram with yield=10 and absolute uncertainty=0.1
 hist = jnp.array([10.0])
-rel_unc = jnp.array([0.1]) / hist
+rel_unc = 0.1 / hist
 
 modifier = evm.Modifier(
     parameter=param,
@@ -335,7 +335,7 @@ import evermore as evm
 
 # param.value is the shape factor, one value per bin
 hist = jnp.array([10.0, 20.0, 30.0])
-param = evm.Parameter(value=jnp.zeros_like(hist))
+param = evm.Parameter(value=[0.0, 0.0, 0.0])
 
 modifier = evm.Modifier(
     parameter=param,
