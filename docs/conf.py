@@ -51,11 +51,13 @@ extensions = [
     "sphinx.ext.autosectionlabel",
     "sphinx_copybutton",
     "sphinx_design",
+    "sphinx_togglebutton",
 ]
 
 myst_enable_extensions = [
     "colon_fence",
     "html_image",
+    "deflist",
 ]
 
 intersphinx_mapping = {
