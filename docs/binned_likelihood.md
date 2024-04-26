@@ -1,9 +1,4 @@
-# Getting Started
-
-evermore is a toolbox that provides common building blocks for building (binned)
-likelihoods in high-energy physics with JAX.
-
-## Binned Likelihood
+# Binned Likelihood
 
 The binned likelihood quantifies the agreement between a model and data in terms
 of histograms. It is defined as follows:
