@@ -1,3 +1,4 @@
+(building-blocks)=
 # Building Blocks
 
 ## Parameter
