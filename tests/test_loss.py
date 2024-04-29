@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import jax.numpy as jnp
+import pytest
 
 import evermore as evm
 
@@ -18,9 +19,9 @@ def test_get_log_probs():
     }
 
     log_probs = evm.loss.get_log_probs(params)
-    assert log_probs["a"] == -0.125
-    assert log_probs["b"] == 0.0
-    assert log_probs["c"] == 0.0
+    assert log_probs["a"] == pytest.approx(-0.125)
+    assert log_probs["b"] == pytest.approx(0.0)
+    assert log_probs["c"] == pytest.approx(0.0)
 
 
 def test_get_boundary_constraints():

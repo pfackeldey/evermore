@@ -274,7 +274,7 @@ class Transform(ModifierBase):
         # -> Array([ 5.049494, 20.197975, 30.296963], dtype=float32)
     """
 
-    transform_fn: Callable[[OffsetAndScale], OffsetAndScale] = eqx.field(static=True)
+    transform_fn: Callable = eqx.field(static=True)
     modifier: ModifierLike
 
     def offset_and_scale(self, hist: Array) -> OffsetAndScale:
@@ -283,7 +283,7 @@ class Transform(ModifierBase):
 
 
 class TransformOffset(ModifierBase):
-    transform_fn: Callable[[Array], Array] = eqx.field(static=True)
+    transform_fn: Callable = eqx.field(static=True)
     modifier: ModifierLike
 
     def offset_and_scale(self, hist: Array) -> OffsetAndScale:
@@ -292,7 +292,7 @@ class TransformOffset(ModifierBase):
 
 
 class TransformScale(ModifierBase):
-    transform_fn: Callable[[Array], Array] = eqx.field(static=True)
+    transform_fn: Callable = eqx.field(static=True)
     modifier: ModifierLike
 
     def offset_and_scale(self, hist: Array) -> OffsetAndScale:
