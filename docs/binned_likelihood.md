@@ -27,7 +27,7 @@ These building blocks include:
 - **evm.Modifier**: Modifiers combine **evm.Effects** and **evm.Parameters** to
   modify data.
 
-The negative log-likelihood (NLL) function of Eq.{eq}`likelihood` can be implemented with evermore as follows:
+The negative log-likelihood (NLL) function of Eq.{eq}`likelihood` can be implemented with evermore as follows (copy & paste the following snippet to start write a _new_ statistical model):
 
 ```{code-block} python
 from jaxtyping import PyTree, Array
@@ -45,15 +45,14 @@ import evermore as evm
 #   ...
 
 
-
 # -- NLL definition --
 @eqx.filter_jit
 def NLL(dynamic_params, static_params, hists, observation):
     params = eqx.combine(dynamic_params, static_params)
     expectations = model(params, hists)
 
-    log_likelihood = evm.loss.PoissonLogLikelihood()
     # first product of Eq. 1 (Poisson term)
+    log_likelihood = evm.loss.PoissonLogLikelihood()
     loss_val = log_likelihood(
         expectation=evm.util.sum_over_leaves(expectations),
         observation=observation,
@@ -61,6 +60,8 @@ def NLL(dynamic_params, static_params, hists, observation):
 
     # second product of Eq. 1 (constraint)
     constraints = evm.loss.get_log_probs(model)
+    # for parameters with `.value.size > 1` (jnp.sum the constraints)
+    constraints = jtu.tree_map(jnp.sum, constraints)
     loss_val += evm.util.sum_over_leaves(constraints)
     return -jnp.sum(loss_val)
 ```
