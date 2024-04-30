@@ -7,8 +7,25 @@ from typing import Any
 import jax.tree_util as jtu
 from jaxtyping import Array, PyTree
 
-import evermore as evm
 from evermore.custom_types import ModifierLike, PDFLike
+from evermore.effect import (
+    AsymmetricExponential,
+    Effect,
+    Identity,
+    Linear,
+    VerticalTemplateMorphing,
+)
+from evermore.modifier import (
+    BooleanMask,
+    Compose,
+    Modifier,
+    Transform,
+    TransformOffset,
+    TransformScale,
+    Where,
+)
+from evermore.parameter import NormalParameter, Parameter
+from evermore.pdf import Normal, Poisson
 
 __all__ = [
     "display",
@@ -21,22 +38,22 @@ def __dir__():
 
 EVERMORE_CLASSES = set(
     {
-        evm.Parameter,
-        evm.NormalParameter,
-        evm.effect.Effect,
-        evm.effect.Identity,
-        evm.effect.Linear,
-        evm.effect.AsymmetricExponential,
-        evm.effect.VerticalTemplateMorphing,
-        evm.modifier.Modifier,
-        evm.modifier.Compose,
-        evm.modifier.Where,
-        evm.modifier.BooleanMask,
-        evm.modifier.Transform,
-        evm.modifier.TransformScale,
-        evm.modifier.TransformOffset,
-        evm.pdf.Normal,
-        evm.pdf.Poisson,
+        Parameter,
+        NormalParameter,
+        Effect,
+        Identity,
+        Linear,
+        AsymmetricExponential,
+        VerticalTemplateMorphing,
+        Modifier,
+        Compose,
+        Where,
+        BooleanMask,
+        Transform,
+        TransformScale,
+        TransformOffset,
+        Normal,
+        Poisson,
         ModifierLike,
         PDFLike,
     }
