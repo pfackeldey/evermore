@@ -36,6 +36,8 @@ def __dir__():
     return __all__
 
 
+penzai_installed = importlib.util.find_spec("penzai") is not None
+
 EVERMORE_CLASSES = set(
     {
         Parameter,
@@ -75,11 +77,10 @@ def display(tree: PyTree) -> None:
             evm.visualization.display(tree)
     """
 
-    penzai_installed = importlib.util.find_spec("penzai") is not None
     if not penzai_installed:
         msg = "install 'penzai' with:\n\n"
         msg += "\tpython -m pip install penzai[notebook]"
-
+        raise ModuleNotFoundError(msg)
     try:
         from IPython import get_ipython
 
