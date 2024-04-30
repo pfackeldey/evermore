@@ -29,6 +29,7 @@ class OffsetAndScale(eqx.Module):
         )
 
 
+@runtime_checkable
 class ModifierLike(Protocol):
     def offset_and_scale(self, hist: Array) -> OffsetAndScale: ...
     def __call__(self, hist: Array) -> Array: ...

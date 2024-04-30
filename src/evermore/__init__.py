@@ -25,6 +25,7 @@ __all__ = [
     "util",
     "modifier",
     "staterror",
+    "visualization",
     # explicitely expose some classes
     "Parameter",
     "NormalParameter",
@@ -44,6 +45,7 @@ from evermore import (  # noqa: E402
     pdf,
     staterror,
     util,
+    visualization,
 )
 from evermore.modifier import Modifier  # noqa: E402
 from evermore.parameter import (  # noqa: E402,
