@@ -1,6 +1,57 @@
+---
+jupytext:
+  formats: md:myst
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: python3
+---
+
+
 # Tips and Tricks
 
 Here are some advanced tips and tricks.
+
+
+## penzai Visualization
+
+Use `penzai` to visualize evermore components!
+
+```{code-cell} ipython3
+import jax
+import jax.numpy as jnp
+import evermore as evm
+import equinox as eqx
+
+jax.config.update("jax_enable_x64", True)
+
+
+mu = evm.Parameter(value=1.1)
+sigma1 = evm.NormalParameter(value=0.1)
+sigma2 = evm.NormalParameter(value=0.2)
+
+hist = jnp.array([10, 20, 30])
+
+
+mu_mod = mu.scale(offset=0, slope=1)
+sigma1_mod = sigma1.scale_log(up=1.1, down=0.9)
+sigma2_mod = sigma2.scale_log(up=1.05, down=0.95)
+composition = evm.modifier.Compose(
+    mu_mod,
+    sigma1_mod,
+    evm.modifier.Where(hist < 15, sigma2_mod, sigma1_mod),
+)
+composition = evm.modifier.Compose(
+    composition,
+    evm.Modifier(parameter=sigma1, effect=evm.effect.AsymmetricExponential(up=1.2, down=0.8)),
+)
+
+evm.visualization.display(composition)
+```
+
 
 
 ## Parameter Partitioning
@@ -47,7 +98,7 @@ If you need to further exclude parameter from being optimized you can either set
 Evert component of evermore is compatible with JAX transformations. That means you can `jax.jit`, `jax.vmap`, ... _everything_.
 You can e.g. sample the parameter values multiple times vectorized from its prior PDF:
 
-```{code-block} python
+```{code-cell} ipython3
 import jax
 import evermore as evm
 
@@ -59,23 +110,7 @@ rng_keys = jax.random.split(rng_key, 100)
 
 vec_sample = jax.vmap(evm.parameter.sample, in_axes=(None, 0))
 
-print(vec_sample(params, rng_keys))
-# {'a': NormalParameter(
-#   value=f32[100,1],
-#   name=None,
-#   lower=f32[100,1],
-#   upper=f32[100,1],
-#   prior=Normal(mean=f32[100,1], width=f32[100,1]),
-#   frozen=False,
-# ),
-#  'b': NormalParameter(
-#   value=f32[100,1],
-#   name=None,
-#   lower=f32[100,1],
-#   upper=f32[100,1],
-#   prior=Normal(mean=f32[100,1], width=f32[100,1]),
-#   frozen=False,
-# )}
+evm.visualization.display(vec_sample(params, rng_keys))
 ```
 
 Many minimizers from the JAX ecosystem are e.g. batchable (`optax`, `optimistix`), which allows you vectorize _full fits_, e.g., for embarrassingly parallel likleihood profiles.

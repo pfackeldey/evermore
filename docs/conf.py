@@ -42,7 +42,8 @@ html_logo = "../assets/favicon.png"
 html_favicon = "../assets/favicon.png"
 
 extensions = [
-    "myst_parser",
+    "myst_nb",
+    # "myst_parser",
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",

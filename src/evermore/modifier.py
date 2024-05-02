@@ -351,19 +351,20 @@ class Compose(ModifierBase):
 
     def __init__(self, *modifiers: ModifierLike) -> None:
         self.modifiers = list(modifiers)
-        # unroll nested compositions
+
+    def unroll_modifiers(self) -> list[ModifierLike]:
         _modifiers = []
         for mod in self.modifiers:
             if isinstance(mod, Compose):
                 _modifiers.extend(mod.modifiers)
             else:
-                assert isinstance(mod, ModifierBase)
+                assert isinstance(mod, ModifierLike)
                 _modifiers.append(mod)
         # by now all are modifiers
-        self.modifiers = _modifiers
+        return _modifiers
 
     def __len__(self) -> int:
-        return len(self.modifiers)
+        return len(self.unroll_modifiers())
 
     def offset_and_scale(self, hist: Array) -> OffsetAndScale:
         from collections import defaultdict
@@ -374,7 +375,7 @@ class Compose(ModifierBase):
 
         groups = defaultdict(list)
         # first group modifiers into same tree structures
-        for mod in self.modifiers:
+        for mod in self.unroll_modifiers():
             groups[hash(jtu.tree_structure(mod))].append(mod)
         # then do the `jax.lax.scan` loops
         for _, group_mods in groups.items():

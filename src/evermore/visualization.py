@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import importlib.util
+import threading
 from typing import Any
 
 import jax.tree_util as jtu
@@ -36,17 +37,23 @@ def __dir__():
     return __all__
 
 
-penzai_installed = importlib.util.find_spec("penzai") is not None
+@dataclasses.dataclass
+class EvermoreClassesContext(threading.local):
+    cls_types: list[Any] = dataclasses.field(default_factory=list)
 
-EVERMORE_CLASSES = set(
-    {
-        Parameter,
+
+Context = EvermoreClassesContext()
+
+
+Context.cls_types.extend(
+    [
         NormalParameter,
-        Effect,
+        Parameter,
         Identity,
         Linear,
         AsymmetricExponential,
         VerticalTemplateMorphing,
+        Effect,
         Modifier,
         Compose,
         Where,
@@ -58,7 +65,7 @@ EVERMORE_CLASSES = set(
         Poisson,
         ModifierLike,
         PDFLike,
-    }
+    ]
 )
 
 
@@ -76,11 +83,13 @@ def display(tree: PyTree) -> None:
             tree = ...
             evm.visualization.display(tree)
     """
+    penzai_installed = importlib.util.find_spec("penzai") is not None
 
     if not penzai_installed:
         msg = "install 'penzai' with:\n\n"
         msg += "\tpython -m pip install penzai[notebook]"
         raise ModuleNotFoundError(msg)
+
     try:
         from IPython import get_ipython
 
@@ -96,20 +105,20 @@ def display(tree: PyTree) -> None:
     from penzai import pz
 
     with pz.ts.active_autovisualizer.set_scoped(pz.ts.ArrayAutovisualizer()):
-        converted_tree = convert_tree(tree)
-        pz.ts.display(converted_tree)
+        pz_tree = convert_tree(tree)
+        pz.ts.display(pz_tree)
 
 
 def convert_tree(tree: PyTree) -> PyTree:
     from functools import partial
 
-    for cls in EVERMORE_CLASSES:
+    for cls in Context.cls_types:
 
-        def _is_evm_cls(leaf: Any, evm_cls: Any) -> bool:
-            return isinstance(leaf, evm_cls)
+        def _is_evm_cls(leaf: Any, cls: Any) -> bool:
+            return isinstance(leaf, cls)
 
         tree = jtu.tree_map(
-            partial(_convert, cls=cls), tree, is_leaf=partial(_is_evm_cls, evm_cls=cls)
+            partial(_convert, cls=cls), tree, is_leaf=partial(_is_evm_cls, cls=cls)
         )
     return tree
 

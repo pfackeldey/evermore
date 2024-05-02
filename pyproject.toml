@@ -36,13 +36,15 @@ dependencies = [
 test = ["pytest >=6", "pytest-cov >=3"]
 dev = ["pytest >=6", "pytest-cov >=3", "optax", "jaxopt >=0.6"]
 docs = [
-    "sphinx>=7.0",
-    "myst_parser>=0.13",
+    "sphinx",
+    "myst-parser",
+    "myst-nb",
     "sphinx_copybutton",
     "sphinx_autodoc_typehints",
     "sphinx-book-theme",
     "sphinx-design",
     "sphinx-togglebutton",
+    "penzai",
 ]
 
 [project.urls]

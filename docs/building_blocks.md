@@ -1,3 +1,15 @@
+---
+jupytext:
+  formats: md:myst
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: python3
+---
+
 (building-blocks)=
 # Building Blocks
 
@@ -117,26 +129,12 @@ Inspect a (PyTree of) `evm.Parameters` with [`penzai`'s treescope](https://penza
 You can even add custom visualizers, such as:
 
 ```{code-block} python
-from penzai import pz
 import evermore as evm
-import plotly.express as px
 
 
 tree = {"a": evm.NormalParameter(), "b": evm.NormalParameter()}
 
-# custom plotly visualization of prior PDF
-def plot_prior_pdf(value, path):
-    if isinstance(value, evm.Parameter) and isinstance(value.prior, evm.custom_types.PDFLike):
-        x = jnp.arange(-3, 3, 0.1)
-        return pz.ts.IPythonVisualization(
-            px.bar(
-                x=x, y=jnp.exp(value.prior.log_prob(x)),
-                width=400, height=200
-            ).update_layout(margin=dict(l=20, r=20, t=20, b=20))
-        )
-
-with pz.ts.active_autovisualizer.set_scoped(plot_prior_pdf):
-    pz.ts.display(tree)
+evm.visualization.display(tree)
 ```
 :::
 
@@ -271,10 +269,13 @@ Modifier that scales a histogram based on vertical template morphing (Normal con
 
 Multiple modifiers should be combined using `evm.modifier.Compose` or the `@` operator:
 
-```{code-block} python
+```{code-cell} ipython3
+import jax
 import jax.numpy as jnp
 import evermore as evm
 
+
+jax.config.update("jax_enable_x64", True)
 
 param = evm.NormalParameter(value=0.1)
 
@@ -286,6 +287,8 @@ modifier1 = param.morphing(
 modifier2 = param.scale_log(up=1.1, down=0.9)
 
 # apply the composed modifier
-(modifier1 @ modifier2)(jnp.array([10, 20, 30])
+(modifier1 @ modifier2)(jnp.array([10, 20, 30]))
 # -> Array([10.259877, 20.500944, 30.760822], dtype=float32)
+
+evm.visualization.display(modifier1 @ modifier2)
 ```
