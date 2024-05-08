@@ -38,15 +38,16 @@ class SPlusBModel(eqx.Module):
 
 
 hists = {
-    "signal": jnp.array([3]),
-    "bkg1": jnp.array([10]),
-    "bkg2": jnp.array([20]),
+    "signal": jnp.array([3.0]),
+    "bkg1": jnp.array([10.0]),
+    "bkg2": jnp.array([20.0]),
 }
 histsw2 = {
-    "signal": jnp.array([5]),
-    "bkg1": jnp.array([11]),
-    "bkg2": jnp.array([25]),
+    "signal": jnp.array([5.0]),
+    "bkg1": jnp.array([11.0]),
+    "bkg2": jnp.array([25.0]),
 }
+observation = jnp.array([34.0])
 
 model = SPlusBModel(hists, histsw2)
 

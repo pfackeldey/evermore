@@ -74,7 +74,7 @@ class StatErrors(eqx.Module):
 
         self.ntot = sum_over_leaves(self.hists)
         self.etot = jnp.sqrt(sum_over_leaves(self.histsw2))
-        ntot_eff = jnp.round(self.ntot**2 / self.etot**2, decimals=0)
+        ntot_eff = self.ntot**2 / self.etot**2
         self.mask = ntot_eff > self.threshold
 
         # setup params
@@ -83,11 +83,21 @@ class StatErrors(eqx.Module):
             lambda hist: NormalParameter(value=jnp.zeros_like(hist)), self.hists
         )
         self.poissons_per_process = jtu.tree_map(
-            lambda hist: Parameter(
-                value=jnp.zeros_like(hist),
-                prior=Poisson(lamb=cast(Array, jnp.where(hist > 0.0, hist, 1.0))),
+            lambda w, w2: Parameter(
+                value=jnp.zeros_like(w),
+                prior=Poisson(
+                    lamb=cast(
+                        Array,
+                        jnp.where(
+                            (w**2 / jnp.sqrt(w2**2)) > 0.0,
+                            (w**2 / jnp.sqrt(w2**2)),
+                            1.0,
+                        ),
+                    )
+                ),
             ),
             self.hists,
+            self.histsw2,
         )
 
     def modifier(self, getter: Callable) -> ModifierLike:
@@ -95,7 +105,7 @@ class StatErrors(eqx.Module):
         # and: https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/latest/part2/bin-wise-stats/#usage-instructions
 
         # poisson case per process
-        # if w > 0.0, then poisson, else noop (no effect)
+        # if w > 0.0, then poisson, else Identity (no effect)
         # since w <= 0 leads to NaNs in derivatives, we need to mask them
         w = getter(self.hists)
         poisson_params = getter(self.poissons_per_process)
@@ -141,7 +151,7 @@ class StatErrors(eqx.Module):
         #   if n_i_eff > threshold or e_i > n_i or n_i <= 0.0:
         #       apply per process gaussian(width=e_i/n_i)
         #   else:
-        #       apply per process poisson(lamb=n_i)
+        #       apply per process poisson(lamb=n_i_eff)
         per_process_mask = (
             ((w**2 / w2**2) > self.threshold) | (jnp.sqrt(w2) > w) | (w <= 0)
         )
