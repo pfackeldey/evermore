@@ -146,7 +146,7 @@ def value_filter_spec(tree: PyTree) -> PyTree:
             leaf = eqx.tree_at(lambda p: p.value, leaf, not leaf.frozen)
         return leaf
 
-    return params_map(_replace_value, filter_spec)
+    return jtu.tree_map(_replace_value, filter_spec, is_leaf=is_parameter)
 
 
 def partition(tree: PyTree) -> tuple[PyTree, PyTree]:
