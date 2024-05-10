@@ -5,6 +5,7 @@ from abc import abstractmethod
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+from jax.scipy.special import gammaln, xlogy
 from jaxtyping import Array, PRNGKeyArray
 
 __all__ = [
@@ -46,8 +47,11 @@ class Poisson(PDF):
     lamb: Array = eqx.field(converter=jnp.atleast_1d)
 
     def log_prob(self, x: Array) -> Array:
-        logpdf_max = jax.scipy.stats.poisson.logpmf(self.lamb, mu=self.lamb)
-        unnormalized = jax.scipy.stats.poisson.logpmf((x + 1) * self.lamb, mu=self.lamb)
+        def _continous_poisson_log_prob(x, lamb):
+            return xlogy(x, lamb) - lamb - gammaln(x + 1)
+
+        logpdf_max = _continous_poisson_log_prob(self.lamb, self.lamb)
+        unnormalized = _continous_poisson_log_prob((x + 1) * self.lamb, self.lamb)
         return unnormalized - logpdf_max
 
     def sample(self, key: PRNGKeyArray) -> Array:
