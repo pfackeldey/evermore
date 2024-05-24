@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-import importlib.util
 import threading
 from typing import Any
 
@@ -29,7 +28,7 @@ from evermore.parameter import NormalParameter, Parameter
 from evermore.pdf import Normal, Poisson
 
 __all__ = [
-    "display",
+    "convert_tree_to_penzai",
 ]
 
 
@@ -69,47 +68,7 @@ Context.cls_types.extend(
 )
 
 
-def display(tree: PyTree) -> None:
-    """
-    Visualize PyTrees of evermore components with penzai in a notebook.
-
-    Usage:
-
-        .. code-block:: python
-
-            import evermore as evm
-
-
-            tree = ...
-            evm.visualization.display(tree)
-    """
-    penzai_installed = importlib.util.find_spec("penzai") is not None
-
-    if not penzai_installed:
-        msg = "install 'penzai' with:\n\n"
-        msg += "\tpython -m pip install penzai[notebook]"
-        raise ModuleNotFoundError(msg)
-
-    try:
-        from IPython import get_ipython
-
-        in_ipython = get_ipython() is not None
-    except ImportError:
-        in_ipython = False
-
-    if not in_ipython:
-        print(tree)
-        return
-
-    # now we can pretty-print
-    from penzai import pz
-
-    with pz.ts.active_autovisualizer.set_scoped(pz.ts.ArrayAutovisualizer()):
-        pz_tree = convert_tree(tree)
-        pz.ts.display(pz_tree)
-
-
-def convert_tree(tree: PyTree) -> PyTree:
+def convert_tree_to_penzai(tree: PyTree) -> PyTree:
     from functools import partial
 
     for cls in Context.cls_types:
