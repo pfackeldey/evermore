@@ -9,17 +9,14 @@ import evermore as evm
 optim = optax.sgd(learning_rate=1e-2)
 opt_state = optim.init(eqx.filter(model, eqx.is_inexact_array))
 
-log_likelihood = evm.loss.PoissonLogLikelihood()
-
 
 @eqx.filter_jit
 def loss(dynamic_model, static_model, hists, observation):
     model = eqx.combine(dynamic_model, static_model)
     expectations = model(hists)
     constraints = evm.loss.get_log_probs(model)
-    loss_val = log_likelihood(
-        expectation=evm.util.sum_over_leaves(expectations),
-        observation=observation,
+    loss_val = evm.pdf.Poisson(evm.util.sum_over_leaves(expectations)).log_prob(
+        observation
     )
     # add constraint
     loss_val += evm.util.sum_over_leaves(constraints)

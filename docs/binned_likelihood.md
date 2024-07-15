@@ -52,10 +52,8 @@ def NLL(dynamic_params, static_params, hists, observation):
     expectations = model(params, hists)
 
     # first product of Eq. 1 (Poisson term)
-    log_likelihood = evm.loss.PoissonLogLikelihood()
-    loss_val = log_likelihood(
-        expectation=evm.util.sum_over_leaves(expectations),
-        observation=observation,
+    loss_val = evm.pdf.Poisson(lamb=evm.util.sum_over_leaves(expectations)).log_prob(
+        observation
     )
 
     # second product of Eq. 1 (constraint)

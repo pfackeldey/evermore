@@ -51,7 +51,7 @@ class Poisson(PDF):
             return xlogy(x, lamb) - lamb - gammaln(x + 1)
 
         logpdf_max = _continous_poisson_log_prob(self.lamb, self.lamb)
-        unnormalized = _continous_poisson_log_prob((x + 1) * self.lamb, self.lamb)
+        unnormalized = _continous_poisson_log_prob(x, self.lamb)
         return unnormalized - logpdf_max
 
     def sample(self, key: PRNGKeyArray) -> Array:
