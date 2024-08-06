@@ -28,7 +28,7 @@ from evermore.parameter import NormalParameter, Parameter
 from evermore.pdf import Normal, Poisson
 
 __all__ = [
-    "convert_tree_to_penzai",
+    "convert_tree_to_treescope",
 ]
 
 
@@ -68,7 +68,7 @@ Context.cls_types.extend(
 )
 
 
-def convert_tree_to_penzai(tree: PyTree) -> PyTree:
+def convert_tree_to_treescope(tree: PyTree) -> PyTree:
     from functools import partial
 
     for cls in Context.cls_types:
@@ -104,7 +104,7 @@ def _convert(leaf: Any, cls: Any) -> Any:
         attrs = {k: _pretty(getattr(leaf, k)) for k in attributes["__annotations__"]}
 
         new_cls = pz.pytree_dataclass(
-            type(leaf_cls.__name__, (pz.Layer,), dict(attributes))
+            type(leaf_cls.__name__, (pz.nn.Layer,), dict(attributes))
         )
         return new_cls(**attrs)
     return leaf

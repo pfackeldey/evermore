@@ -32,7 +32,8 @@ sphinx-togglebutton = "*"
 myst-nb = "*"
 
 [pypi-dependencies]
-penzai = "*"
+treescope = "*"
+penzai = ">=0.2.0"
 
 [tasks]
 postinstall = "pip install -e '.[dev]' && pip install pre-commit && pre-commit install"
