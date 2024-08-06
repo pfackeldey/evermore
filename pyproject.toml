@@ -59,10 +59,10 @@ version.path = "src/evermore/__init__.py"
 envs.default.dependencies = ["pytest", "pytest-cov"]
 
 [tool.pytest.ini_options]
-minversion = "6.0"
-addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
-xfail_strict = true
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning", # <- remove once equinox publishes a new release (see: https://github.com/patrick-kidger/equinox/commit/5a5bf287f73032201c34ff2c73e73573f8232739)
+]
 log_cli_level = "INFO"
 testpaths = ["tests"]
 
@@ -85,6 +85,13 @@ ignore_missing_imports = true
 
 
 [tool.ruff.lint]
+extend-ignore = [
+    "PLR",  # Design related pylint codes
+    "E501", # Line too long
+    # "B006",   # converts default args to 'None'
+    "I002",   # isort: "from __future__ import annotations"
+    "ISC001", # flake8-implicit-str-concat: Implicit string concatenation"
+]
 select = [
     "E",
     "F",
@@ -107,13 +114,6 @@ select = [
     "UP",  # pyupgrade
     "YTT", # flake8-2020
     "EXE", # flake8-executable
-]
-extend-ignore = [
-    "PLR",  # Design related pylint codes
-    "E501", # Line too long
-    # "B006",   # converts default args to 'None'
-    "I002",   # isort: "from __future__ import annotations"
-    "ISC001", # flake8-implicit-str-concat: Implicit string concatenation"
 ]
 unfixable = [
     "F841", # Would remove unused variables
