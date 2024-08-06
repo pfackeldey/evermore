@@ -15,17 +15,17 @@ kernelspec:
 
 Here are some advanced tips and tricks.
 
-(penzai-visualization)=
-## penzai Visualization
+(treescope-visualization)=
+## treescope Visualization
 
-evermore components can be visualized with `penzai`. Convert the corresponding PyTree using `evermore.visualization.convert_tree_to_penzai` and use it with `penzai`. In IPython notebooks you can display the tree using `penzai.ts.display`.
+evermore components can be visualized with `treescope`. Convert the corresponding PyTree using `evermore.visualization.convert_tree_to_treescope` and use it with `treescope`. In IPython notebooks you can display the tree using `treescope.display`.
 
 ```{code-cell} ipython3
 import jax
 import jax.numpy as jnp
 import evermore as evm
 import equinox as eqx
-from penzai import pz
+import treescope
 
 jax.config.update("jax_enable_x64", True)
 
@@ -50,16 +50,16 @@ composition = evm.modifier.Compose(
     evm.Modifier(parameter=sigma1, effect=evm.effect.AsymmetricExponential(up=1.2, down=0.8)),
 )
 
-with pz.ts.active_autovisualizer.set_scoped(pz.ts.ArrayAutovisualizer()):
-    pz_tree = evm.visualization.convert_tree_to_penzai(composition)
-    pz.ts.display(pz_tree)
+with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
+    tree = evm.visualization.convert_tree_to_treescope(composition)
+    treescope.display(tree)
 ```
 
 You can also save the tree to an HTML file.
 ```{code-cell} python
-with pz.ts.active_autovisualizer.set_scoped(pz.ts.ArrayAutovisualizer()):
-    pz_tree = evm.visualization.convert_tree_to_penzai(composition)
-    contents = pz.ts.render_to_html(pz_tree, roundtrip_mode=True)
+with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
+    tree = evm.visualization.convert_tree_to_treescope(composition)
+    contents = treescope.render_to_html(tree)
 
 with open("composition.html", "w") as f:
     f.write(contents)
@@ -121,9 +121,9 @@ rng_keys = jax.random.split(rng_key, 100)
 
 vec_sample = jax.vmap(evm.parameter.sample, in_axes=(None, 0))
 
-with pz.ts.active_autovisualizer.set_scoped(pz.ts.ArrayAutovisualizer()):
-    pz_tree = evm.visualization.convert_tree_to_penzai(vec_sample(params, rng_keys))
-    pz.ts.display(pz_tree)
+with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
+    tree = evm.visualization.convert_tree_to_treescope(vec_sample(params, rng_keys))
+    treescope.display(tree)
 ```
 
 Many minimizers from the JAX ecosystem are e.g. batchable (`optax`, `optimistix`), which allows you vectorize _full fits_, e.g., for embarrassingly parallel likleihood profiles.
