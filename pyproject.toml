@@ -1,6 +1,7 @@
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
 [project]
 name = "evermore"
 authors = [
@@ -34,7 +35,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest >=6", "pytest-cov >=3"]
-dev = ["pytest >=6", "pytest-cov >=3", "optax", "jaxopt >=0.6"]
+dev = ["ipython", "ruff", "optax", "jaxopt >=0.6"]
 docs = [
     "sphinx",
     "myst-parser",
@@ -124,3 +125,28 @@ isort.required-imports = ["from __future__ import annotations"]
 [tool.ruff]
 src = ["src"]
 exclude = []
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["osx-64"]
+
+[tool.pixi.dependencies]
+jax = "*"
+jaxlib = "*"
+jaxtyping = "*"
+equinox = ">=0.10.6" # eqx.field
+
+[tool.pixi.pypi-dependencies]
+evermore = { path = ".", editable = true }
+
+[tool.pixi.environments]
+default = { solve-group = "default" }
+dev = { features = ["docs", "test", "dev"], solve-group = "default" }
+docs = { features = ["docs"], solve-group = "default" }
+test = { features = ["test"], solve-group = "default" }
+
+[tool.pixi.tasks]
+test = "pytest"
+lint = "ruff check . --fix --show-fixes"
+checkall = "pre-commit run --all-files"
+builddocs = "rm -rf build/ && sphinx-build -M html ./docs ./build -W --keep-going"

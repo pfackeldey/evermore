@@ -176,3 +176,6 @@ test/
 .pixi/
 pixi.lock
 pyrightconfig.json
+# pixi environments
+.pixi
+*.egg-info
