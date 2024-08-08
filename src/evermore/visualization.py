@@ -83,7 +83,7 @@ def convert_tree_to_penzai(tree: PyTree) -> PyTree:
 
 
 def _convert(leaf: Any, cls: Any) -> Any:
-    from penzai import pz
+    from penzai.deprecated.v1 import pz
 
     if isinstance(leaf, cls) and dataclasses.is_dataclass(leaf):
         fields = dataclasses.fields(leaf)
