@@ -35,7 +35,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest >=6", "pytest-cov >=3"]
-dev = ["ipython", "ruff", "optax", "jaxopt >=0.6"]
+dev = ["ipython", "ruff", "pre_commit", "mypy", "optax", "jaxopt >=0.6"]
 docs = [
     "sphinx",
     "myst-parser",
