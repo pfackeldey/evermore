@@ -8,8 +8,7 @@ We use [pixi](https://pixi.sh/latest/) to manage the development environment.
 
 ```shell
 pixi install
-pixi shell
-pixi run postinstall
+pixi shell -e dev
 ```
 
 ### Testing
