@@ -46,13 +46,15 @@ class Normal(PDF):
 class Poisson(PDF):
     lamb: Array = eqx.field(converter=jnp.atleast_1d)
 
-    def log_prob(self, x: Array) -> Array:
+    def log_prob(self, x: Array, normalize: bool = True) -> Array:
         def _continous_poisson_log_prob(x, lamb):
             return xlogy(x, lamb) - lamb - gammaln(x + 1)
 
-        logpdf_max = _continous_poisson_log_prob(self.lamb, self.lamb)
-        unnormalized = _continous_poisson_log_prob((x + 1) * self.lamb, self.lamb)
-        return unnormalized - logpdf_max
+        unnormalized = _continous_poisson_log_prob(x, self.lamb)
+        if normalize:
+            logpdf_max = _continous_poisson_log_prob(x, x)
+            return unnormalized - logpdf_max
+        return unnormalized
 
     def sample(self, key: PRNGKeyArray) -> Array:
         # this samples only integers, do we want that?
