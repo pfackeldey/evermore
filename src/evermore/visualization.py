@@ -12,7 +12,7 @@ from treescope import (
 )
 
 
-class SupportTreescope:
+class SupportsTreescope:
     def __treescope_repr__(
         self,
         path: str,
@@ -56,7 +56,6 @@ def handle_evermore_classes(
     # get colors for the background of the tree node
     def _treescope_color(node) -> str:
         """Returns the color of the tree node."""
-        from treescope import formatting_util
 
         type_string = type(node).__module__ + "." + type(node).__qualname__
         return formatting_util.color_from_string(type_string)

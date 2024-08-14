@@ -15,7 +15,7 @@ from evermore.custom_types import ModifierLike, OffsetAndScale
 from evermore.effect import DEFAULT_EFFECT
 from evermore.parameter import Parameter
 from evermore.util import tree_stack
-from evermore.visualization import SupportTreescope
+from evermore.visualization import SupportsTreescope
 
 if TYPE_CHECKING:
     from evermore.effect import Effect
@@ -59,7 +59,7 @@ class MatMulCompose(eqx.Module):
         return Compose(self, other)
 
 
-class ModifierBase(ApplyFn, MatMulCompose, AbstractModifier, SupportTreescope):
+class ModifierBase(ApplyFn, MatMulCompose, AbstractModifier, SupportsTreescope):
     """
     This serves as a base class for all modifiers.
     It automatically implements the __call__ method to apply the scale factors to the hist array

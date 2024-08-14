@@ -12,7 +12,7 @@ from jaxtyping import Array, ArrayLike, PRNGKeyArray, PyTree
 from evermore.custom_types import PDFLike
 from evermore.pdf import Normal, Poisson
 from evermore.util import filter_tree_map
-from evermore.visualization import SupportTreescope
+from evermore.visualization import SupportsTreescope
 
 if TYPE_CHECKING:
     from evermore.modifier import Modifier
@@ -34,7 +34,7 @@ def __dir__():
     return __all__
 
 
-class Parameter(eqx.Module, SupportTreescope):
+class Parameter(eqx.Module, SupportsTreescope):
     """
     Implementation of a general Parameter class. The class is used to define the parameters of a statistical model.
     Key is the value attribute, which holds the actual value of the parameter. In additon,
