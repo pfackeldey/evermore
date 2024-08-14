@@ -9,6 +9,7 @@ from jaxtyping import Array, PyTree
 
 from evermore.custom_types import OffsetAndScale
 from evermore.parameter import Parameter
+from evermore.visualization import SupportsTreescope
 
 __all__ = [
     "Effect",
@@ -23,7 +24,7 @@ def __dir__():
     return __all__
 
 
-class Effect(eqx.Module):
+class Effect(eqx.Module, SupportsTreescope):
     @abc.abstractmethod
     def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale: ...
 

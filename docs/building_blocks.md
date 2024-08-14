@@ -122,10 +122,10 @@ Correlate a Parameter
     ```
 
 
-:::{admonition} Inspect `evm.Parameters` with `penzai`
+:::{admonition} Inspect `evm.Parameters` with `treescope`
 :class: tip dropdown
 
-Inspect a (PyTree of) `evm.Parameters` with [`penzai`'s treescope](https://penzai.readthedocs.io/en/stable/notebooks/treescope_prettyprinting.html) visualization in IPython or Colab notebooks (see <project:#penzai-visualization> for more information).
+Inspect a (PyTree of) `evm.Parameters` with [treescope](https://treescope.readthedocs.io/en/stable/index.html) visualization in IPython or Colab notebooks (see <project:#treescope-visualization> for more information).
 You can even add custom visualizers, such as:
 
 ```{code-block} python
@@ -134,9 +134,8 @@ import evermore as evm
 
 tree = {"a": evm.NormalParameter(), "b": evm.NormalParameter()}
 
-with pz.ts.active_autovisualizer.set_scoped(pz.ts.ArrayAutovisualizer()):
-    pz_tree = evm.visualization.convert_tree_to_penzai(tree)
-    pz.ts.display(pz_tree)
+with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
+    treescope.display(tree)
 ```
 :::
 
@@ -275,7 +274,7 @@ Multiple modifiers should be combined using `evm.modifier.Compose` or the `@` op
 import jax
 import jax.numpy as jnp
 import evermore as evm
-from penzai import pz
+import treescope
 
 
 jax.config.update("jax_enable_x64", True)
@@ -293,7 +292,7 @@ modifier2 = param.scale_log(up=1.1, down=0.9)
 (modifier1 @ modifier2)(jnp.array([10, 20, 30]))
 # -> Array([10.259877, 20.500944, 30.760822], dtype=float32)
 
-with pz.ts.active_autovisualizer.set_scoped(pz.ts.ArrayAutovisualizer()):
-    pz_tree = evm.visualization.convert_tree_to_penzai(modifier1 @ modifier2)
-    pz.ts.display(pz_tree)
+with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
+    composition = modifier1 @ modifier2
+    treescope.display(composition)
 ```

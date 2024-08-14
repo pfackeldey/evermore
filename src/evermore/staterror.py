@@ -14,6 +14,7 @@ from evermore.modifier import Modifier, Where
 from evermore.parameter import NormalParameter, Parameter
 from evermore.pdf import Poisson
 from evermore.util import sum_over_leaves
+from evermore.visualization import SupportsTreescope
 
 __all__ = [
     "StatErrors",
@@ -24,7 +25,7 @@ def __dir__():
     return __all__
 
 
-class StatErrors(eqx.Module):
+class StatErrors(eqx.Module, SupportsTreescope):
     """
     Create staterror (barlow-beeston) parameters.
 

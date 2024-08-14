@@ -1,110 +1,121 @@
 from __future__ import annotations
 
 import dataclasses
-import threading
+from collections.abc import Callable
 from typing import Any
 
-import jax.tree_util as jtu
-from jaxtyping import Array, PyTree
-
-from evermore.custom_types import ModifierLike, PDFLike
-from evermore.effect import (
-    AsymmetricExponential,
-    Effect,
-    Identity,
-    Linear,
-    VerticalTemplateMorphing,
-)
-from evermore.modifier import (
-    BooleanMask,
-    Compose,
-    Modifier,
-    Transform,
-    TransformOffset,
-    TransformScale,
-    Where,
-)
-from evermore.parameter import NormalParameter, Parameter
-from evermore.pdf import Normal, Poisson
-
-__all__ = [
-    "convert_tree_to_penzai",
-]
-
-
-def __dir__():
-    return __all__
-
-
-@dataclasses.dataclass
-class EvermoreClassesContext(threading.local):
-    cls_types: list[Any] = dataclasses.field(default_factory=list)
-
-
-Context = EvermoreClassesContext()
-
-
-Context.cls_types.extend(
-    [
-        NormalParameter,
-        Parameter,
-        Identity,
-        Linear,
-        AsymmetricExponential,
-        VerticalTemplateMorphing,
-        Effect,
-        Modifier,
-        Compose,
-        Where,
-        BooleanMask,
-        Transform,
-        TransformScale,
-        TransformOffset,
-        Normal,
-        Poisson,
-        ModifierLike,
-        PDFLike,
-    ]
+from treescope import (
+    dataclass_util,
+    formatting_util,
+    renderers,
+    rendering_parts,
 )
 
 
-def convert_tree_to_penzai(tree: PyTree) -> PyTree:
-    from functools import partial
+class SupportsTreescope:
+    def __treescope_repr__(
+        self,
+        path: str,
+        subtree_renderer: Callable[[Any, str | None], rendering_parts.Rendering],
+    ) -> rendering_parts.Rendering:
+        return handle_evermore_classes(self, path, subtree_renderer)
 
-    for cls in Context.cls_types:
 
-        def _is_evm_cls(leaf: Any, cls: Any) -> bool:
-            return isinstance(leaf, cls)
+def handle_evermore_classes(
+    node: Any,
+    path: str | None,
+    subtree_renderer: renderers.TreescopeSubtreeRenderer,
+) -> rendering_parts.RenderableTreePart | rendering_parts.Rendering:
+    """Renders evermore classes.
+    Taken from: https://github.com/google-deepmind/penzai/blob/b1bd577dc34f0e7b8f7fef3bbeb2cd571c2f8fcd/penzai/core/_treescope_handlers/struct_handler.py
 
-        tree = jtu.tree_map(
-            partial(_convert, cls=cls), tree, is_leaf=partial(_is_evm_cls, cls=cls)
+    Args:
+        node: The node to render.
+        path: The path to the node. (Optional)
+        subtree_renderer: A recursive renderer for subtrees.
+
+    Returns:
+        A rendering of evermore classes.
+    """
+
+    # get prefix, e.g. "Parameter("
+    prefix = render_evermore_constructor(node)
+
+    # get fields of the dataclass, e.g. value=1.0
+    fields = dataclasses.fields(node)
+
+    # get children of the tree
+    children = rendering_parts.build_field_children(
+        node,
+        path,
+        subtree_renderer,
+        fields_or_attribute_names=fields,
+        attr_style_fn=evermore_attr_style_fn_for_fields(fields),
+    )
+
+    # get colors for the background of the tree node
+    def _treescope_color(node) -> str:
+        """Returns the color of the tree node."""
+
+        type_string = type(node).__module__ + "." + type(node).__qualname__
+        return formatting_util.color_from_string(type_string)
+
+    background_color, background_pattern = (
+        formatting_util.parse_simple_color_and_pattern_spec(
+            _treescope_color(node), type(node).__name__
         )
-    return tree
+    )
+
+    return rendering_parts.build_foldable_tree_node_from_children(
+        prefix=prefix,
+        children=children,
+        suffix=")",
+        background_color=background_color,
+        background_pattern=background_pattern,
+    )
 
 
-def _convert(leaf: Any, cls: Any) -> Any:
-    from penzai.deprecated.v1 import pz
+def evermore_attr_style_fn_for_fields(
+    fields,
+) -> Callable[[str], rendering_parts.RenderableTreePart]:
+    """Builds a function to render attributes of an evermore class.
 
-    if isinstance(leaf, cls) and dataclasses.is_dataclass(leaf):
-        fields = dataclasses.fields(leaf)
+    The resulting function will render pytree node fields in a different style.
+    E.g. the field "value" of a Parameter class will be rendered in a different style.
 
-        leaf_cls = type(leaf)
-        attributes: dict[str, Any] = {
-            "__annotations__": {field.name: field.type for field in fields}
-        }
+    Taken from: https://github.com/google-deepmind/penzai/blob/b1bd577dc34f0e7b8f7fef3bbeb2cd571c2f8fcd/penzai/core/_treescope_handlers/struct_handler.py
 
-        if callable(leaf_cls):
-            attributes["__call__"] = leaf_cls.__call__
+    Args:
+        fields: The fields of the evermore class.
 
-        def _pretty(x: Any) -> Any:
-            if isinstance(x, Array) and x.size == 1:
-                return x.item()
-            return x
+    Returns:
+        A function that takes a field name and returns a RenderableTreePart."""
+    fields_by_name = {field.name: field for field in fields}
 
-        attrs = {k: _pretty(getattr(leaf, k)) for k in attributes["__annotations__"]}
+    def attr_style_fn(field_name):
+        field = fields_by_name[field_name]
+        if field.metadata.get("pytree_node", True):
+            return rendering_parts.custom_style(
+                rendering_parts.text(field_name),
+                css_style="font-style: italic; color: #00255f;",
+            )
+        return rendering_parts.text(field_name)
 
-        new_cls = pz.pytree_dataclass(
-            type(leaf_cls.__name__, (pz.Layer,), dict(attributes))
+    return attr_style_fn
+
+
+def render_evermore_constructor(node: Any) -> rendering_parts.RenderableTreePart:
+    """Renders the constructor of an evermore class, with an open parenthesis.
+    Taken from: https://github.com/google-deepmind/penzai/blob/b1bd577dc34f0e7b8f7fef3bbeb2cd571c2f8fcd/penzai/core/_treescope_handlers/struct_handler.py
+    """
+    if dataclass_util.init_takes_fields(type(node)):
+        return rendering_parts.siblings(
+            rendering_parts.maybe_qualified_type_name(type(node)), "("
         )
-        return new_cls(**attrs)
-    return leaf
+
+    return rendering_parts.siblings(
+        rendering_parts.maybe_qualified_type_name(type(node)),
+        rendering_parts.roundtrip_condition(
+            roundtrip=rendering_parts.text(".from_attributes")
+        ),
+    )

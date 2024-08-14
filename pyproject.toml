@@ -31,6 +31,7 @@ dependencies = [
     "jaxlib",
     "jaxtyping",
     "equinox>=0.10.6", # eqx.field
+    "treescope",
 ]
 
 [project.optional-dependencies]
@@ -45,7 +46,6 @@ docs = [
     "sphinx-book-theme",
     "sphinx-design",
     "sphinx-togglebutton",
-    "penzai",
 ]
 
 [project.urls]
@@ -135,6 +135,7 @@ jax = "*"
 jaxlib = "*"
 jaxtyping = "*"
 equinox = ">=0.10.6" # eqx.field
+treescope = "*"
 
 [tool.pixi.pypi-dependencies]
 evermore = { path = ".", editable = true }
