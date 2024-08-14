@@ -15,4 +15,4 @@ def test_Normal():
 def test_Poisson():
     pdf = Poisson(lamb=jnp.array(10))
 
-    assert pdf.log_prob(jnp.array(-0.5)) == pytest.approx(-1.196003)
+    assert pdf.log_prob(jnp.array(5.0)) == pytest.approx(-1.5342636)
