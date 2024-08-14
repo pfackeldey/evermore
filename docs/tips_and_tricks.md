@@ -18,7 +18,7 @@ Here are some advanced tips and tricks.
 (treescope-visualization)=
 ## treescope Visualization
 
-evermore components can be visualized with `treescope`. Convert the corresponding PyTree using `evermore.visualization.convert_tree_to_treescope` and use it with `treescope`. In IPython notebooks you can display the tree using `treescope.display`.
+evermore components can be visualized with [treescope](https://treescope.readthedocs.io/en/stable/index.html). In IPython notebooks you can display the tree using `treescope.display`.
 
 ```{code-cell} ipython3
 import jax
@@ -51,15 +51,13 @@ composition = evm.modifier.Compose(
 )
 
 with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
-    tree = evm.visualization.convert_tree_to_treescope(composition)
-    treescope.display(tree)
+    treescope.display(composition)
 ```
 
 You can also save the tree to an HTML file.
 ```{code-cell} python
 with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
-    tree = evm.visualization.convert_tree_to_treescope(composition)
-    contents = treescope.render_to_html(tree)
+    contents = treescope.render_to_html(composition)
 
 with open("composition.html", "w") as f:
     f.write(contents)
@@ -112,6 +110,7 @@ You can e.g. sample the parameter values multiple times vectorized from its prio
 ```{code-cell} ipython3
 import jax
 import evermore as evm
+import treescope
 
 
 params = {"a": evm.NormalParameter(), "b": evm.NormalParameter()}
@@ -122,7 +121,7 @@ rng_keys = jax.random.split(rng_key, 100)
 vec_sample = jax.vmap(evm.parameter.sample, in_axes=(None, 0))
 
 with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
-    tree = evm.visualization.convert_tree_to_treescope(vec_sample(params, rng_keys))
+    tree = vec_sample(params, rng_keys)
     treescope.display(tree)
 ```
 

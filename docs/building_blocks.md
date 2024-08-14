@@ -135,7 +135,6 @@ import evermore as evm
 tree = {"a": evm.NormalParameter(), "b": evm.NormalParameter()}
 
 with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
-    tree = evm.visualization.convert_tree_to_treescope(tree)
     treescope.display(tree)
 ```
 :::
@@ -294,6 +293,6 @@ modifier2 = param.scale_log(up=1.1, down=0.9)
 # -> Array([10.259877, 20.500944, 30.760822], dtype=float32)
 
 with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
-    tree = evm.visualization.convert_tree_to_treescope(modifier1 @ modifier2)
-    treescope.display(tree)
+    composition = modifier1 @ modifier2
+    treescope.display(composition)
 ```

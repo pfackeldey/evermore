@@ -8,6 +8,8 @@ import jax.numpy as jnp
 from jax.scipy.special import gammaln, xlogy
 from jaxtyping import Array, PRNGKeyArray
 
+from evermore.visualization import SupportTreescope
+
 __all__ = [
     "PDF",
     "Normal",
@@ -19,7 +21,7 @@ def __dir__():
     return __all__
 
 
-class PDF(eqx.Module):
+class PDF(eqx.Module, SupportTreescope):
     @abstractmethod
     def log_prob(self, x: Array) -> Array: ...
 
