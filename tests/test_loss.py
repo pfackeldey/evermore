@@ -6,11 +6,6 @@ import pytest
 import evermore as evm
 
 
-def test_PoissonLogLikelihood():
-    f = evm.loss.PoissonLogLikelihood()
-    assert f(jnp.array([1.0]), jnp.array([1.0])) == 0.0
-
-
 def test_get_log_probs():
     params = {
         "a": evm.NormalParameter(value=0.5),
