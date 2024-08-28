@@ -140,11 +140,36 @@ treescope = "*"
 [tool.pixi.pypi-dependencies]
 evermore = { path = ".", editable = true }
 
+[tool.pixi.feature.test.dependencies]
+pytest = ">=6"
+pytest-cov = ">=3"
+
+[tool.pixi.feature.dev.dependencies]
+ipython = "*"
+ruff = "*"
+pre_commit = "*"
+mypy = "*"
+optax = "*"
+jaxopt = ">=0.6"
+
+[tool.pixi.feature.docs.dependencies]
+sphinx = "*"
+myst-parser = "*"
+myst-nb = "*"
+sphinx-book-theme = "*"
+sphinx-design = "*"
+sphinx-togglebutton = "*"
+
+# osx-arm64 doesn't have conda-forge builds of these
+[tool.pixi.feature.docs.pypi-dependencies]
+sphinx_copybutton = "*"
+sphinx_autodoc_typehints = "*"
+
 [tool.pixi.environments]
 default = { solve-group = "default" }
-dev = { features = ["docs", "test", "dev"], solve-group = "default" }
-docs = { features = ["docs"], solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
+dev = ["docs", "test", "dev"]
+docs = ["docs"]
+test = ["test"]
 
 [tool.pixi.tasks]
 test = "pytest"
