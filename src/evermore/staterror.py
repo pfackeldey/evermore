@@ -4,8 +4,8 @@ from collections.abc import Callable
 from typing import cast
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 from jaxtyping import Array, PyTree
 
 from evermore.custom_types import ModifierLike
@@ -67,7 +67,7 @@ class StatErrors(eqx.Module, SupportsTreescope):
         threshold: float = 10.0,
     ) -> None:
         assert (
-            jtu.tree_structure(hists) == jtu.tree_structure(histsw2)  # type: ignore[operator]
+            jax.tree.structure(hists) == jax.tree.structure(histsw2)  # type: ignore[operator]
         ), "The PyTree structure of hists and histsw2 must be the same!"
         self.hists = hists
         self.histsw2 = histsw2
@@ -80,10 +80,10 @@ class StatErrors(eqx.Module, SupportsTreescope):
 
         # setup params
         self.gaussians_global = NormalParameter(value=jnp.zeros_like(self.ntot))
-        self.gaussians_per_process = jtu.tree_map(
+        self.gaussians_per_process = jax.tree.map(
             lambda hist: NormalParameter(value=jnp.zeros_like(hist)), self.hists
         )
-        self.poissons_per_process = jtu.tree_map(
+        self.poissons_per_process = jax.tree.map(
             lambda w, w2: Parameter(
                 value=jnp.zeros_like(w),
                 prior=Poisson(

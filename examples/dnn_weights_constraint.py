@@ -36,7 +36,7 @@ def loss_fn(model, x, y):
     mse = jax.numpy.mean((y - pred_y) ** 2)
     constraints = evm.loss.get_log_probs(model)
     # sum them all up for each weight
-    constraints = jax.tree_util.tree_map(jnp.sum, constraints)
+    constraints = jax.tree.map(jnp.sum, constraints)
     return mse + evm.util.sum_over_leaves(constraints)
 
 

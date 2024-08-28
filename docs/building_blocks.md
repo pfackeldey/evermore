@@ -101,7 +101,6 @@ Correlate a Parameter
     A more general case of correlating any PyTree of parameters is implemented as follows:
     ```{code-block} python
     from typing import NamedTuple
-    import jax.tree_util as jtu
 
 
     class Params(NamedTuple):
@@ -110,11 +109,11 @@ Correlate a Parameter
 
     params = Params(mu=evm.Parameter(1.0), syst=evm.NormalParameter(0.0))
 
-    flat_params, tree_def = jtu.tree_flatten(params, evm.parameter.is_parameter)
+    flat_params, tree_def = jax.tree.flatten(params, evm.parameter.is_parameter)
 
     # correlate the parameters
     correlated_flat_params = evm.parameter.correlate(*flat_params)
-    correlated_params = jtu.tree_unflatten(tree_def, correlated_flat_params)
+    correlated_params = jax.tree.unflatten(tree_def, correlated_flat_params)
 
     # now correlated_params.mu and correlated_params.syst are correlated,
     # they share the same value

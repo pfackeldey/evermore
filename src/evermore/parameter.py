@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, cast
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 from jaxtyping import Array, ArrayLike, PRNGKeyArray, PyTree
 
 from evermore.custom_types import PDFLike
@@ -139,7 +138,7 @@ def value_filter_spec(tree: PyTree) -> PyTree:
             ...
     """
     # 1. set the filter_spec to False for all non-static leaves
-    filter_spec = jtu.tree_map(lambda _: False, tree)
+    filter_spec = jax.tree.map(lambda _: False, tree)
 
     # 2. set the filter_spec to True for each parameter value
     def _replace_value(leaf: Any) -> Any:
@@ -147,7 +146,7 @@ def value_filter_spec(tree: PyTree) -> PyTree:
             leaf = eqx.tree_at(lambda p: p.value, leaf, not leaf.frozen)
         return leaf
 
-    return jtu.tree_map(_replace_value, filter_spec, is_leaf=is_parameter)
+    return jax.tree.map(_replace_value, filter_spec, is_leaf=is_parameter)
 
 
 def partition(tree: PyTree) -> tuple[PyTree, PyTree]:
@@ -175,11 +174,11 @@ def sample(tree: PyTree, key: PRNGKeyArray) -> PyTree:
     """
     # partition the tree into parameters and the rest
     params_tree, rest_tree = eqx.partition(tree, is_parameter, is_leaf=is_parameter)
-    params_structure = jax.tree_util.tree_structure(params_tree)
+    params_structure = jax.tree.structure(params_tree)
     n_params = params_structure.num_leaves  # type: ignore[attr-defined]
 
     keys = jax.random.split(key, n_params)
-    keys_tree = jax.tree_util.tree_unflatten(params_structure, keys)
+    keys_tree = jax.tree.unflatten(params_structure, keys)
 
     def _sample(param: Parameter, key: Parameter) -> Array:
         if isinstance(param.prior, PDFLike):
@@ -209,7 +208,7 @@ def sample(tree: PyTree, key: PRNGKeyArray) -> PyTree:
         return eqx.tree_at(lambda p: p.value, param, sampled_value)
 
     # sample for each parameter
-    sampled_params_tree = jtu.tree_map(
+    sampled_params_tree = jax.tree.map(
         _sample, params_tree, keys_tree, is_leaf=is_parameter
     )
 
@@ -246,7 +245,6 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
 
         # More general case of correlating any PyTree of parameters
         from typing import NamedTuple
-        import jax.tree_util as jtu
 
 
         class Params(NamedTuple):
@@ -256,11 +254,11 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
         params = Params(mu=evm.Parameter(1.0), syst=evm.NormalParameter(0.0))
 
         def model(params: Params):
-            flat_params, tree_def = jtu.tree_flatten(params, evm.parameter.is_parameter)
+            flat_params, tree_def = jax.tree.flatten(params, evm.parameter.is_parameter)
 
             # correlate the parameters
             correlated_flat_params = evm.parameter.correlate(*flat_params)
-            correlated_params = jtu.tree_unflatten(tree_def, correlated_flat_params)
+            correlated_params = jax.tree.unflatten(tree_def, correlated_flat_params)
 
             # now correlated_params.mu and correlated_params.syst are correlated, i.e., they share the same value
             assert correlated_params.mu.value == correlated_params.syst.value

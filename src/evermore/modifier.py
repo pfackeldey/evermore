@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 from jaxtyping import Array, ArrayLike, PyTree
 
 from evermore.custom_types import ModifierLike, OffsetAndScale
@@ -73,7 +72,6 @@ class ModifierBase(ApplyFn, MatMulCompose, AbstractModifier, SupportsTreescope):
 
         import equinox as eqx
         import jax.numpy as jnp
-        import jax.tree_util as jtu
         from jaxtyping import Array
 
         import evermore as evm
@@ -86,7 +84,7 @@ class ModifierBase(ApplyFn, MatMulCompose, AbstractModifier, SupportsTreescope):
 
             def offset_and_scale(self, hist: Array) -> evm.custom_types.OffsetAndScale:
                 os = self.modifier.offset_and_scale(hist)
-                return jtu.tree_map(lambda x: jnp.clip(x, self.min_sf, self.max_sf), os)
+                return jax.tree.map(lambda x: jnp.clip(x, self.min_sf, self.max_sf), os)
 
 
         parameter = evm.Parameter(value=1.1)
@@ -201,7 +199,7 @@ class Where(ModifierBase):
         def _where(true: Array, false: Array) -> Array:
             return jnp.where(self.condition, true, false)
 
-        return jtu.tree_map(_where, true_os, false_os)
+        return jax.tree.map(_where, true_os, false_os)
 
 
 class BooleanMask(ModifierBase):
@@ -280,7 +278,7 @@ class Transform(ModifierBase):
 
     def offset_and_scale(self, hist: Array) -> OffsetAndScale:
         os = self.modifier.offset_and_scale(hist)
-        return jtu.tree_map(self.transform_fn, os)
+        return jax.tree.map(self.transform_fn, os)
 
 
 class TransformOffset(ModifierBase):
@@ -377,7 +375,7 @@ class Compose(ModifierBase):
         groups = defaultdict(list)
         # first group modifiers into same tree structures
         for mod in self.unroll_modifiers():
-            groups[hash(jtu.tree_structure(mod))].append(mod)
+            groups[hash(jax.tree.structure(mod))].append(mod)
         # then do the `jax.lax.scan` loops
         for _, group_mods in groups.items():
             # skip empty groups
