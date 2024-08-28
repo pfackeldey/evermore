@@ -171,8 +171,12 @@ dev = ["docs", "test", "dev"]
 docs = ["docs"]
 test = ["test"]
 
-[tool.pixi.tasks]
+[tool.pixi.feature.test.tasks]
 test = "pytest"
+
+[tool.pixi.feature.dev.tasks]
 lint = "ruff check . --fix --show-fixes"
 checkall = "pre-commit run --all-files"
+
+[tool.pixi.feature.docs.tasks]
 builddocs = "rm -rf build/ && sphinx-build -M html ./docs ./build -W --keep-going"
