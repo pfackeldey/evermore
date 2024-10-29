@@ -167,4 +167,4 @@ def dump_hlo_graph(fun: Callable, *args: Any, **kwargs: Any) -> str:
         filepath = pathlib.Path('graph.gv')
         filepath.write_text(dump_hlo_graph(f, x), encoding='ascii')
     """
-    return jax.xla_computation(fun)(*args, **kwargs).as_hlo_dot_graph()
+    return jax.jit(fun).lower(*args, **kwargs).compiler_ir("hlo").as_hlo_dot_graph()  # type: ignore[union-attr]
