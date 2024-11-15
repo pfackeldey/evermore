@@ -1,11 +1,16 @@
 import equinox as eqx
 import jax
+import jax.numpy as jnp
 from jaxtyping import Array, PRNGKeyArray
 from model import hists, model, observation
 
 import evermore as evm
 
 key = jax.random.PRNGKey(0)
+
+# set lower and upper bounds for the mu parameter
+model = eqx.tree_at(lambda t: t.mu.lower, model, jnp.array([0.0]))
+model = eqx.tree_at(lambda t: t.mu.upper, model, jnp.array([10.0]))
 
 # generate a new model with sampled parameters according to their constraint pdfs
 toymodel = evm.parameter.sample(model, key)
