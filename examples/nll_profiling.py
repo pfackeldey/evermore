@@ -29,9 +29,11 @@ def fixed_mu_fit(mu: Array) -> Array:
         model = eqx.combine(dynamic_model, static_model)
         expectations = model(hists)
         constraints = evm.loss.get_log_probs(model)
-        loss_val = evm.pdf.Poisson(
-            lamb=evm.util.sum_over_leaves(expectations)
-        ).log_prob(observation)
+        loss_val = (
+            evm.pdf.Poisson(lamb=evm.util.sum_over_leaves(expectations))
+            .log_prob(observation)
+            .sum()
+        )
         # add constraint
         loss_val += evm.util.sum_over_leaves(constraints)
         return -2 * jnp.sum(loss_val)
