@@ -15,8 +15,10 @@ def loss(dynamic_model, static_model, hists, observation):
     model = eqx.combine(dynamic_model, static_model)
     expectations = model(hists)
     constraints = evm.loss.get_log_probs(model)
-    loss_val = evm.pdf.Poisson(evm.util.sum_over_leaves(expectations)).log_prob(
-        observation
+    loss_val = (
+        evm.pdf.Poisson(evm.util.sum_over_leaves(expectations))
+        .log_prob(observation)
+        .sum()
     )
     # add constraint
     loss_val += evm.util.sum_over_leaves(constraints)

@@ -60,7 +60,7 @@ def loss(
     params = eqx.combine(diffable, static)
     expectation = model(params, hists)
     # Poisson NLL of the expectation and observation
-    log_likelihood = evm.pdf.Poisson(lamb=expectation).log_prob(observation)
+    log_likelihood = evm.pdf.Poisson(lamb=expectation).log_prob(observation).sum()
     # Add parameter constraints from logpdfs
     constraints = evm.loss.get_log_probs(params)
     log_likelihood += evm.util.sum_over_leaves(constraints)

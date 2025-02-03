@@ -54,7 +54,7 @@ def NLL(dynamic_params, static_params, hists, observation):
     # first product of Eq. 1 (Poisson term)
     loss_val = evm.pdf.Poisson(lamb=evm.util.sum_over_leaves(expectations)).log_prob(
         observation
-    )
+    ).sum()
 
     # second product of Eq. 1 (constraint)
     constraints = evm.loss.get_log_probs(model)

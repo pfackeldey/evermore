@@ -9,8 +9,12 @@ import evermore as evm
 def loss(model, hists, observation):
     expectations = model(hists)
     constraints = evm.loss.get_log_probs(model)
-    loss_val = evm.pdf.Poisson(lamb=evm.util.sum_over_leaves(expectations)).log_prob(
-        observation,
+    loss_val = (
+        evm.pdf.Poisson(lamb=evm.util.sum_over_leaves(expectations))
+        .log_prob(
+            observation,
+        )
+        .sum()
     )
     # add constraint
     loss_val += evm.util.sum_over_leaves(constraints)
