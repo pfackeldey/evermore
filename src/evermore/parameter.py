@@ -193,10 +193,13 @@ def sample(tree: PyTree, key: PRNGKeyArray) -> PyTree:
                 sampled_value = (sampled_value / pdf.lamb) - 1
         else:
             assert param.prior is None, f"Unknown prior type: {param.prior}."
-            if not jnp.isfinite(param.lower) and not jnp.isfinite(param.upper):
-                msg = f"Can't sample uniform from {param} (no given prior), because of non-finite bounds. "
-                msg += "Please provide finite bounds."
-                raise ValueError(msg)
+            msg = f"Can't sample uniform from {param} (no given prior). "
+            param = eqx.error_if(
+                param, ~jnp.isfinite(param.lower), msg + "No lower bound given."
+            )
+            param = eqx.error_if(
+                param, ~jnp.isfinite(param.upper), msg + "No upper bound given."
+            )
             sampled_value = jax.random.uniform(
                 key.value,
                 shape=param.value.shape,
