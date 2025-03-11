@@ -50,6 +50,7 @@ class Poisson(PDF):
 
     def log_prob(self, x: Array, normalize: bool = True) -> Array:
         def _continous_poisson_log_prob(x, lamb):
+            x = jnp.array(x, jnp.result_type(float))
             return xlogy(x, lamb) - lamb - gammaln(x + 1)
 
         unnormalized = _continous_poisson_log_prob(x, self.lamb)
