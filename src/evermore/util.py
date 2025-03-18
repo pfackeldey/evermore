@@ -8,7 +8,6 @@ from typing import Any
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import jax.tree_util as jtu
 from jaxtyping import Array, PyTree
 
 __all__ = [
@@ -31,7 +30,7 @@ def filter_tree_map(
     filter: Callable,
 ) -> eqx.Module:
     params = eqx.filter(module, filter, is_leaf=filter)
-    return jtu.tree_map(
+    return jax.tree.map(
         fun,
         params,
         is_leaf=filter,
@@ -39,7 +38,7 @@ def filter_tree_map(
 
 
 def sum_over_leaves(tree: PyTree) -> Array:
-    return jtu.tree_reduce(operator.add, tree)
+    return jax.tree.reduce(operator.add, tree)
 
 
 def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
@@ -83,7 +82,7 @@ def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
     leaves_list = []
     treedef_list = []
     for tree in trees:
-        leaves, treedef = jtu.tree_flatten(tree)
+        leaves, treedef = jax.tree.flatten(tree)
         leaves_list.append(leaves)
         treedef_list.append(treedef)
 
@@ -93,11 +92,11 @@ def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
         if broadcast_leaves:
             shape = jnp.broadcast_shapes(*[leaf.shape for leaf in leaves])
             stacked_leaves.append(
-                jnp.stack(jtu.tree_map(partial(jnp.broadcast_to, shape=shape), leaves))
+                jnp.stack(jax.tree.map(partial(jnp.broadcast_to, shape=shape), leaves))
             )
         else:
             stacked_leaves.append(jnp.stack(leaves))
-    return jtu.tree_unflatten(treedef_list[0], stacked_leaves)
+    return jax.tree.unflatten(treedef_list[0], stacked_leaves)
 
 
 def dataclass_auto_init(module: eqx.Module) -> eqx.Module:
