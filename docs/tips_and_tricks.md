@@ -16,7 +16,6 @@ kernelspec:
 Here are some advanced tips and tricks.
 
 (treescope-visualization)=
-
 ## treescope Visualization
 
 evermore components can be visualized with [treescope](https://treescope.readthedocs.io/en/stable/index.html). In IPython notebooks you can display the tree using `treescope.display`.
@@ -56,7 +55,6 @@ with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer())
 ```
 
 You can also save the tree to an HTML file.
-
 ```{code-cell} python
 with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
     contents = treescope.render_to_html(composition)
@@ -102,6 +100,7 @@ grad_loss = eqx.filter_grad(loss)(diffable, static, ...)
 ```
 
 If you need to further exclude parameter from being optimized you can either set `frozen=True` or set the corresponding leaf in `filter_spec` from `True` to `False`.
+
 
 ## JAX Transformations
 
