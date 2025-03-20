@@ -37,7 +37,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-test = ["pytest >=6", "pytest-cov >=3"]
+test = ["pytest >=7", "pytest-cov >=3"]
 docs = [
     "sphinx",
     "myst-parser",
