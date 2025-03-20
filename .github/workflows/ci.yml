@@ -49,9 +49,6 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
-      - name: Install package (+ dev dependencies)
-        run: uv sync
-
       - name: Test package
         run: >-
           uv run pytest -ra --cov --cov-report=xml --cov-report=term

@@ -9,10 +9,7 @@ We use [uv](https://docs.astral.sh/uv/) to manage the development environment.
 Setup a virtual environment (once):
 
 ```shell
-uv venv
-source .venv/bin/activate
-
-uv pip install -e . --group dev
+uv sync
 ```
 
 ### Testing
@@ -20,7 +17,7 @@ uv pip install -e . --group dev
 Use pytest to run the unit checks:
 
 ```bash
-pytest .
+uv run pytest .
 ```
 
 ### Linting
@@ -28,7 +25,7 @@ pytest .
 We use `ruff` to lint the code. Run the following command to check the code:
 
 ```bash
-ruff check . --fix --show-fixes
+uv run ruff check . --fix --show-fixes
 ```
 
 ### Check all files
@@ -45,5 +42,5 @@ pre-commit run --all-files
 To build the documentation, run the following command:
 
 ```bash
-sphinx-build -M html ./docs ./docs/_build -W --keep-going
+uv run sphinx-build -M html ./docs ./docs/_build -W --keep-going
 ```
