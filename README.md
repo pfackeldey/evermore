@@ -8,6 +8,8 @@
 [![Actions Status][actions-badge]][actions-link]
 [![PyPI version][pypi-version]][pypi-link]
 [![PyPI platforms][pypi-platforms]][pypi-link]
+[![Conda-Forge](https://img.shields.io/conda/vn/conda-forge/evermore)](https://github.com/conda-forge/evermore-feedstock)
+[![BSD-3 Clause License](https://img.shields.io/badge/license-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 Differentiable (binned) likelihoods in JAX.
 
@@ -46,16 +48,16 @@ jax.config.update("jax_enable_x64", True)
 
 # define a simple model with two processes and two parameters
 def model(params: PyTree, hists: dict[str, Array]) -> Array:
-  mu_modifier = params.mu.scale()
-  syst_modifier = params.syst.scale_log(up=1.1, down=0.9)
-  return mu_modifier(hists["signal"]) + syst_modifier(hists["bkg"])
+    mu_modifier = params.mu.scale()
+    syst_modifier = params.syst.scale_log(up=1.1, down=0.9)
+    return mu_modifier(hists["signal"]) + syst_modifier(hists["bkg"])
 
 
 def loss(
-  diffable: PyTree,
-  static: PyTree,
-  hists: dict[str, Array],
-  observation: Array,
+    diffable: PyTree,
+    static: PyTree,
+    hists: dict[str, Array],
+    observation: Array,
 ) -> Array:
     params = eqx.combine(diffable, static)
     expectation = model(params, hists)
@@ -74,8 +76,8 @@ observation = jnp.array([15])
 
 # define parameters, can be any PyTree of evm.Parameters
 class Params(NamedTuple):
-  mu: evm.Parameter
-  syst: evm.NormalParameter
+    mu: evm.Parameter
+    syst: evm.NormalParameter
 
 
 params = Params(mu=evm.Parameter(1.0), syst=evm.NormalParameter(0.0))
@@ -98,9 +100,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on how to contribute.
 Distributed under the terms of the [BSD license](LICENSE).
 
 <!-- prettier-ignore-start -->
-[actions-badge]:            https://github.com/pfackeldey/evermore/workflows/CI/badge.svg
-[actions-link]:             https://github.com/pfackeldey/evermore/actions
-[pypi-link]:                https://pypi.org/project/evermore/
-[pypi-platforms]:           https://img.shields.io/pypi/pyversions/evermore
-[pypi-version]:             https://img.shields.io/pypi/v/evermore
+
 <!-- prettier-ignore-end -->
+
+[actions-badge]: https://github.com/pfackeldey/evermore/workflows/CI/badge.svg
+[actions-link]: https://github.com/pfackeldey/evermore/actions
+[pypi-link]: https://pypi.org/project/evermore/
+[pypi-platforms]: https://img.shields.io/pypi/pyversions/evermore
+[pypi-version]: https://img.shields.io/pypi/v/evermore

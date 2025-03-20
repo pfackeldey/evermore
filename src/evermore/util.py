@@ -11,12 +11,12 @@ import jax.numpy as jnp
 from jaxtyping import Array, PyTree
 
 __all__ = [
-    "filter_tree_map",
-    "sum_over_leaves",
-    "tree_stack",
     "dataclass_auto_init",
     "dump_hlo_graph",
     "dump_jaxpr",
+    "filter_tree_map",
+    "sum_over_leaves",
+    "tree_stack",
 ]
 
 
@@ -125,8 +125,10 @@ def dump_jaxpr(fun: Callable, *args: Any, **kwargs: Any) -> str:
         import jax
         import jax.numpy as jnp
 
+
         def f(x: jax.Array) -> jax.Array:
             return jnp.sin(x) ** 2 + jnp.cos(x) ** 2
+
 
         x = jnp.array([1.0, 2.0, 3.0])
 
@@ -160,10 +162,11 @@ def dump_hlo_graph(fun: Callable, *args: Any, **kwargs: Any) -> str:
         def f(x: jax.Array) -> jax.Array:
             return x + 1.0
 
+
         x = jnp.array([1.0, 2.0, 3.0])
 
         # dump dot graph to file
-        filepath = pathlib.Path('graph.gv')
-        filepath.write_text(dump_hlo_graph(f, x), encoding='ascii')
+        filepath = pathlib.Path("graph.gv")
+        filepath.write_text(dump_hlo_graph(f, x), encoding="ascii")
     """
     return jax.jit(fun).lower(*args, **kwargs).compiler_ir("hlo").as_hlo_dot_graph()  # type: ignore[union-attr]

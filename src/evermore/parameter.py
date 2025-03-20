@@ -18,14 +18,14 @@ if TYPE_CHECKING:
 
 
 __all__ = [
-    "Parameter",
     "NormalParameter",
+    "Parameter",
+    "correlate",
     "is_parameter",
     "params_map",
-    "value_filter_spec",
     "partition",
     "sample",
-    "correlate",
+    "value_filter_spec",
 ]
 
 
@@ -36,7 +36,7 @@ def __dir__():
 class Parameter(eqx.Module, SupportsTreescope):
     """
     Implementation of a general Parameter class. The class is used to define the parameters of a statistical model.
-    Key is the value attribute, which holds the actual value of the parameter. In additon,
+    Key is the value attribute, which holds the actual value of the parameter. In addition,
     the lower and upper attributes define the boundaries of the parameter. The prior attribute
     is used to define the prior distribution of the parameter. The frozen attribute is used to
     freeze the parameter during optimization.
@@ -49,7 +49,9 @@ class Parameter(eqx.Module, SupportsTreescope):
 
         simple_param = evm.Parameter(value=1.0)
         bounded_param = evm.Parameter(value=1.0, lower=0.0, upper=2.0)
-        constrained_parameter = evm.Parameter(value=1.0, prior=evm.pdf.Normal(mean=1.0, width=0.1))
+        constrained_parameter = evm.Parameter(
+            value=1.0, prior=evm.pdf.Normal(mean=1.0, width=0.1)
+        )
         frozen_parameter = evm.Parameter(value=1.0, frozen=True)
     """
 
@@ -236,12 +238,14 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
         p2 = evm.Parameter(value=0.0)
         p3 = evm.Parameter(value=0.5)
 
+
         def model(*parameters: PyTree[evm.Parameter]):
             # correlate them inside the model
             p1, p2, p3 = evm.parameter.correlate(*parameters)
 
             # now p1, p2, p3 are correlated, i.e., they share the same value
             assert p1.value == p2.value == p3.value
+
 
         # use the model
         model(p1, p2, p3)
@@ -254,7 +258,9 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
             mu: evm.Parameter
             syst: evm.NormalParameter
 
+
         params = Params(mu=evm.Parameter(1.0), syst=evm.NormalParameter(0.0))
+
 
         def model(params: Params):
             flat_params, tree_def = jax.tree.flatten(params, evm.parameter.is_parameter)
@@ -265,6 +271,7 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
 
             # now correlated_params.mu and correlated_params.syst are correlated, i.e., they share the same value
             assert correlated_params.mu.value == correlated_params.syst.value
+
 
         # use the model
         model(params)

@@ -20,14 +20,14 @@ if TYPE_CHECKING:
     from evermore.effect import Effect
 
 __all__ = [
-    "ModifierBase",
-    "Modifier",
-    "Compose",
-    "Where",
     "BooleanMask",
+    "Compose",
+    "Modifier",
+    "ModifierBase",
     "Transform",
     "TransformOffset",
     "TransformScale",
+    "Where",
 ]
 
 
@@ -95,7 +95,9 @@ class ModifierBase(ApplyFn, MatMulCompose, AbstractModifier, SupportsTreescope):
         # this example is trivial, because you can also implement it with *evm.modifier.Transform*:
         from functools import partial
 
-        clipped_modifier = evm.modifier.Transform(partial(jnp.clip, a_min=0.8, a_max=1.2), modifier)
+        clipped_modifier = evm.modifier.Transform(
+            partial(jnp.clip, a_min=0.8, a_max=1.2), modifier
+        )
     """
 
 
@@ -123,7 +125,9 @@ class Modifier(ModifierBase):
         # -> Array([11., 22., 33.], dtype=float32, weak_type=True),
 
         # log_normal effect
-        modify = evm.Modifier(parameter=norm, effect=evm.effect.AsymmetricExponential(up=1.2, down=0.8))
+        modify = evm.Modifier(
+            parameter=norm, effect=evm.effect.AsymmetricExponential(up=1.2, down=0.8)
+        )
         # or shorthand
         modify = norm.scale_log(up=1.2, down=0.8)
 
@@ -137,7 +141,12 @@ class Modifier(ModifierBase):
         # shape effect
         up_template = jnp.array([12, 23, 35])
         down_template = jnp.array([8, 19, 26])
-        modify = evm.Modifier(parameter=norm, effect=evm.effect.VerticalTemplateMorphing(up_template=up_template, down_template=down_template))
+        modify = evm.Modifier(
+            parameter=norm,
+            effect=evm.effect.VerticalTemplateMorphing(
+                up_template=up_template, down_template=down_template
+            ),
+        )
         # or shorthand
         modify = norm.morphing(up_template=up_template, down_template=down_template)
     """
@@ -172,7 +181,9 @@ class Where(ModifierBase):
         syst = evm.NormalParameter(value=0.1)
 
         norm = syst.scale_log(up=jnp.array([1.1]), down=jnp.array([0.9]))
-        shape = syst.morphing(up_template=jnp.array([7, 22, 31]), down_template=jnp.array([4, 16, 27]))
+        shape = syst.morphing(
+            up_template=jnp.array([7, 22, 31]), down_template=jnp.array([4, 16, 27])
+        )
 
         # apply norm if hist < 10, else apply shape
         modifier = evm.modifier.Where(hist < 10, norm, shape)
@@ -302,7 +313,7 @@ class TransformScale(ModifierBase):
 class Compose(ModifierBase):
     """
     Composition of multiple modifiers, in order to correctly apply them *together*.
-    It behaves like a single modifier, but it is composed of multiple modifiers; it can be arbitrarly nested.
+    It behaves like a single modifier, but it is composed of multiple modifiers; it can be arbitrarily nested.
 
     Example:
 
@@ -337,7 +348,9 @@ class Compose(ModifierBase):
         # nest compositions
         composition = evm.modifier.Compose(
             composition,
-            evm.Modifier(parameter=sigma, effect=evm.effect.AsymmetricExponential(up=1.2, down=0.8)),
+            evm.Modifier(
+                parameter=sigma, effect=evm.effect.AsymmetricExponential(up=1.2, down=0.8)
+            ),
         )
 
         # jit

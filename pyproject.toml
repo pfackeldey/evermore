@@ -8,13 +8,14 @@ authors = [
     { name = "Peter Fackeldey", email = "peter.fackeldey@rwth-aachen.de" },
 ]
 description = "Differentiable (binned) likelihoods in JAX."
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 1 - Planning",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
@@ -28,16 +29,15 @@ classifiers = [
 ]
 dynamic = ["version"] # version is set in src/evermore/__init__.py
 dependencies = [
-    "jax>=0.4.25", # jax.tree
+    "jax>=0.4.25",     # jax.tree
     "jaxlib",
     "jaxtyping",
     "equinox>=0.10.6", # eqx.field
     "treescope",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 test = ["pytest >=6", "pytest-cov >=3"]
-dev = ["ipython", "ruff", "pre_commit", "mypy", "optax", "jaxopt >=0.6"]
 docs = [
     "sphinx",
     "myst-parser",
@@ -47,6 +47,17 @@ docs = [
     "sphinx-book-theme",
     "sphinx-design",
     "sphinx-togglebutton",
+]
+dev = [
+    { include-group = "test" },
+    { include-group = "docs" },
+    "ipython",
+    "ruff",
+    "pre_commit",
+    "mypy",
+    "optax",
+    "optimistix",
+    "jaxopt >=0.6",
 ]
 
 [project.urls]
@@ -61,6 +72,9 @@ version.path = "src/evermore/__init__.py"
 envs.default.dependencies = ["pytest", "pytest-cov"]
 
 [tool.pytest.ini_options]
+minversion = "7"
+xfail_strict = true
+addopts = ["-ra", "--strict-config", "--strict-markers"]
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning", # <- remove once equinox publishes a new release (see: https://github.com/patrick-kidger/equinox/commit/5a5bf287f73032201c34ff2c73e73573f8232739)
@@ -77,17 +91,17 @@ port.exclude_lines = ['pragma: no cover', '\.\.\.', 'if typing.TYPE_CHECKING:']
 [tool.mypy]
 files = ["src", "tests"]
 python_version = "3.10"
-show_error_codes = true
 warn_unreachable = true
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 check_untyped_defs = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 strict = false
 ignore_missing_imports = true
 
 
 [tool.ruff.lint]
-extend-ignore = [
+ignore = [
     "PLR",  # Design related pylint codes
     "E501", # Line too long
     # "B006",   # converts default args to 'None'
@@ -122,33 +136,3 @@ unfixable = [
 ]
 flake8-unused-arguments.ignore-variadic-names = true
 isort.required-imports = ["from __future__ import annotations"]
-
-[tool.ruff]
-src = ["src"]
-exclude = []
-
-[tool.pixi.project]
-channels = ["conda-forge"]
-platforms = ["linux-64", "osx-arm64", "osx-64"]
-
-[tool.pixi.dependencies]
-jax = "*"
-jaxlib = "*"
-jaxtyping = "*"
-equinox = ">=0.10.6" # eqx.field
-treescope = "*"
-
-[tool.pixi.pypi-dependencies]
-evermore = { path = ".", editable = true }
-
-[tool.pixi.environments]
-default = { solve-group = "default" }
-dev = { features = ["docs", "test", "dev"], solve-group = "default" }
-docs = { features = ["docs"], solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
-
-[tool.pixi.tasks]
-test = "pytest"
-lint = "ruff check . --fix --show-fixes"
-checkall = "pre-commit run --all-files"
-builddocs = "rm -rf build/ && sphinx-build -M html ./docs ./build -W --keep-going"

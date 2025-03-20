@@ -70,6 +70,7 @@ instance/
 
 # Sphinx documentation
 docs/_build/
+docs/composition.html
 
 # PyBuilder
 .pybuilder/
@@ -175,6 +176,7 @@ test/
 .zed/
 .pixi/
 pixi.lock
+uv.lock
 pyrightconfig.json
 # pixi environments
 .pixi
