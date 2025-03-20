@@ -117,7 +117,7 @@ class StatErrors(eqx.Module, SupportsTreescope):
 
         # gaussian case per process
         # if w == 0.0, guard for division by zero
-        # gaussians with width 0 also lead to nans, so we need to guard this aswell
+        # gaussians with width 0 also lead to nans, so we need to guard this as well
         w2 = getter(self.histsw2)
         relerr = jnp.where(w == 0.0, 0.0, jnp.sqrt(w2) / jnp.where(w == 0.0, 1.0, w))
         mask = relerr == 0.0

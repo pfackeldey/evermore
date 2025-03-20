@@ -8,8 +8,8 @@ from evermore.custom_types import PDFLike
 from evermore.parameter import Parameter, params_map
 
 __all__ = [
-    "get_log_probs",
     "get_boundary_constraints",
+    "get_log_probs",
 ]
 
 

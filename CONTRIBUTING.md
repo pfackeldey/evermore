@@ -4,11 +4,12 @@ We welcome contributions to the project. Please follow the guidelines below.
 
 ## Development environment
 
-We use [pixi](https://pixi.sh/latest/) to manage the development environment.
+We use [uv](https://docs.astral.sh/uv/) to manage the development environment.
+
+Setup a virtual environment (once):
 
 ```shell
-pixi install
-pixi shell -e dev
+uv sync
 ```
 
 ### Testing
@@ -16,7 +17,7 @@ pixi shell -e dev
 Use pytest to run the unit checks:
 
 ```bash
-pixi run test
+uv run pytest .
 ```
 
 ### Linting
@@ -24,7 +25,7 @@ pixi run test
 We use `ruff` to lint the code. Run the following command to check the code:
 
 ```bash
-pixi run lint
+uv run ruff check . --fix --show-fixes
 ```
 
 ### Check all files
@@ -33,5 +34,13 @@ pixi run lint
 run the following command:
 
 ```bash
-pixi run checkall
+pre-commit run --all-files
+```
+
+### Build the documentation
+
+To build the documentation, run the following command:
+
+```bash
+uv run sphinx-build -M html ./docs ./docs/_build -W --keep-going
 ```

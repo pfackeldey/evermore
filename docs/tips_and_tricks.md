@@ -16,6 +16,7 @@ kernelspec:
 Here are some advanced tips and tricks.
 
 (treescope-visualization)=
+
 ## treescope Visualization
 
 evermore components can be visualized with [treescope](https://treescope.readthedocs.io/en/stable/index.html). In IPython notebooks you can display the tree using `treescope.display`.
@@ -55,6 +56,7 @@ with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer())
 ```
 
 You can also save the tree to an HTML file.
+
 ```{code-cell} python
 with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
     contents = treescope.render_to_html(composition)
@@ -69,7 +71,7 @@ For optimization it is necessary to differentiate only against meaningful leaves
 By default JAX would differentiate w.r.t. every non-static leaf of a `evm.Parameter`, including the prior PDF and its bounds.
 Gradients are typically only wanted w.r.t. the `.value` attribute of the `evm.Parameters`. This is solved by splitting
 the PyTree of `evm.Parameters` into a differentiable and a non-differentiable part, and then defining the loss function
-w.r.t. both parts. Gradient calculation is performed only w.r.t. the differentiable arguement, see:
+w.r.t. both parts. Gradient calculation is performed only w.r.t. the differentiable argument, see:
 
 ```{code-block} python
 from jaxtyping import Array, PyTree
@@ -101,7 +103,6 @@ grad_loss = eqx.filter_grad(loss)(diffable, static, ...)
 
 If you need to further exclude parameter from being optimized you can either set `frozen=True` or set the corresponding leaf in `filter_spec` from `True` to `False`.
 
-
 ## JAX Transformations
 
 Evert component of evermore is compatible with JAX transformations. That means you can `jax.jit`, `jax.vmap`, ... _everything_.
@@ -125,7 +126,7 @@ with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer())
     treescope.display(tree)
 ```
 
-Many minimizers from the JAX ecosystem are e.g. batchable (`optax`, `optimistix`), which allows you vectorize _full fits_, e.g., for embarrassingly parallel likleihood profiles.
+Many minimizers from the JAX ecosystem are e.g. batchable (`optax`, `optimistix`), which allows you vectorize _full fits_, e.g., for embarrassingly parallel likelihood profiles.
 
 ## Visualize the Computational Graph
 

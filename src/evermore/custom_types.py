@@ -11,8 +11,8 @@ if TYPE_CHECKING:
 
 
 __all__ = [
-    "OffsetAndScale",
     "ModifierLike",
+    "OffsetAndScale",
     "PDFLike",
 ]
 

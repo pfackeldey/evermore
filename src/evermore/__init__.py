@@ -17,19 +17,19 @@ __version__ = "0.2.10"
 # expose public API
 
 __all__ = [
+    "Modifier",
+    "NormalParameter",
+    # explicitly expose some classes
+    "Parameter",
     "__version__",
     "effect",
     "loss",
+    "modifier",
     "parameter",
     "pdf",
-    "util",
-    "modifier",
     "staterror",
+    "util",
     "visualization",
-    # explicitely expose some classes
-    "Parameter",
-    "NormalParameter",
-    "Modifier",
 ]
 
 
