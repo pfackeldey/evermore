@@ -29,6 +29,9 @@ class PDF(eqx.Module, SupportsTreescope):
     @abstractmethod
     def sample(self, key: PRNGKeyArray) -> Array: ...
 
+    def prob(self, x: Array) -> Array:
+        return jnp.exp(self.log_prob(x))
+
 
 class Normal(PDF):
     mean: Array = eqx.field(converter=atleast_1d_float_array)
