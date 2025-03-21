@@ -9,6 +9,7 @@ from jaxtyping import Array, PyTree
 
 from evermore.custom_types import OffsetAndScale
 from evermore.parameter import Parameter
+from evermore.util import atleast_1d_float_array
 from evermore.visualization import SupportsTreescope
 
 __all__ = [
@@ -56,8 +57,8 @@ class Lambda(Effect):
 
 
 class Linear(Effect):
-    offset: Array = eqx.field(converter=jnp.atleast_1d)
-    slope: Array = eqx.field(converter=jnp.atleast_1d)
+    offset: Array = eqx.field(converter=atleast_1d_float_array)
+    slope: Array = eqx.field(converter=atleast_1d_float_array)
 
     @jax.named_scope("evm.effect.Linear")
     def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
@@ -70,8 +71,8 @@ DEFAULT_EFFECT: Linear = Linear(offset=0.0, slope=1.0)
 
 
 class VerticalTemplateMorphing(Effect):
-    up_template: Array = eqx.field(converter=jnp.atleast_1d)  # + 1 sigma
-    down_template: Array = eqx.field(converter=jnp.atleast_1d)  # - 1 sigma
+    up_template: Array = eqx.field(converter=atleast_1d_float_array)  # + 1 sigma
+    down_template: Array = eqx.field(converter=atleast_1d_float_array)  # - 1 sigma
 
     def vshift(self, x: Array, hist: Array) -> Array:
         dx_sum = self.up_template + self.down_template - 2 * hist
@@ -99,8 +100,8 @@ class VerticalTemplateMorphing(Effect):
 
 
 class AsymmetricExponential(Effect):
-    up: Array = eqx.field(converter=jnp.atleast_1d)
-    down: Array = eqx.field(converter=jnp.atleast_1d)
+    up: Array = eqx.field(converter=atleast_1d_float_array)
+    down: Array = eqx.field(converter=atleast_1d_float_array)
 
     def interpolate(self, x: Array) -> Array:
         # https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/be488af288361ef101859a398ae618131373cad7/src/ProcessNormalization.cc#L112-L129

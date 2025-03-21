@@ -8,6 +8,7 @@ import jax.numpy as jnp
 from jax.scipy.special import gammaln, xlogy
 from jaxtyping import Array, PRNGKeyArray
 
+from evermore.util import atleast_1d_float_array
 from evermore.visualization import SupportsTreescope
 
 __all__ = [
@@ -30,8 +31,8 @@ class PDF(eqx.Module, SupportsTreescope):
 
 
 class Normal(PDF):
-    mean: Array = eqx.field(converter=jnp.atleast_1d)
-    width: Array = eqx.field(converter=jnp.atleast_1d)
+    mean: Array = eqx.field(converter=atleast_1d_float_array)
+    width: Array = eqx.field(converter=atleast_1d_float_array)
 
     def log_prob(self, x: Array) -> Array:
         logpdf_max = jax.scipy.stats.norm.logpdf(
@@ -46,7 +47,7 @@ class Normal(PDF):
 
 
 class Poisson(PDF):
-    lamb: Array = eqx.field(converter=jnp.atleast_1d)
+    lamb: Array = eqx.field(converter=atleast_1d_float_array)
 
     def log_prob(self, x: Array, normalize: bool = True) -> Array:
         def _continous_poisson_log_prob(x, lamb):
