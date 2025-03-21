@@ -6,6 +6,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, PRNGKeyArray
 
+from evermore.util import atleast_1d_float_array
+
 if TYPE_CHECKING:
     from evermore.modifier import Compose
 
@@ -18,8 +20,8 @@ __all__ = [
 
 
 class OffsetAndScale(eqx.Module):
-    offset: Array = eqx.field(converter=jnp.atleast_1d, default=0.0)
-    scale: Array = eqx.field(converter=jnp.atleast_1d, default=1.0)
+    offset: Array = eqx.field(converter=atleast_1d_float_array, default=0.0)
+    scale: Array = eqx.field(converter=atleast_1d_float_array, default=1.0)
 
     def broadcast(self) -> OffsetAndScale:
         shape = jnp.broadcast_shapes(self.offset.shape, self.scale.shape)

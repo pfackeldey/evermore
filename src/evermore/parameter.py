@@ -10,7 +10,7 @@ from jaxtyping import Array, ArrayLike, PRNGKeyArray, PyTree
 
 from evermore.custom_types import PDFLike
 from evermore.pdf import Normal, Poisson
-from evermore.util import filter_tree_map
+from evermore.util import atleast_1d_float_array, filter_tree_map
 from evermore.visualization import SupportsTreescope
 
 if TYPE_CHECKING:
@@ -55,10 +55,10 @@ class Parameter(eqx.Module, SupportsTreescope):
         frozen_parameter = evm.Parameter(value=1.0, frozen=True)
     """
 
-    value: Array = eqx.field(converter=jnp.atleast_1d, default=0.0)
+    value: Array = eqx.field(converter=atleast_1d_float_array, default=0.0)
     name: str | None = eqx.field(static=True, default=None)
-    lower: Array = eqx.field(converter=jnp.atleast_1d, default=-jnp.inf)
-    upper: Array = eqx.field(converter=jnp.atleast_1d, default=jnp.inf)
+    lower: Array = eqx.field(converter=atleast_1d_float_array, default=-jnp.inf)
+    upper: Array = eqx.field(converter=atleast_1d_float_array, default=jnp.inf)
     prior: PDFLike | None = eqx.field(default=None)
     frozen: bool = eqx.field(static=True, default=False)
 

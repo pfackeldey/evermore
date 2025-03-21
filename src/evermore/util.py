@@ -11,6 +11,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, PyTree
 
 __all__ = [
+    "atleast_1d_float_array",
     "dataclass_auto_init",
     "dump_hlo_graph",
     "dump_jaxpr",
@@ -22,6 +23,11 @@ __all__ = [
 
 def __dir__():
     return __all__
+
+
+def atleast_1d_float_array(x: Any) -> Array:
+    float_type = jnp.result_type(float)
+    return jnp.atleast_1d(jnp.asarray(x, dtype=float_type))
 
 
 def filter_tree_map(
