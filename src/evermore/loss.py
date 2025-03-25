@@ -5,10 +5,9 @@ from jaxtyping import Array, PyTree
 
 from evermore import pdf
 from evermore.custom_types import PDFLike
-from evermore.parameter import Parameter, params_map
+from evermore.parameter import Parameter, _params_map
 
 __all__ = [
-    "get_boundary_constraints",
     "get_log_probs",
 ]
 
@@ -29,8 +28,4 @@ def get_log_probs(module: PyTree) -> PyTree:
         return jnp.array([0.0])
 
     # constraints from pdfs
-    return params_map(_constraint, module)
-
-
-def get_boundary_constraints(module: PyTree) -> PyTree:
-    return params_map(lambda p: p.boundary_constraint, module)
+    return _params_map(_constraint, module)

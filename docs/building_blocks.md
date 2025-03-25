@@ -68,9 +68,8 @@ PDFs
 
 Parameter Boundaries
 
-:   The `lower` and `upper` attributes denote the valid bounds of a parameter. Using `evm.loss.get_boundary_constraints` allows you to extract
-    from a PyTree of parameters if a value if outside of these bounds; if yes it return `jnp.inf` else `0.0`. This return value can be added to
-    the likelihood function in order to _break_ the fit in case a parameter runs out of its bounds.
+:   The `lower` and `upper` attributes denote the valid bounds of a parameter.
+They can be used to e.g. transform a parameter to a constrained space or add penalty terms to the loss function.
 
 
 Freeze a Parameter
