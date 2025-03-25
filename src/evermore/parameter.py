@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import abc
 from functools import partial
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import equinox as eqx
 import jax
@@ -18,14 +19,17 @@ if TYPE_CHECKING:
 
 
 __all__ = [
+    "MinuitTransform",
     "NormalParameter",
     "Parameter",
+    "SoftPlusTransform",
     "correlate",
     "is_parameter",
-    "params_map",
     "partition",
     "sample",
+    "unwrap",
     "value_filter_spec",
+    "wrap",
 ]
 
 
@@ -35,11 +39,16 @@ def __dir__():
 
 class Parameter(eqx.Module, SupportsTreescope):
     """
-    Implementation of a general Parameter class. The class is used to define the parameters of a statistical model.
-    Key is the value attribute, which holds the actual value of the parameter. In addition,
-    the lower and upper attributes define the boundaries of the parameter. The prior attribute
-    is used to define the prior distribution of the parameter. The frozen attribute is used to
-    freeze the parameter during optimization.
+    A general Parameter class for defining the parameters of a statistical model.
+
+    Attributes:
+        value (Array): The actual value of the parameter.
+        name (str | None): An optional name for the parameter.
+        lower (Array | None): The lower boundary of the parameter.
+        upper (Array | None): The upper boundary of the parameter.
+        prior (PDFLike | None): The prior distribution of the parameter.
+        frozen (bool): Indicates if the parameter is frozen during optimization.
+        transform (AbstractParameterTransformation | None): An optional transformation applied to the parameter.
 
     Usage:
 
@@ -57,20 +66,23 @@ class Parameter(eqx.Module, SupportsTreescope):
 
     value: Array = eqx.field(converter=atleast_1d_float_array, default=0.0)
     name: str | None = eqx.field(static=True, default=None)
-    lower: Array = eqx.field(converter=atleast_1d_float_array, default=-jnp.inf)
-    upper: Array = eqx.field(converter=atleast_1d_float_array, default=jnp.inf)
+    lower: Array | None = eqx.field(default=None)
+    upper: Array | None = eqx.field(default=None)
     prior: PDFLike | None = eqx.field(default=None)
     frozen: bool = eqx.field(static=True, default=False)
-
-    @property
-    def boundary_constraint(self) -> Array:
-        return jnp.where(
-            (self.value < self.lower) | (self.value > self.upper),
-            jnp.inf,
-            0,
-        )
+    transform: AbstractParameterTransformation | None = eqx.field(default=None)
 
     def scale(self, slope: ArrayLike = 1.0, offset: ArrayLike = 0.0) -> Modifier:
+        """
+        Applies a linear scaling effect to the parameter.
+
+        Args:
+            slope (ArrayLike, optional): The slope of the linear scaling. Defaults to 1.0.
+            offset (ArrayLike, optional): The offset of the linear scaling. Defaults to 0.0.
+
+        Returns:
+            Modifier: A Modifier instance with the linear scaling effect applied.
+        """
         from evermore.effect import Linear
         from evermore.modifier import Modifier
 
@@ -81,15 +93,45 @@ class Parameter(eqx.Module, SupportsTreescope):
 
 
 class NormalParameter(Parameter):
+    """
+    A specialized Parameter class with a Normal prior distribution.
+
+    This class extends the general Parameter class by setting a default Normal prior distribution.
+    It also provides additional methods for scaling and morphing the parameter.
+
+    Attributes:
+        prior (PDFLike | None): The prior distribution of the parameter, defaulting to a Normal distribution with mean 0.0 and width 1.0.
+    """
+
     prior: PDFLike | None = Normal(mean=0.0, width=1.0)
 
     def scale_log(self, up: ArrayLike, down: ArrayLike) -> Modifier:
+        """
+        Applies an asymmetric exponential scaling to the parameter.
+
+        Args:
+            up (ArrayLike): The scaling factor for the upward direction.
+            down (ArrayLike): The scaling factor for the downward direction.
+
+        Returns:
+            Modifier: A Modifier instance with the asymmetric exponential effect applied.
+        """
         from evermore.effect import AsymmetricExponential
         from evermore.modifier import Modifier
 
         return Modifier(parameter=self, effect=AsymmetricExponential(up=up, down=down))
 
     def morphing(self, up_template: Array, down_template: Array) -> Modifier:
+        """
+        Applies vertical template morphing to the parameter.
+
+        Args:
+            up_template (Array): The template for the upward shift.
+            down_template (Array): The template for the downward shift.
+
+        Returns:
+            Modifier: A Modifier instance with the vertical template morphing effect applied.
+        """
         from evermore.effect import VerticalTemplateMorphing
         from evermore.modifier import Modifier
 
@@ -102,17 +144,36 @@ class NormalParameter(Parameter):
 
 
 def is_parameter(leaf: Any) -> bool:
+    """
+    Checks if the given leaf is an instance of the Parameter class.
+
+    Args:
+        leaf (Any): The object to check.
+
+    Returns:
+        bool: True if the leaf is an instance of Parameter, False otherwise.
+    """
     return isinstance(leaf, Parameter)
 
 
-params_map = partial(filter_tree_map, filter=is_parameter)
+_params_map = partial(filter_tree_map, filter=is_parameter)
 
 
-def value_filter_spec(tree: PyTree) -> PyTree:
+_ParamsTree = TypeVar("_ParamsTree", bound=PyTree[Parameter])
+
+
+def value_filter_spec(tree: _ParamsTree) -> _ParamsTree:
     """
-    Used to split a PyTree of evm.Parameters into two PyTrees: one containing the values of the parameters
+    Splits a PyTree of `evm.Parameter` instances into two PyTrees: one containing the values of the parameters
     and the other containing the rest of the PyTree. This is useful for defining which components are to be optimized
     and which to keep fixed during optimization.
+
+    Args:
+        tree (_ParamsTree): A PyTree of `evm.Parameter` instances to be split.
+
+    Returns:
+        _ParamsTree: A PyTree with the same structure as the input, but with boolean values indicating
+        which parts of the tree are diffable (True) and which are static (False).
 
     Usage:
 
@@ -131,7 +192,7 @@ def value_filter_spec(tree: PyTree) -> PyTree:
         filter_spec = evm.parameter.value_filter_spec(params)
         diffable, static = eqx.partition(params, filter_spec)
 
-        # model's first argument is only the diffable part of the parameter Pytree!!
+        # model's first argument is only the diffable part of the parameter PyTree!!
         def model(diffable, static, hists) -> Array:
             # combine the diffable and static parts of the parameter PyTree
             parameters = eqx.combine(diffable, static)
@@ -151,9 +212,22 @@ def value_filter_spec(tree: PyTree) -> PyTree:
     return jax.tree.map(_replace_value, filter_spec, is_leaf=is_parameter)
 
 
-def partition(tree: PyTree) -> tuple[PyTree, PyTree]:
+def partition(tree: _ParamsTree) -> tuple[_ParamsTree, _ParamsTree]:
     """
-    Short hand for:
+    Partitions a PyTree of parameters into two separate PyTrees: one containing the diffable (optimizable) parts
+    and the other containing the static parts.
+
+    This function serves as a shorthand for manually creating a filter specification and then using `eqx.partition`
+    to split the parameters.
+
+    Args:
+        tree (_ParamsTree): A PyTree of parameters to be partitioned.
+
+    Returns:
+        tuple[_ParamsTree, _ParamsTree]: A tuple containing two PyTrees. The first PyTree contains the diffable parts
+        of the parameters, and the second PyTree contains the static parts.
+
+    Example:
 
     .. code-block:: python
 
@@ -169,12 +243,22 @@ def partition(tree: PyTree) -> tuple[PyTree, PyTree]:
     return eqx.partition(tree, filter_spec=value_filter_spec(tree))
 
 
-def sample(tree: PyTree, key: PRNGKeyArray) -> PyTree:
+def sample(tree: _ParamsTree, key: PRNGKeyArray) -> _ParamsTree:
     """
-    Sample from the individual prior (no correlations taken into account!) of the parameters in the PyTree.
-    See examples/toy_generation.py for an example.
+    Samples from the individual prior distributions of the parameters in the given PyTree.
+    Note that no correlations between parameters are taken into account during sampling.
+
+    Args:
+        tree (_ParamsTree): A PyTree of parameters from which to sample.
+        key (PRNGKeyArray): A JAX random key used for generating random samples.
+
+    Returns:
+        _ParamsTree: A new PyTree with the parameters sampled from their respective prior distributions.
+
+    Example:
+        See examples/toy_generation.py for an example usage.
     """
-    # partition the tree into parameters and the rest
+    # Partition the tree into parameters and the rest
     params_tree, rest_tree = eqx.partition(tree, is_parameter, is_leaf=is_parameter)
     params_structure = jax.tree.structure(params_tree)
     n_params = params_structure.num_leaves  # type: ignore[attr-defined]
@@ -187,10 +271,10 @@ def sample(tree: PyTree, key: PRNGKeyArray) -> PyTree:
             pdf = param.prior
             pdf = cast(PDFLike, pdf)
 
-            # sample new value from the prior pdf
+            # Sample new value from the prior pdf
             sampled_value = pdf.sample(key.value)
 
-            # TODO: make this compatible with externally provided Poisson PDFs
+            # TODO: Make this compatible with externally provided Poisson PDFs
             if isinstance(pdf, Poisson):
                 sampled_value = (sampled_value / pdf.lamb) - 1
         else:
@@ -209,15 +293,15 @@ def sample(tree: PyTree, key: PRNGKeyArray) -> PyTree:
                 maxval=param.upper,
             )
 
-        # replace the sampled parameter value and return new parameter
+        # Replace the sampled parameter value and return new parameter
         return eqx.tree_at(lambda p: p.value, param, sampled_value)
 
-    # sample for each parameter
+    # Sample for each parameter
     sampled_params_tree = jax.tree.map(
         _sample, params_tree, keys_tree, is_leaf=is_parameter
     )
 
-    # combine the sampled parameters with the rest of the model and return it
+    # Combine the sampled parameters with the rest of the model and return it
     return eqx.combine(sampled_params_tree, rest_tree, is_leaf=is_parameter)
 
 
@@ -226,6 +310,12 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
     Correlate parameters by sharing the value of the *first* given parameter.
 
     It is preferred to just use the same parameter if possible, this function should be used if that is not doable.
+
+    Args:
+        *parameters (Parameter): A variable number of Parameter instances to be correlated.
+
+    Returns:
+        tuple[Parameter, ...]: A tuple of correlated Parameter instances.
 
     Example:
 
@@ -299,3 +389,255 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
         _, p_corr = _correlate(p)
         correlated.append(p_corr)
     return tuple(correlated)
+
+
+def unwrap(params: _ParamsTree) -> _ParamsTree:
+    """
+    Unwraps the parameters in the given PyTree by applying their respective transformations.
+
+    This function traverses the PyTree of parameters and applies the `unwrap` method of each parameter's
+    transformation, if it exists. If a parameter does not have a transformation, it remains unchanged.
+
+    Args:
+        params (_ParamsTree): A PyTree of parameters to be unwrapped.
+
+    Returns:
+        _ParamsTree: A new PyTree with the parameters unwrapped.
+    """
+
+    def _unwrap(param: Parameter) -> Parameter:
+        if param.transform is None:
+            return param
+        return param.transform.unwrap(param)
+
+    return _params_map(_unwrap, params)
+
+
+def wrap(params: _ParamsTree) -> _ParamsTree:
+    """
+    Wraps the parameters in the given PyTree by applying their respective transformations.
+    This is the inverse operation of `unwrap`.
+
+    This function traverses the PyTree of parameters and applies the `wrap` method of each parameter's
+    transformation, if it exists. If a parameter does not have a transformation, it remains unchanged.
+
+    Args:
+        params (_ParamsTree): A PyTree of parameters to be wrapped.
+
+    Returns:
+        _ParamsTree: A new PyTree with the parameters wrapped.
+    """
+
+    def _wrap(param: Parameter) -> Parameter:
+        if param.transform is None:
+            return param
+        return param.transform.wrap(param)
+
+    return _params_map(_wrap, params)
+
+
+class AbstractParameterTransformation(eqx.Module):
+    """
+    Abstract base class for parameter transformations.
+
+    This class defines the interface for parameter transformations, which are used to map parameters
+    between different spaces (e.g., from constrained to unconstrained space). Subclasses must implement
+    the `unwrap` and `wrap` methods to define the specific transformation logic.
+
+    Methods:
+        unwrap(parameter: Parameter) -> Parameter:
+            Abstract method to transform a parameter from its original space to a transformed space.
+
+        wrap(parameter: Parameter) -> Parameter:
+            Abstract method to transform a parameter from its transformed space back to its original space.
+    """
+
+    @abc.abstractmethod
+    def unwrap(self, parameter: Parameter) -> Parameter:
+        """
+        Transform a parameter from its original space to a transformed space.
+
+        Args:
+            parameter (Parameter): The parameter to be transformed.
+
+        Returns:
+            Parameter: The transformed parameter.
+        """
+
+    @abc.abstractmethod
+    def wrap(self, parameter: Parameter) -> Parameter:
+        """
+        Transform a parameter from its transformed space back to its original space.
+
+        Args:
+            parameter (Parameter): The parameter to be transformed.
+
+        Returns:
+            Parameter: The parameter transformed back to its original space.
+        """
+
+
+class MinuitTransform(AbstractParameterTransformation):
+    """
+    Transform parameters based on Minuit's conventions. This transformation is used to map parameters with finite
+    lower and upper boundaries to an unconstrained space. Both lower and upper boundaries
+    are required and must be finite.
+
+    Reference:
+    https://root.cern.ch/download/minuit.pdf (Sec. 1.2.1 The transformation for parameters with limits.)
+
+    Example:
+
+        .. code-block:: python
+
+            import evermore as evm
+            import wadler_lindig as wl
+
+            pytree = {
+                "a": evm.Parameter(
+                    2.0, lower=-0.1, upper=2.2, transform=evm.parameter.MinuitTransform()
+                ),  # close to bound
+                "b": evm.Parameter(
+                    0.1, lower=0.0, upper=1.1, transform=evm.parameter.MinuitTransform()
+                ),  # close to bound
+            }
+
+            # unwrap (or "transform")
+            pytree_t = evm.parameter.unwrap(pytree)
+            # wrap back (or "inverse transform")
+            pytree_tt = evm.parameter.wrap(pytree_t)
+
+            wl.pprint(pytree, width=150, short_arrays=False)
+            # {
+            #   'a': Parameter(value=Array([2.], dtype=float32), lower=-0.1, upper=2.2, transform=MinuitTransform()),
+            #   'b': Parameter(value=Array([0.1], dtype=float32), lower=0.0, upper=1.1, transform=MinuitTransform())
+            # }
+
+            wl.pprint(pytree_t, width=150, short_arrays=False)
+            # {
+            #   'a': Parameter(value=Array([0.9721281], dtype=float32), lower=-0.1, upper=2.2, transform=MinuitTransform()),
+            #   'b': Parameter(value=Array([-0.95824164], dtype=float32), lower=0.0, upper=1.1, transform=MinuitTransform())
+            # }
+
+            wl.pprint(pytree_tt, width=150, short_arrays=False)
+            # {
+            #   'a': Parameter(value=Array([1.9999999], dtype=float32), lower=-0.1, upper=2.2, transform=MinuitTransform()),
+            #   'b': Parameter(value=Array([0.09999997], dtype=float32), lower=0.0, upper=1.1, transform=MinuitTransform())
+            # }
+    """
+
+    def _check(self, parameter: Parameter) -> Parameter:
+        if (parameter.lower is None and parameter.upper is not None) or (
+            parameter.lower is not None and parameter.upper is None
+        ):
+            msg = f"{parameter} must have both lower and upper boundaries set, or none of them."
+            raise ValueError(msg)
+        # check for finite boundaries
+        error_msg = f"Bounds of {parameter} must be finite, got {parameter.lower=}, {parameter.upper=}."
+        parameter = eqx.error_if(
+            parameter,
+            ~jnp.isfinite(parameter.lower),
+            error_msg,
+        )
+        return eqx.error_if(
+            parameter,
+            ~jnp.isfinite(parameter.upper),
+            error_msg,
+        )
+
+    def unwrap(self, parameter: Parameter) -> Parameter:
+        # short-cut
+        if parameter.lower is None and parameter.upper is None:
+            return parameter
+
+        # for unwrapping, we need to make sure the value is within the boundaries initially
+        error_msg = f"The value of {parameter} is exactly at or outside the boundaries [{parameter.lower}, {parameter.upper}]."
+        parameter = eqx.error_if(
+            parameter,
+            parameter.value <= parameter.lower,
+            error_msg,
+        )
+        parameter = eqx.error_if(
+            parameter,
+            parameter.value >= parameter.upper,
+            error_msg,
+        )
+
+        parameter = self._check(parameter)
+        # this formula turns user-provided "external" parameter values into "internal" values
+        value_t = jnp.arcsin(
+            2.0
+            * (parameter.value - parameter.lower)  # type: ignore[operator]
+            / (parameter.upper - parameter.lower)  # type: ignore[operator]
+            - 1.0
+        )
+        return eqx.tree_at(lambda p: p.value, parameter, value_t)
+
+    def wrap(self, parameter: Parameter) -> Parameter:
+        # short-cut
+        if parameter.lower is None and parameter.upper is None:
+            return parameter
+
+        parameter = self._check(parameter)
+        # this formula turns "internal" parameter values into "external" values
+        value_t = parameter.lower + (parameter.upper - parameter.lower) / 2 * (  # type: ignore[operator]
+            jnp.sin(parameter.value) + 1
+        )
+        return eqx.tree_at(lambda p: p.value, parameter, value_t)
+
+
+class SoftPlusTransform(AbstractParameterTransformation):
+    """
+    Applies the softplus transformation to parameters, projecting them from real space (R) to positive space (R+).
+    This transformation is useful for enforcing the positivity of parameters and does not require lower or upper boundaries.
+
+    Example:
+
+    .. code-block:: python
+
+        import evermore as evm
+        import wadler_lindig as wl
+
+        pytree = {
+            "a": evm.Parameter(-2.0, transform=evm.parameter.SoftPlusTransform()),
+            "b": evm.Parameter(0.1, transform=evm.parameter.SoftPlusTransform()),
+        }
+
+        # unwrap (or "transform")
+        pytree_t = evm.parameter.unwrap(pytree)
+        # wrap back (or "inverse transform")
+        pytree_tt = evm.parameter.wrap(pytree_t)
+
+        wl.pprint(pytree, width=150, short_arrays=False)
+        # {
+        #   'a': Parameter(value=Array([-2.], dtype=float32), transform=SoftPlusTransform()),
+        #   'b': Parameter(value=Array([0.1], dtype=float32), transform=SoftPlusTransform())
+        # }
+
+        wl.pprint(pytree_t, width=150, short_arrays=False)
+        # {
+        #   'a': Parameter(value=Array([0.126928], dtype=float32), transform=SoftPlusTransform()),
+        #   'b': Parameter(value=Array([0.7443967], dtype=float32), transform=SoftPlusTransform())
+        # }
+
+        wl.pprint(pytree_tt, width=150, short_arrays=False)
+        # {
+        #   'a': Parameter(value=Array([-2.0000002], dtype=float32), transform=SoftPlusTransform()),
+        #   'b': Parameter(value=Array([0.10000014], dtype=float32), transform=SoftPlusTransform())
+        # }
+    """
+
+    def unwrap(self, parameter: Parameter) -> Parameter:
+        value_t = jax.nn.softplus(parameter.value)
+        return eqx.tree_at(lambda p: p.value, parameter, value_t)
+
+    def wrap(self, parameter: Parameter) -> Parameter:
+        # from: https://github.com/danielward27/paramax/blob/main/paramax/utils.py
+        """The inverse of the softplus function, checking for positive inputs."""
+        parameter = eqx.error_if(
+            parameter,
+            parameter.value < 0,
+            "Expected positive inputs to inv_softplus.",
+        )
+        value_t = jnp.log(-jnp.expm1(-parameter.value)) + parameter.value
+        return eqx.tree_at(lambda p: p.value, parameter, value_t)
