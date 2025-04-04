@@ -57,7 +57,7 @@ def NLL(dynamic_params, static_params, hists, observation):
     ).sum()
 
     # second product of Eq. 1 (constraint)
-    constraints = evm.loss.get_log_probs(model)
+    constraints = evm.loss.get_log_probs(params)
     # for parameters with `.value.size > 1` (jnp.sum the constraints)
     constraints = jax.tree.map(jnp.sum, constraints)
     loss_val += evm.util.sum_over_leaves(constraints)
