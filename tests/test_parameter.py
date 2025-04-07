@@ -9,7 +9,6 @@ def test_Parameter():
     assert p.value == 1.0
     assert p.lower == 0.0
     assert p.upper == 2.0
-    assert p.boundary_constraint == 0.0
     assert p.prior is None
 
 
@@ -18,5 +17,4 @@ def test_NormalParameter():
     assert p.value == 1.0
     assert p.lower == 0.0
     assert p.upper == 2.0
-    assert p.boundary_constraint == 0.0
     assert isinstance(p.prior, Normal)

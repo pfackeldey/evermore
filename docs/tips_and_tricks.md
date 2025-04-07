@@ -63,6 +63,42 @@ with open("composition.html", "w") as f:
     f.write(contents)
 ```
 
+(parameter-transformations)=
+## Parameter Transformations
+
+evermore provides a set of parameter transformations that can be used to modify the parameter values.
+This can be useful for example to ensure that the parameter values are within a certain range or that they are always positive.
+evermore provides two predefined transformations: [`evm.parameter.MinuitTransform`](#evermore.parameter.MinuitTransform) (for bounded parameters) and [`evm.parameter.SoftPlusTransform`](#evermore.parameter.SoftPlusTransform) (for positive parameters).
+
+
+```{code-cell} ipython3
+import evermore as evm
+import wadler_lindig as wl
+
+
+enforce_positivity = evm.parameter.SoftPlusTransform()
+pytree = {
+    "a": evm.Parameter(2.0, transform=enforce_positivity),
+    "b": evm.Parameter(0.1, transform=enforce_positivity),
+}
+
+# unwrap (or "transform")
+pytree_t = evm.parameter.unwrap(pytree)
+# wrap back (or "inverse transform")
+pytree_tt = evm.parameter.wrap(pytree_t)
+
+wl.pprint(("Original", pytree), width=150, short_arrays=False)
+wl.pprint(("Transformed", pytree_t), width=150, short_arrays=False)
+wl.pprint(("Transformed back / Original", pytree_tt), width=150, short_arrays=False)
+```
+
+Transformations always transform into the unconstrained real space (using [`evm.parameter.unwrap`](#evermore.parameter.unwrap)) and back to the constrained space (using [`evm.parameter.wrap`](#evermore.parameter.wrap)).
+Typically, you would transform your parameters as a first step inside your loss (or model) function.
+Then, a minimizer can optimize the transformed parameters in the unconstrained space. Finally, you can transform them back to the constrained space for further processing.
+
+Custom transformations can be defined by subclassing [`evm.parameter.ParameterTransformation`](#evermore.parameter.ParameterTransformation) and implementing the [`wrap`](#evermore.parameter.ParameterTransformation.wrap) and [`unwrap`](#evermore.parameter.ParameterTransformation.unwrap) methods.
+
+
 ## Parameter Partitioning
 
 For optimization it is necessary to differentiate only against meaningful leaves of the PyTree of `evm.Parameters`.

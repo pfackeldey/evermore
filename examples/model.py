@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, PyTree
+from jaxtyping import Array
 
 import evermore as evm
 
@@ -12,9 +12,6 @@ class SPlusBModel(eqx.Module):
     norm1: evm.NormalParameter
     norm2: evm.NormalParameter
     shape1: evm.NormalParameter
-
-    def __init__(self, hist: PyTree, histw2: PyTree) -> None:
-        evm.util.dataclass_auto_init(self)
 
     def __call__(self, hists: dict) -> dict[str, Array]:
         expectations = {}
@@ -63,14 +60,12 @@ hists = {
     },
 }
 
-hist = hists["nominal"]
-histw2 = {
-    "signal": jnp.array([5]),
-    "bkg1": jnp.array([11]),
-    "bkg2": jnp.array([25]),
-}
-
-model = SPlusBModel(hist, histw2)
+model = SPlusBModel(
+    mu=evm.Parameter(value=0.0, lower=0.0, upper=10.0),
+    norm1=evm.NormalParameter(),
+    norm2=evm.NormalParameter(),
+    shape1=evm.NormalParameter(),
+)
 
 observation = jnp.array([37])
 expectations = model(hists)
