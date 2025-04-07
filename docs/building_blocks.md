@@ -33,10 +33,11 @@ parameter = evm.Parameter()
 parameter = evm.Parameter(
     value=1.0,          # default: 0.0
     name="my_param",    # default: None
-    lower=0.0,          # default: -jnp.inf
-    upper=10.0,         # default: +jnp.inf
+    lower=0.0,          # default: None
+    upper=10.0,         # default: None
     prior=None,         # default: None
     frozen=False,       # default: False
+    transform=None,     # default: None
 )
 ```
 
@@ -69,7 +70,8 @@ PDFs
 Parameter Boundaries
 
 :   The `lower` and `upper` attributes denote the valid bounds of a parameter.
-They can be used to e.g. transform a parameter to a constrained space or add penalty terms to the loss function.
+They can be used to e.g. enforce a parameter to only have values in a constrained space or add penalty terms to the loss function.
+More information can be found in <project:#parameter-transformations>.
 
 
 Freeze a Parameter

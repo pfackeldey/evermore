@@ -22,6 +22,7 @@ __all__ = [
     "MinuitTransform",
     "NormalParameter",
     "Parameter",
+    "ParameterTransformation",
     "SoftPlusTransform",
     "correlate",
     "is_parameter",
@@ -48,7 +49,7 @@ class Parameter(eqx.Module, SupportsTreescope):
         upper (Array | None): The upper boundary of the parameter.
         prior (PDFLike | None): The prior distribution of the parameter.
         frozen (bool): Indicates if the parameter is frozen during optimization.
-        transform (AbstractParameterTransformation | None): An optional transformation applied to the parameter.
+        transform (ParameterTransformation | None): An optional transformation applied to the parameter.
 
     Usage:
 
@@ -70,7 +71,7 @@ class Parameter(eqx.Module, SupportsTreescope):
     upper: Array | None = eqx.field(default=None)
     prior: PDFLike | None = eqx.field(default=None)
     frozen: bool = eqx.field(static=True, default=False)
-    transform: AbstractParameterTransformation | None = eqx.field(default=None)
+    transform: ParameterTransformation | None = eqx.field(default=None)
 
     def scale(self, slope: ArrayLike = 1.0, offset: ArrayLike = 0.0) -> Modifier:
         """
@@ -436,26 +437,19 @@ def wrap(params: _ParamsTree) -> _ParamsTree:
     return _params_map(_wrap, params)
 
 
-class AbstractParameterTransformation(eqx.Module):
+class ParameterTransformation(eqx.Module):
     """
     Abstract base class for parameter transformations.
 
     This class defines the interface for parameter transformations, which are used to map parameters
     between different spaces (e.g., from constrained to unconstrained space). Subclasses must implement
     the `unwrap` and `wrap` methods to define the specific transformation logic.
-
-    Methods:
-        unwrap(parameter: Parameter) -> Parameter:
-            Abstract method to transform a parameter from its original space to a transformed space.
-
-        wrap(parameter: Parameter) -> Parameter:
-            Abstract method to transform a parameter from its transformed space back to its original space.
     """
 
     @abc.abstractmethod
     def unwrap(self, parameter: Parameter) -> Parameter:
         """
-        Transform a parameter from its original space to a transformed space.
+        Transform a parameter from its meaningful (e.g. bounded) space to the real unconstrained space.
 
         Args:
             parameter (Parameter): The parameter to be transformed.
@@ -467,7 +461,7 @@ class AbstractParameterTransformation(eqx.Module):
     @abc.abstractmethod
     def wrap(self, parameter: Parameter) -> Parameter:
         """
-        Transform a parameter from its transformed space back to its original space.
+        Transform a parameter from the real unconstrained space back to its meaningful (e.g. bounded) space. (Inverse of `unwrap`)
 
         Args:
             parameter (Parameter): The parameter to be transformed.
@@ -477,11 +471,13 @@ class AbstractParameterTransformation(eqx.Module):
         """
 
 
-class MinuitTransform(AbstractParameterTransformation):
+class MinuitTransform(ParameterTransformation):
     """
     Transform parameters based on Minuit's conventions. This transformation is used to map parameters with finite
     lower and upper boundaries to an unconstrained space. Both lower and upper boundaries
     are required and must be finite.
+
+    Use `unwrap` to transform parameters into the unconstrained space and `wrap` to transform them back into the bounded space.
 
     Reference:
     https://root.cern.ch/download/minuit.pdf (Sec. 1.2.1 The transformation for parameters with limits.)
@@ -493,13 +489,11 @@ class MinuitTransform(AbstractParameterTransformation):
             import evermore as evm
             import wadler_lindig as wl
 
+
+            minuit_transform = evm.parameter.MinuitTransform()
             pytree = {
-                "a": evm.Parameter(
-                    2.0, lower=-0.1, upper=2.2, transform=evm.parameter.MinuitTransform()
-                ),  # close to bound
-                "b": evm.Parameter(
-                    0.1, lower=0.0, upper=1.1, transform=evm.parameter.MinuitTransform()
-                ),  # close to bound
+                "a": evm.Parameter(2.0, lower=-0.1, upper=2.2, transform=minuit_transform),
+                "b": evm.Parameter(0.1, lower=0.0, upper=1.1, transform=minuit_transform),
             }
 
             # unwrap (or "transform")
@@ -586,10 +580,12 @@ class MinuitTransform(AbstractParameterTransformation):
         return eqx.tree_at(lambda p: p.value, parameter, value_t)
 
 
-class SoftPlusTransform(AbstractParameterTransformation):
+class SoftPlusTransform(ParameterTransformation):
     """
     Applies the softplus transformation to parameters, projecting them from real space (R) to positive space (R+).
     This transformation is useful for enforcing the positivity of parameters and does not require lower or upper boundaries.
+
+    Use `unwrap` to transform parameters into the unconstrained real space and `wrap` to transform them back into the positive real space.
 
     Example:
 
@@ -598,9 +594,11 @@ class SoftPlusTransform(AbstractParameterTransformation):
         import evermore as evm
         import wadler_lindig as wl
 
+
+        enforce_positivity = evm.parameter.SoftPlusTransform()
         pytree = {
-            "a": evm.Parameter(-2.0, transform=evm.parameter.SoftPlusTransform()),
-            "b": evm.Parameter(0.1, transform=evm.parameter.SoftPlusTransform()),
+            "a": evm.Parameter(2.0, transform=enforce_positivity),
+            "b": evm.Parameter(0.1, transform=enforce_positivity),
         }
 
         # unwrap (or "transform")
@@ -610,28 +608,24 @@ class SoftPlusTransform(AbstractParameterTransformation):
 
         wl.pprint(pytree, width=150, short_arrays=False)
         # {
-        #   'a': Parameter(value=Array([-2.], dtype=float32), transform=SoftPlusTransform()),
+        #   'a': Parameter(value=Array([2.], dtype=float32), transform=SoftPlusTransform()),
         #   'b': Parameter(value=Array([0.1], dtype=float32), transform=SoftPlusTransform())
         # }
 
         wl.pprint(pytree_t, width=150, short_arrays=False)
         # {
-        #   'a': Parameter(value=Array([0.126928], dtype=float32), transform=SoftPlusTransform()),
-        #   'b': Parameter(value=Array([0.7443967], dtype=float32), transform=SoftPlusTransform())
+        #   'a': Parameter(value=Array([1.8545866], dtype=float32), transform=SoftPlusTransform()),
+        #   'b': Parameter(value=Array([-2.2521687], dtype=float32), transform=SoftPlusTransform())
         # }
 
         wl.pprint(pytree_tt, width=150, short_arrays=False)
         # {
-        #   'a': Parameter(value=Array([-2.0000002], dtype=float32), transform=SoftPlusTransform()),
-        #   'b': Parameter(value=Array([0.10000014], dtype=float32), transform=SoftPlusTransform())
+        #   'a': Parameter(value=Array([2.], dtype=float32), transform=SoftPlusTransform()),
+        #   'b': Parameter(value=Array([0.09999998], dtype=float32), transform=SoftPlusTransform())
         # }
     """
 
     def unwrap(self, parameter: Parameter) -> Parameter:
-        value_t = jax.nn.softplus(parameter.value)
-        return eqx.tree_at(lambda p: p.value, parameter, value_t)
-
-    def wrap(self, parameter: Parameter) -> Parameter:
         # from: https://github.com/danielward27/paramax/blob/main/paramax/utils.py
         """The inverse of the softplus function, checking for positive inputs."""
         parameter = eqx.error_if(
@@ -640,4 +634,8 @@ class SoftPlusTransform(AbstractParameterTransformation):
             "Expected positive inputs to inv_softplus.",
         )
         value_t = jnp.log(-jnp.expm1(-parameter.value)) + parameter.value
+        return eqx.tree_at(lambda p: p.value, parameter, value_t)
+
+    def wrap(self, parameter: Parameter) -> Parameter:
+        value_t = jax.nn.softplus(parameter.value)
         return eqx.tree_at(lambda p: p.value, parameter, value_t)
