@@ -49,7 +49,6 @@ class StatErrors(eqx.Module, SupportsTreescope):
         mod(hists["qcd"])
     """
 
-    gaussians_global: PyTree
     gaussians_per_process: PyTree
     poissons_per_process: PyTree
     hists: PyTree
