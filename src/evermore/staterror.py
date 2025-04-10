@@ -126,7 +126,5 @@ class StatErrors(eqx.Module, SupportsTreescope):
         #     apply per process gaussian(width=e_i/n_i)
         # else:
         #     apply per process poisson(lamb=n_i_eff)
-        per_process_mask = (
-            (jnp.sqrt(w2) > w) | (w <= 0)
-        )
+        per_process_mask = (jnp.sqrt(w2) > w) | (w <= 0)
         return Where(per_process_mask, gauss_mod, poisson_mod)
