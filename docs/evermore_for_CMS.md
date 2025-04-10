@@ -182,6 +182,12 @@ bin1 autoMCStats 10 [include-signal = 0] [hist-mode = 1]
 
 :::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
+Combine's feature to automatically treat the sum of per-process uncertainties in a bin as
+a single Gaussian uncertainty in case the approximate number of simulated events exceeds
+a certain threshold (e.g. 10) is not supported by evermore. It is considered a statistical
+approximation for the sake of computational efficiency. In evermore, it is encouraged to
+use the full, unaltered Barlow-Beeston method instead.
+
 ```{code-block} python
 from operator import itemgetter
 import jax.numpy as jnp
@@ -195,11 +201,9 @@ histsw2 = {"signal": jnp.array([12]), "bkg1": jnp.array([50]), "bkg2": jnp.array
 
 # Additional `Combine` options:
 # if `[hist-mode 2]`: <not available in evermore>
-# if `[include-signal 0]`:
-#     hists.pop("signal")
-#     histsw2.pop("signal")
+# if `[include-signal 0]`: <not required in evermore>
 
-staterrors = evm.staterror.StatErrors(hists, histsw2, threshold=10.0)
+staterrors = evm.staterror.StatErrors(hists, histsw2)
 
 # Create a modifier for the qcd process, `getter` is a function
 # that finds the corresponding parameter from `staterrors.params_per_process`

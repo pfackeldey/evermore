@@ -13,7 +13,6 @@ from evermore.effect import Identity
 from evermore.modifier import Modifier, Where
 from evermore.parameter import NormalParameter, Parameter
 from evermore.pdf import Poisson
-from evermore.util import sum_over_leaves
 from evermore.visualization import SupportsTreescope
 
 __all__ = [
@@ -41,9 +40,9 @@ class StatErrors(eqx.Module, SupportsTreescope):
         hists = {"qcd": jnp.array([10, 20, 30]), "signal": jnp.array([5, 10, 15])}
         histsw2 = {"qcd": jnp.array([12, 21, 29]), "signal": jnp.array([5, 8, 11])}
 
-        staterrors = evm.staterror.StatErrors(hists, histsw2, threshold=10.0)
+        staterrors = evm.staterror.StatErrors(hists, histsw2)
 
-        # Create a modifier for the qcd process, `where` is a function
+        # Create a modifier for the qcd process, `getter` is a function
         # that finds the corresponding parameter from `staterrors.params_per_process`
         mod = staterrors.modifier(getter=itemgetter("qcd"))
         # apply the modifier to the parameter
@@ -55,31 +54,15 @@ class StatErrors(eqx.Module, SupportsTreescope):
     poissons_per_process: PyTree
     hists: PyTree
     histsw2: PyTree
-    ntot: Array
-    etot: Array
-    threshold: float
-    mask: Array
 
-    def __init__(
-        self,
-        hists: PyTree,
-        histsw2: PyTree,
-        threshold: float = 10.0,
-    ) -> None:
+    def __init__(self, hists: PyTree, histsw2: PyTree) -> None:
         assert (
             jax.tree.structure(hists) == jax.tree.structure(histsw2)  # type: ignore[operator]
         ), "The PyTree structure of hists and histsw2 must be the same!"
         self.hists = hists
         self.histsw2 = histsw2
-        self.threshold = threshold
-
-        self.ntot = sum_over_leaves(self.hists)
-        self.etot = jnp.sqrt(sum_over_leaves(self.histsw2))
-        ntot_eff = self.ntot**2 / self.etot**2
-        self.mask = ntot_eff > self.threshold
 
         # setup params
-        self.gaussians_global = NormalParameter(value=jnp.zeros_like(self.ntot))
         self.gaussians_per_process = jax.tree.map(
             lambda hist: NormalParameter(value=jnp.zeros_like(hist)), self.hists
         )
@@ -104,6 +87,8 @@ class StatErrors(eqx.Module, SupportsTreescope):
     def modifier(self, getter: Callable) -> ModifierLike:
         # see: https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/pull/929
         # and: https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/latest/part2/bin-wise-stats/#usage-instructions
+        # however, note that the statistical simplification of treating the sum of poissons as a
+        # single gaussian per bin is not applied here, as the full treatment is encouraged
 
         # poisson case per process
         # if w > 0.0, then poisson, else Identity (no effect)
@@ -128,36 +113,18 @@ class StatErrors(eqx.Module, SupportsTreescope):
             mask, gauss_identity_mod, gauss_params.scale(slope=relerr, offset=1.0)
         )
 
-        # gaussian case global
-        gauss_global_mod = self.gaussians_global.scale(
-            slope=self.etot / self.ntot, offset=1.0
-        )
-
         # combine all, logic as here: https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/main/src/CMSHistErrorPropagator.cc#L320-L434
         #
         # legend:
-        # - n_tot_eff: effective number of events summed over all processes per bin, `n_tot_eff = n_tot^2 / e_tot^2`
-        # - e_tot: error summed over all processes per bin
-        # - n_tot: number of events summed over all processes per bin
-        # - n_i_eff: effective number of events for process i per bin, `n_i_eff = n_i^2 / e_i^2`
         # - e_i: error for process i per bin
         # - n_i: number of events for process i per bin
-        # - threshold: threshold for applying gaussian
+        # - n_i_eff: effective number of events for process i per bin, `n_i_eff = n_i^2 / e_i^2`
         #
         # pseudo-code:
         #
-        # if n_tot_eff > threshold:
-        #   apply global gaussian(width=e_tot/n_tot)
+        # if e_i > n_i or n_i <= 0.0:
+        #     apply per process gaussian(width=e_i/n_i)
         # else:
-        #   if n_i_eff > threshold or e_i > n_i or n_i <= 0.0:
-        #       apply per process gaussian(width=e_i/n_i)
-        #   else:
-        #       apply per process poisson(lamb=n_i_eff)
-        per_process_mask = (
-            ((w**2 / w2**2) > self.threshold) | (jnp.sqrt(w2) > w) | (w <= 0)
-        )
-        return Where(
-            self.mask,
-            gauss_global_mod,
-            Where(per_process_mask, gauss_mod, poisson_mod),
-        )
+        #     apply per process poisson(lamb=n_i_eff)
+        per_process_mask = (jnp.sqrt(w2) > w) | (w <= 0)
+        return Where(per_process_mask, gauss_mod, poisson_mod)
