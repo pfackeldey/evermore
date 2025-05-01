@@ -203,12 +203,12 @@ histsw2 = {"signal": jnp.array([12]), "bkg1": jnp.array([50]), "bkg2": jnp.array
 # if `[hist-mode 2]`: <not available in evermore>
 # if `[include-signal 0]`: <not required in evermore>
 
-staterrors = evm.staterror.StatErrors(hists, histsw2)
+staterrors = evm.staterror.StatErrors.from_hists_and_variances(hists, histsw2)
 
 # Create a modifier for the qcd process, `getter` is a function
 # that finds the corresponding parameter from `staterrors.params_per_process`
 getter = itemgetter("bkg1")
-mod = staterrors.modifier(getter=getter)
+mod = staterrors.modifier(getter=getter, hist=getter(hists))
 # apply the modifier
 mod(getter(hists))
 ```

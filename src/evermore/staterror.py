@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import cast
 
 import equinox as eqx
 import jax
@@ -40,90 +39,111 @@ class StatErrors(eqx.Module, SupportsTreescope):
         hists = {"qcd": jnp.array([10, 20, 30]), "signal": jnp.array([5, 10, 15])}
         histsw2 = {"qcd": jnp.array([12, 21, 29]), "signal": jnp.array([5, 8, 11])}
 
-        staterrors = evm.staterror.StatErrors(hists, histsw2)
+        staterrors = evm.staterror.StatErrors.from_hists_and_variances(hists, histsw2)
 
         # Create a modifier for the qcd process, `getter` is a function
-        # that finds the corresponding parameter from `staterrors.params_per_process`
-        mod = staterrors.modifier(getter=itemgetter("qcd"))
+        # that finds the corresponding parameter from for the Poissons and Gaussians
+        getter = itemgetter("qcd")
+        mod = staterrors.modifier(getter=getter, hist=getter(hists))
         # apply the modifier to the parameter
-        mod(hists["qcd"])
+        mod(getter(hists))
     """
 
     gaussians_per_process: PyTree
     poissons_per_process: PyTree
-    hists: PyTree
-    histsw2: PyTree
+    n_true_events: PyTree[Array]
 
-    def __init__(self, hists: PyTree, histsw2: PyTree) -> None:
+    @classmethod
+    def from_hists_and_variances(cls, hists: PyTree[Array], variances: PyTree[Array]):
         assert (
-            jax.tree.structure(hists) == jax.tree.structure(histsw2)  # type: ignore[operator]
-        ), "The PyTree structure of hists and histsw2 must be the same!"
-        self.hists = hists
-        self.histsw2 = histsw2
+            jax.tree.structure(hists) == jax.tree.structure(variances)  # type: ignore[operator]
+        ), "The PyTree structure of hists and variances must be the same!"
+        n_true_events = jax.tree.map(
+            lambda w, w2: jnp.where(w != 0.0, (w**2 / w2), 0.0),
+            hists,
+            variances,
+        )
+        return cls(n_true_events=n_true_events)
+
+    def __init__(self, n_true_events: PyTree[Array]) -> None:
+        self.n_true_events = n_true_events
 
         # setup params
         self.gaussians_per_process = jax.tree.map(
-            lambda hist: NormalParameter(value=jnp.zeros_like(hist)), self.hists
+            lambda n: NormalParameter(value=jnp.zeros_like(n)), self.n_true_events
         )
         self.poissons_per_process = jax.tree.map(
-            lambda w, w2: Parameter(
-                value=jnp.zeros_like(w),
-                prior=Poisson(
-                    lamb=cast(
-                        Array,
-                        jnp.where(
-                            (w**2 / jnp.sqrt(w2**2)) > 0.0,
-                            (w**2 / jnp.sqrt(w2**2)),
-                            1.0,
-                        ),
-                    )
-                ),
+            lambda n: Parameter(
+                value=jnp.zeros_like(n),
+                prior=Poisson(lamb=jnp.where(n != 0.0, n, 0.0)),
             ),
-            self.hists,
-            self.histsw2,
+            self.n_true_events,
         )
 
-    def modifier(self, getter: Callable) -> ModifierLike:
+    def modifier(
+        self,
+        getter: Callable,
+        hist: Array,
+    ) -> ModifierLike:
+        """
+        Creates a modifier for statistical errors (Barlow-Beeston parameters)
+        for a given process. This modifier applies either a Poisson or Gaussian
+        treatment to the statistical uncertainties based on the input histograms
+        and their associated uncertainties.
+
+        Args:
+            getter (Callable): A function to extract the relevant histogram
+                and variance for a specific process.
+            hist (Array): Histogram values for the process.
+
+        Returns:
+            ModifierLike: A modifier that applies the appropriate statistical
+            treatment (Poisson or Gaussian) based on the input data.
+        """
         # see: https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/pull/929
         # and: https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/latest/part2/bin-wise-stats/#usage-instructions
+        # and: https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/pull/929#issuecomment-2034000873
         # however, note that the statistical simplification of treating the sum of poissons as a
         # single gaussian per bin is not applied here, as the full treatment is encouraged
 
         # poisson case per process
-        # if w > 0.0, then poisson, else Identity (no effect)
-        # since w <= 0 leads to NaNs in derivatives, we need to mask them
-        w = getter(self.hists)
+        # if n != 0.0, then poisson, else Identity (no effect)
+        n = getter(self.n_true_events)
+        non_empty_mask = n != 0.0
         poisson_params = getter(self.poissons_per_process)
         poisson_identity_mod = Modifier(parameter=poisson_params, effect=Identity())
         poisson_mod = Where(
-            w > 0.0, poisson_params.scale(slope=1.0, offset=1.0), poisson_identity_mod
+            non_empty_mask,
+            poisson_params.scale(slope=1.0, offset=1.0),
+            poisson_identity_mod,
         )
 
         # gaussian case per process
-        # if w == 0.0, guard for division by zero
-        # gaussians with width 0 also lead to nans, so we need to guard this as well
-        w2 = getter(self.histsw2)
-        relerr = jnp.where(w == 0.0, 0.0, jnp.sqrt(w2) / jnp.where(w == 0.0, 1.0, w))
-        mask = relerr == 0.0
-        relerr = jnp.where(mask, relerr, 1.0)
+        eps = jnp.finfo(n.dtype).eps
+        relerr = jnp.where(
+            non_empty_mask,
+            1.0 / jnp.sqrt(n + jnp.where(non_empty_mask, 0.0, eps)),
+            1.0,
+        )
         gauss_params = getter(self.gaussians_per_process)
         gauss_identity_mod = Modifier(parameter=gauss_params, effect=Identity())
         gauss_mod = Where(
-            mask, gauss_identity_mod, gauss_params.scale(slope=relerr, offset=1.0)
+            non_empty_mask,
+            gauss_params.scale(slope=relerr, offset=1.0),
+            gauss_identity_mod,
         )
 
-        # combine all, logic as here: https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/main/src/CMSHistErrorPropagator.cc#L320-L434
+        # combine both, logic as here: https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/main/src/CMSHistErrorPropagator.cc#L320-L434
         #
         # legend:
-        # - e_i: error for process i per bin
         # - n_i: number of events for process i per bin
-        # - n_i_eff: effective number of events for process i per bin, `n_i_eff = n_i^2 / e_i^2`
+        # - n_i_true: true number of events for process i per bin, `n_i_true ~= n_i^2 / e_i^2`
         #
-        # pseudo-code:
+        # pseudo-code (per bin):
         #
-        # if e_i > n_i or n_i <= 0.0:
-        #     apply per process gaussian(width=e_i/n_i)
+        # if n_i_true < 1 or n_i <= 0.0:
+        #     apply per process gaussian(width=1/sqrt(n_i_true))
         # else:
-        #     apply per process poisson(lamb=n_i_eff)
-        per_process_mask = (jnp.sqrt(w2) > w) | (w <= 0)
-        return Where(per_process_mask, gauss_mod, poisson_mod)
+        #     apply per process poisson(lamb=n_i_true)
+        gauss_mask = (n < 1.0) | (hist <= 0.0)
+        return Where(gauss_mask, gauss_mod, poisson_mod)
