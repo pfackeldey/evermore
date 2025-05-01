@@ -14,24 +14,27 @@ class SPlusBModel(eqx.Module):
 
     def __init__(self, hists: dict[str, Array], histsw2: dict[str, Array]) -> None:
         # create the staterrors (barlow-beeston-lite with threshold=10.0)
-        self.staterrors = evm.staterror.StatErrors(
-            hists=hists, histsw2=histsw2, threshold=10.0
+        self.staterrors = evm.staterror.StatErrors.from_hists_and_variances(
+            hists=hists, variances=histsw2
         )
 
     def __call__(self, hists: dict) -> dict[str, Array]:
         expectations = {}
 
         # signal process
-        signal_mcstat_mod = self.staterrors.modifier(getter=lambda p: p["signal"])
-        expectations["signal"] = signal_mcstat_mod(hists["signal"])
+        getter = itemgetter("signal")
+        signal_mcstat_mod = self.staterrors.modifier(getter=getter, hist=getter(hists))
+        expectations["signal"] = signal_mcstat_mod(getter(hists))
 
         # bkg1 process
-        bkg1_mcstat_mod = self.staterrors.modifier(getter=lambda p: p["bkg1"])
-        expectations["bkg1"] = bkg1_mcstat_mod(hists["bkg1"])
+        getter = itemgetter("bkg1")
+        bkg1_mcstat_mod = self.staterrors.modifier(getter=getter, hist=getter(hists))
+        expectations["bkg1"] = bkg1_mcstat_mod(getter(hists))
 
         # bkg2 process
-        bkg2_mcstat_mod = self.staterrors.modifier(getter=lambda p: p["bkg2"])
-        expectations["bkg2"] = bkg2_mcstat_mod(hists["bkg2"])
+        getter = itemgetter("bkg2")
+        bkg2_mcstat_mod = self.staterrors.modifier(getter=getter, hist=getter(hists))
+        expectations["bkg2"] = bkg2_mcstat_mod(getter(hists))
 
         # return the modified expectations
         return expectations
@@ -53,14 +56,3 @@ model = SPlusBModel(hists, histsw2)
 
 # test the model
 expectations = model(hists)
-
-
-# scale the histsw2 e.g. after minimization with
-# the best fit values of the staterror modifiers.
-# This is needed to get the correct stat. uncertainties
-modified_histsw2 = {}
-
-
-for process, histw2 in histsw2.items():
-    mod = model.staterrors.modifier(getter=itemgetter(process))
-    modified_histsw2[process] = mod(histw2)
