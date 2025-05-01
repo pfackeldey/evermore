@@ -12,7 +12,6 @@ from jaxtyping import Array, PyTree
 
 __all__ = [
     "atleast_1d_float_array",
-    "dataclass_auto_init",
     "dump_hlo_graph",
     "dump_jaxpr",
     "filter_tree_map",
@@ -103,22 +102,6 @@ def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
         else:
             stacked_leaves.append(jnp.stack(leaves))
     return jax.tree.unflatten(treedef_list[0], stacked_leaves)
-
-
-def dataclass_auto_init(module: eqx.Module) -> eqx.Module:
-    import dataclasses
-    import typing
-
-    from evermore.parameter import NormalParameter, Parameter
-
-    type_hints = typing.get_type_hints(module.__class__)
-    for field in dataclasses.fields(module):
-        name = field.name
-        hint = type_hints[name]
-        # we only have reasonable defaults for `FreeFloating` and `NormalConstrained`
-        if issubclass(hint, Parameter | NormalParameter) and not hasattr(module, name):
-            setattr(module, name, hint())
-    return module
 
 
 def dump_jaxpr(fun: Callable, *args: Any, **kwargs: Any) -> str:
