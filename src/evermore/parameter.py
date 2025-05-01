@@ -104,7 +104,9 @@ class NormalParameter(Parameter):
         prior (PDFLike | None): The prior distribution of the parameter, defaulting to a Normal distribution with mean 0.0 and width 1.0.
     """
 
-    prior: PDFLike | None = Normal(mean=0.0, width=1.0)
+    prior: PDFLike | None = eqx.field(
+        default_factory=lambda: Normal(mean=0.0, width=1.0)
+    )
 
     def scale_log(self, up: ArrayLike, down: ArrayLike) -> Modifier:
         """
