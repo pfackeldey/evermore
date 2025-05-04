@@ -23,17 +23,17 @@ class SPlusBModel(eqx.Module):
 
         # signal process
         getter = itemgetter("signal")
-        signal_mcstat_mod = self.staterrors.modifier(getter=getter, hist=getter(hists))
+        signal_mcstat_mod = self.staterrors.modifier(getter=getter)
         expectations["signal"] = signal_mcstat_mod(getter(hists))
 
         # bkg1 process
         getter = itemgetter("bkg1")
-        bkg1_mcstat_mod = self.staterrors.modifier(getter=getter, hist=getter(hists))
+        bkg1_mcstat_mod = self.staterrors.modifier(getter=getter)
         expectations["bkg1"] = bkg1_mcstat_mod(getter(hists))
 
         # bkg2 process
         getter = itemgetter("bkg2")
-        bkg2_mcstat_mod = self.staterrors.modifier(getter=getter, hist=getter(hists))
+        bkg2_mcstat_mod = self.staterrors.modifier(getter=getter)
         expectations["bkg2"] = bkg2_mcstat_mod(getter(hists))
 
         # return the modified expectations
