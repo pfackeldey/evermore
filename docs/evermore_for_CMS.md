@@ -182,11 +182,12 @@ bin1 autoMCStats 10 [include-signal = 0] [hist-mode = 1]
 
 :::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
 
-Combine's feature to automatically treat the sum of per-process uncertainties in a bin as
-a single Gaussian uncertainty in case the approximate number of simulated events exceeds
-a certain threshold (e.g. 10) is not supported by evermore. It is considered a statistical
-approximation for the sake of computational efficiency. In evermore, it is encouraged to
-use the full, unaltered Barlow-Beeston method instead.
+Please note that evermore is treating statistical uncertainties through Gaussian
+rather than Poisson modifiers, comparable to the behavior of [pyhf](https://pyhf.readthedocs.io/en/latest/likelihood.html#mc-statistical-uncertainty-staterror).
+However, unlike pyhf, evermore allows to define a threshold on the number of true,
+simulated events per bin below which the statistical uncertainty is modelled per
+process. The threshold value is negative by default, meaning that the per-process
+treatment is always applied.
 
 ```{code-block} python
 from operator import itemgetter
@@ -200,15 +201,15 @@ hists = {"signal": jnp.array([12]), "bkg1": jnp.array([50]), "bkg2": jnp.array([
 histsw2 = {"signal": jnp.array([12]), "bkg1": jnp.array([50]), "bkg2": jnp.array([30])}
 
 # Additional `Combine` options:
-# if `[hist-mode 2]`: <not available in evermore>
-# if `[include-signal 0]`: <not required in evermore>
+# hist-mode: not available in evermore
+# include-signal: not available in evermore, use separate StatErrors objects instead
 
 staterrors = evm.staterror.StatErrors.from_hists_and_variances(hists, histsw2)
 
 # Create a modifier for the qcd process, `getter` is a function
 # that finds the corresponding parameter from `staterrors.params_per_process`
 getter = itemgetter("bkg1")
-mod = staterrors.modifier(getter=getter, hist=getter(hists))
+mod = staterrors.modifier(getter=getter)
 # apply the modifier
 mod(getter(hists))
 ```
