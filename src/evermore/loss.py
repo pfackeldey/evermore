@@ -3,7 +3,6 @@ from typing import cast
 import jax.numpy as jnp
 from jaxtyping import Array, PyTree
 
-from evermore import pdf
 from evermore.custom_types import PDFLike
 from evermore.parameter import Parameter, _params_map
 
@@ -21,10 +20,8 @@ def get_log_probs(module: PyTree) -> PyTree:
         prior = param.prior
         if isinstance(prior, PDFLike):
             prior = cast(PDFLike, prior)
-            if isinstance(prior, pdf.Poisson):
-                # expectation for Poisson pdf (x+1)*lambda
-                return prior.log_prob((param.value + 1) * prior.lamb)
-            return prior.log_prob(param.value)
+            x = prior.scale_std(param.value)
+            return prior.log_prob(x)
         return jnp.array([0.0])
 
     # constraints from pdfs
