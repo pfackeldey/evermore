@@ -10,8 +10,8 @@ from jaxtyping import Array, PyTree
 from evermore.custom_types import ModifierLike
 from evermore.effect import Identity
 from evermore.modifier import Modifier, Where
-from evermore.parameter import NormalParameter, Parameter
-from evermore.pdf import Poisson
+from evermore.parameter import NormalParameter
+from evermore.util import sum_over_leaves
 from evermore.visualization import SupportsTreescope
 
 __all__ = [
@@ -36,114 +36,115 @@ class StatErrors(eqx.Module, SupportsTreescope):
         import evermore as evm
 
 
+        # histograms with bin contents and variances
         hists = {"qcd": jnp.array([10, 20, 30]), "signal": jnp.array([5, 10, 15])}
         histsw2 = {"qcd": jnp.array([12, 21, 29]), "signal": jnp.array([5, 8, 11])}
 
-        staterrors = evm.staterror.StatErrors.from_hists_and_variances(hists, histsw2)
+        # threshold deciding above which number of true entries a global gaussian
+        # parameter is used per bin rather than per-histogram ones
+        # (negative values mean that per-histogram gaussians are always used)
+        threshold = -1.0
+
+        staterrors = evm.staterror.StatErrors.from_hists_and_variances(hists, histsw2, treshold)
 
         # Create a modifier for the qcd process, `getter` is a function
         # that finds the corresponding parameter from for the Poissons and Gaussians
         getter = itemgetter("qcd")
-        mod = staterrors.modifier(getter=getter, hist=getter(hists))
+        mod = staterrors.modifier(getter=getter)
         # apply the modifier to the parameter
         mod(getter(hists))
     """
 
-    gaussians_per_process: PyTree
-    poissons_per_process: PyTree
-    n_true_events: PyTree[Array]
+    n_entries: PyTree[Array]
+    gaussians_per_hist: PyTree
+    gaussians_global: PyTree
+    global_mask: Array
+    threshold: float
 
     @classmethod
-    def from_hists_and_variances(cls, hists: PyTree[Array], variances: PyTree[Array]):
+    def from_hists_and_variances(
+        cls,
+        hists: PyTree[Array],
+        variances: PyTree[Array],
+        threshold: float = -1.0,
+    ) -> StatErrors:
         assert (
             jax.tree.structure(hists) == jax.tree.structure(variances)  # type: ignore[operator]
         ), "The PyTree structure of hists and variances must be the same!"
-        n_true_events = jax.tree.map(
-            lambda w, w2: jnp.where(w != 0.0, (w**2 / w2), 0.0),
+        n_entries = jax.tree.map(
+            lambda w, w2: jnp.where(w2 != 0.0, (w**2 / (w2 + jnp.where(w2 != 0.0, 0.0, jnp.finfo(w2.dtype).eps))), 0.0),
             hists,
             variances,
         )
-        return cls(n_true_events=n_true_events)
+        return cls(n_entries=n_entries, threshold=threshold)
 
-    def __init__(self, n_true_events: PyTree[Array]) -> None:
-        self.n_true_events = n_true_events
+    def __init__(self, n_entries: PyTree[Array], threshold: float = -1.0) -> None:
+        self.n_entries = n_entries
+        self.threshold = threshold
 
-        # setup params
-        self.gaussians_per_process = jax.tree.map(
-            lambda n: NormalParameter(value=jnp.zeros_like(n)), self.n_true_events
-        )
-        self.poissons_per_process = jax.tree.map(
-            lambda n: Parameter(
-                value=jnp.zeros_like(n),
-                prior=Poisson(lamb=jnp.where(n != 0.0, n, 0.0)),
-            ),
-            self.n_true_events,
-        )
+        # setup gaussian per-hist params
+        self.gaussians_per_hist = jax.tree.map(lambda n: NormalParameter(value=jnp.zeros_like(n)), self.n_entries)
 
-    def modifier(
-        self,
-        getter: Callable,
-        hist: Array,
-    ) -> ModifierLike:
+        # setup gaussian global params
+        n_tot_entries = sum_over_leaves(self.n_entries)
+        global_zeros = jnp.zeros_like(n_tot_entries)
+        self.gaussians_global = NormalParameter(value=global_zeros)
+
+        # evaluate the mask for switching between per-hist and global params
+        self.global_mask = jnp.astype(global_zeros, jnp.bool) if threshold < 0.0 else n_tot_entries >= threshold
+
+    def modifier(self, getter: Callable) -> ModifierLike:
         """
         Creates a modifier for statistical errors (Barlow-Beeston parameters)
-        for a given process. This modifier applies either a Poisson or Gaussian
-        treatment to the statistical uncertainties based on the input histograms
-        and their associated uncertainties.
+        for a given histogram. This modifier applies a Gaussian treatment to the
+        statistical uncertainties based on the number of true entries. Depending
+        on the threshold, the modifier will apply either a global Gaussian per bin
+        or per-histogram Gaussians.
 
         Args:
             getter (Callable): A function to extract the relevant histogram
-                and variance for a specific process.
-            hist (Array): Histogram values for the process.
+                and variance for a specific hist.
 
         Returns:
             ModifierLike: A modifier that applies the appropriate statistical
-            treatment (Poisson or Gaussian) based on the input data.
+                Gaussian treatment based on the input data.
         """
         # see: https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/pull/929
         # and: https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/latest/part2/bin-wise-stats/#usage-instructions
         # and: https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/pull/929#issuecomment-2034000873
-        # however, note that the statistical simplification of treating the sum of poissons as a
-        # single gaussian per bin is not applied here, as the full treatment is encouraged
+        # however, note that the treatment is implemented as always being Gaussian below
 
-        # poisson case per process
-        # if n != 0.0, then poisson, else Identity (no effect)
-        n = getter(self.n_true_events)
-        non_empty_mask = n != 0.0
-        poisson_params = getter(self.poissons_per_process)
-        poisson_identity_mod = Modifier(parameter=poisson_params, effect=Identity())
-        poisson_mod = Where(
-            non_empty_mask,
-            poisson_params.scale(slope=1.0, offset=1.0),
-            poisson_identity_mod,
-        )
-
-        # gaussian case per process
+        # extract entries
+        n = getter(self.n_entries)
+        n_tot = sum_over_leaves(self.n_entries)
         eps = jnp.finfo(n.dtype).eps
-        relerr = jnp.where(
+
+        # gaussian per-hist case
+        non_empty_mask = n != 0.0
+        rel_err = jnp.where(
             non_empty_mask,
             1.0 / jnp.sqrt(n + jnp.where(non_empty_mask, 0.0, eps)),
             1.0,
         )
-        gauss_params = getter(self.gaussians_per_process)
-        gauss_identity_mod = Modifier(parameter=gauss_params, effect=Identity())
-        gauss_mod = Where(
+        gauss_hist_params = getter(self.gaussians_per_hist)
+        per_hist_mod = Where(
             non_empty_mask,
-            gauss_params.scale(slope=relerr, offset=1.0),
-            gauss_identity_mod,
+            gauss_hist_params.scale(slope=rel_err, offset=1.0),
+            Modifier(parameter=gauss_hist_params, effect=Identity()),
         )
 
-        # combine both, logic as here: https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/main/src/CMSHistErrorPropagator.cc#L320-L434
-        #
-        # legend:
-        # - n_i: number of events for process i per bin
-        # - n_i_true: true number of events for process i per bin, `n_i_true ~= n_i^2 / e_i^2`
-        #
-        # pseudo-code (per bin):
-        #
-        # if n_i_true < 1 or n_i <= 0.0:
-        #     apply per process gaussian(width=1/sqrt(n_i_true))
-        # else:
-        #     apply per process poisson(lamb=n_i_true)
-        gauss_mask = (n < 1.0) | (hist <= 0.0)
-        return Where(gauss_mask, gauss_mod, poisson_mod)
+        # gaussian global case
+        global_non_empty_mask = n_tot != 0.0
+        rel_err_tot = jnp.where(
+            global_non_empty_mask,
+            1.0 / jnp.sqrt(n_tot + jnp.where(global_non_empty_mask, 0.0, eps)),
+            1.0,
+        )
+        global_mod = Where(
+            global_non_empty_mask,
+            self.gaussians_global.scale(slope=rel_err_tot, offset=1.0),
+            Modifier(parameter=self.gaussians_global, effect=Identity()),
+        )
+
+        # combine both
+        return Where(self.global_mask, global_mod, per_hist_mod)
