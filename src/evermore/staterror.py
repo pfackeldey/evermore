@@ -72,7 +72,11 @@ class StatErrors(eqx.Module, SupportsTreescope):
             jax.tree.structure(hists) == jax.tree.structure(variances)  # type: ignore[operator]
         ), "The PyTree structure of hists and variances must be the same!"
         n_entries = jax.tree.map(
-            lambda w, w2: jnp.where(w2 != 0.0, (w**2 / (w2 + jnp.where(w2 != 0.0, 0.0, jnp.finfo(w2.dtype).eps))), 0.0),
+            lambda w, w2: jnp.where(
+                w2 != 0.0,
+                (w**2 / (w2 + jnp.where(w2 != 0.0, 0.0, jnp.finfo(w2.dtype).eps))),
+                0.0,
+            ),
             hists,
             variances,
         )
@@ -83,7 +87,9 @@ class StatErrors(eqx.Module, SupportsTreescope):
         self.threshold = threshold
 
         # setup gaussian per-hist params
-        self.gaussians_per_hist = jax.tree.map(lambda n: NormalParameter(value=jnp.zeros_like(n)), self.n_entries)
+        self.gaussians_per_hist = jax.tree.map(
+            lambda n: NormalParameter(value=jnp.zeros_like(n)), self.n_entries
+        )
 
         # setup gaussian global params
         n_tot_entries = sum_over_leaves(self.n_entries)
@@ -91,7 +97,11 @@ class StatErrors(eqx.Module, SupportsTreescope):
         self.gaussians_global = NormalParameter(value=global_zeros)
 
         # evaluate the mask for switching between per-hist and global params
-        self.global_mask = jnp.astype(global_zeros, jnp.bool) if threshold < 0.0 else n_tot_entries >= threshold
+        self.global_mask = (
+            jnp.astype(global_zeros, jnp.bool)
+            if threshold < 0.0
+            else n_tot_entries >= threshold
+        )
 
     def modifier(self, getter: Callable) -> ModifierLike:
         """
