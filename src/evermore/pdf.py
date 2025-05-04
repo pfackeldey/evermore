@@ -5,7 +5,7 @@ from abc import abstractmethod
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jax.scipy.special import gammaln, xlogy, digamma
+from jax.scipy.special import digamma, gammaln, xlogy
 from jaxtyping import Array, PRNGKeyArray
 
 from evermore.util import atleast_1d_float_array
@@ -52,7 +52,9 @@ class Normal(PDF):
 class Poisson(PDF):
     lamb: Array = eqx.field(converter=atleast_1d_float_array)
 
-    def log_prob(self, x: Array, normalize: bool = True, shift_mode: bool = False) -> Array:
+    def log_prob(
+        self, x: Array, normalize: bool = True, shift_mode: bool = False
+    ) -> Array:
         # optionally adjust lambda to a higer value such that the new mode is the current lambda
         lamb = jnp.exp(digamma(self.lamb + 1)) if shift_mode else self.lamb
 
