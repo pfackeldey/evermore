@@ -27,6 +27,9 @@ class PDF(eqx.Module, SupportsTreescope):
     def log_prob(self, x: Array) -> Array: ...
 
     @abstractmethod
+    def scale_std(self, value: Array) -> Array: ...
+
+    @abstractmethod
     def sample(self, key: PRNGKeyArray) -> Array: ...
 
     def prob(self, x: Array) -> Array:
@@ -44,9 +47,13 @@ class Normal(PDF):
         unnormalized = jax.scipy.stats.norm.logpdf(x, loc=self.mean, scale=self.width)
         return unnormalized - logpdf_max
 
+    def scale_std(self, value: Array) -> Array:
+        # normal scaling via mean and width
+        return self.mean + self.width * value
+
     def sample(self, key: PRNGKeyArray) -> Array:
         # sample parameter from pdf
-        return self.mean + self.width * jax.random.normal(key)
+        return self.scale_std(jax.random.normal(key))
 
 
 class Poisson(PDF):
@@ -62,6 +69,10 @@ class Poisson(PDF):
             logpdf_max = _continous_poisson_log_prob(x, x)
             return unnormalized - logpdf_max
         return unnormalized
+
+    def scale_std(self, value: Array) -> Array:
+        err = f"{self.__class__.__name__} does not support scale_std"
+        raise Exception(err)
 
     def sample(self, key: PRNGKeyArray) -> Array:
         # this samples only integers, do we want that?
