@@ -45,7 +45,9 @@ class StatErrors(eqx.Module, SupportsTreescope):
         # (negative values mean that per-histogram gaussians are always used)
         threshold = -1.0
 
-        staterrors = evm.staterror.StatErrors.from_hists_and_variances(hists, histsw2, threshold)
+        staterrors = evm.staterror.StatErrors.from_hists_and_variances(
+            hists, histsw2, threshold
+        )
 
         # Create a modifier for the qcd process, `getter` is a function
         # that finds the corresponding parameter from for the Poissons and Gaussians
