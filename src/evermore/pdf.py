@@ -55,7 +55,7 @@ class Poisson(PDF):
     def log_prob(
         self, x: Array, normalize: bool = True, shift_mode: bool = False
     ) -> Array:
-        # optionally adjust lambda to a higer value such that the new mode is the current lambda
+        # optionally adjust lambda to a higher value such that the new mode is the current lambda
         lamb = jnp.exp(digamma(self.lamb + 1)) if shift_mode else self.lamb
 
         def _continous_poisson_log_prob(x, lamb):
