@@ -19,13 +19,13 @@ def __dir__():
     return __all__
 
 
-def sample_uncorrelated(tree: _ParamsTree, key: PRNGKeyArray) -> _ParamsTree:
+def sample_uncorrelated(params: _ParamsTree, key: PRNGKeyArray) -> _ParamsTree:
     """
     Samples from the individual prior distributions of the parameters in the given PyTree.
     Note that no correlations between parameters are taken into account during sampling.
 
     Args:
-        tree (_ParamsTree): A PyTree of parameters from which to sample.
+        params (_ParamsTree): A PyTree of parameters from which to sample.
         key (PRNGKeyArray): A JAX random key used for generating random samples.
 
     Returns:
@@ -35,7 +35,7 @@ def sample_uncorrelated(tree: _ParamsTree, key: PRNGKeyArray) -> _ParamsTree:
         See examples/toy_generation.py for an example usage.
     """
     # Partition the tree into parameters and the rest
-    params_tree, rest_tree = eqx.partition(tree, is_parameter, is_leaf=is_parameter)
+    params_tree, rest_tree = eqx.partition(params, is_parameter, is_leaf=is_parameter)
     params_structure = jax.tree.structure(params_tree)
     n_params = params_structure.num_leaves  # type: ignore[attr-defined]
 
