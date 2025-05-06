@@ -1,4 +1,4 @@
-# evermore.pdf
+# PDFs
 
 ```{eval-rst}
 .. automodule:: evermore.pdf

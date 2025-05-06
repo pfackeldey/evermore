@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from abc import abstractmethod
+import abc
+from typing import Protocol, runtime_checkable
 
 import equinox as eqx
 import jax
@@ -23,14 +24,24 @@ def __dir__():
     return __all__
 
 
+@runtime_checkable
+class PDFLike(Protocol):
+    """Mirrors the (relevant) interface of `tfp.distributions.Distribution` & `distrax.Distribution`."""
+
+    def log_prob(self, x: Array) -> Array: ...
+    def scale_std(self, value: Array) -> Array: ...
+    def sample(self, key: PRNGKeyArray) -> Array: ...
+    def prob(self, x: Array) -> Array: ...
+
+
 class PDF(eqx.Module, SupportsTreescope):
-    @abstractmethod
+    @abc.abstractmethod
     def log_prob(self, x: Array) -> Array: ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def scale_std(self, value: Array) -> Array: ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array: ...
 
     def prob(self, x: Array, **kwargs) -> Array:

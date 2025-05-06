@@ -68,7 +68,7 @@ with open("composition.html", "w") as f:
 
 evermore provides a set of parameter transformations that can be used to modify the parameter values.
 This can be useful for example to ensure that the parameter values are within a certain range or that they are always positive.
-evermore provides two predefined transformations: [`evm.parameter.MinuitTransform`](#evermore.parameter.MinuitTransform) (for bounded parameters) and [`evm.parameter.SoftPlusTransform`](#evermore.parameter.SoftPlusTransform) (for positive parameters).
+evermore provides two predefined transformations: [`evm.transform.MinuitTransform`](#evermore.parameters.transform.MinuitTransform) (for bounded parameters) and [`evm.transform.SoftPlusTransform`](#evermore.parameters.transform.SoftPlusTransform) (for positive parameters).
 
 
 ```{code-cell} ipython3
@@ -76,27 +76,27 @@ import evermore as evm
 import wadler_lindig as wl
 
 
-enforce_positivity = evm.parameter.SoftPlusTransform()
+enforce_positivity = evm.transform.SoftPlusTransform()
 pytree = {
     "a": evm.Parameter(2.0, transform=enforce_positivity),
     "b": evm.Parameter(0.1, transform=enforce_positivity),
 }
 
 # unwrap (or "transform")
-pytree_t = evm.parameter.unwrap(pytree)
+pytree_t = evm.transform.unwrap(pytree)
 # wrap back (or "inverse transform")
-pytree_tt = evm.parameter.wrap(pytree_t)
+pytree_tt = evm.transform.wrap(pytree_t)
 
 wl.pprint(("Original", pytree), width=150, short_arrays=False)
 wl.pprint(("Transformed", pytree_t), width=150, short_arrays=False)
 wl.pprint(("Transformed back / Original", pytree_tt), width=150, short_arrays=False)
 ```
 
-Transformations always transform into the unconstrained real space (using [`evm.parameter.unwrap`](#evermore.parameter.unwrap)) and back to the constrained space (using [`evm.parameter.wrap`](#evermore.parameter.wrap)).
+Transformations always transform into the unconstrained real space (using [`evm.transform.unwrap`](#evermore.parameters.transform.unwrap)) and back to the constrained space (using [`evm.transform.wrap`](#evermore.parameters.transform.wrap)).
 Typically, you would transform your parameters as a first step inside your loss (or model) function.
 Then, a minimizer can optimize the transformed parameters in the unconstrained space. Finally, you can transform them back to the constrained space for further processing.
 
-Custom transformations can be defined by subclassing [`evm.parameter.ParameterTransformation`](#evermore.parameter.ParameterTransformation) and implementing the [`wrap`](#evermore.parameter.ParameterTransformation.wrap) and [`unwrap`](#evermore.parameter.ParameterTransformation.unwrap) methods.
+Custom transformations can be defined by subclassing [`evm.transform.ParameterTransformation`](#evermore.parameters.transform.ParameterTransformation) and implementing the [`wrap`](#evermore.parameters.transform.ParameterTransformation.wrap) and [`unwrap`](#evermore.parameters.transform.ParameterTransformation.unwrap) methods.
 
 
 ## Parameter Partitioning
@@ -154,7 +154,7 @@ params = {"a": evm.NormalParameter(), "b": evm.NormalParameter()}
 rng_key = jax.random.key(0)
 rng_keys = jax.random.split(rng_key, 100)
 
-vec_sample = jax.vmap(evm.parameter.sample, in_axes=(None, 0))
+vec_sample = jax.vmap(evm.sample.sample_uncorrelated, in_axes=(None, 0))
 
 with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
     tree = vec_sample(params, rng_keys)

@@ -1,4 +1,4 @@
-# evermore.util
+# Utilities
 
 ```{eval-rst}
 .. automodule:: evermore.util
