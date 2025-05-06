@@ -5,6 +5,7 @@ from abc import abstractmethod
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+from jax._src.random import Shape
 from jax.scipy.special import digamma, gammaln, xlogy
 from jaxtyping import Array, PRNGKeyArray
 
@@ -30,7 +31,7 @@ class PDF(eqx.Module, SupportsTreescope):
     def scale_std(self, value: Array) -> Array: ...
 
     @abstractmethod
-    def sample(self, key: PRNGKeyArray) -> Array: ...
+    def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array: ...
 
     def prob(self, x: Array, **kwargs) -> Array:
         return jnp.exp(self.log_prob(x, **kwargs))
@@ -51,9 +52,12 @@ class Normal(PDF):
         # normal scaling via mean and width
         return self.mean + self.width * value
 
-    def sample(self, key: PRNGKeyArray) -> Array:
+    def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array:
+        # jax.random.normal does not accept None shape
+        if shape is None:
+            shape = ()
         # sample parameter from pdf
-        return self.scale_std(jax.random.normal(key))
+        return self.scale_std(jax.random.normal(key, shape=shape))
 
 
 class Poisson(PDF):
@@ -82,6 +86,9 @@ class Poisson(PDF):
         err = f"{self.__class__.__name__} does not support scale_std"
         raise Exception(err)
 
-    def sample(self, key: PRNGKeyArray) -> Array:
+    def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array:
+        # jax.random.poisson does not accept empty tuple shape
+        if shape == ():
+            shape = None
         # this samples only integers, do we want that?
-        return jax.random.poisson(key, self.lamb)
+        return jax.random.poisson(key, self.lamb, shape=shape)
