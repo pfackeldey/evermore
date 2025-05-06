@@ -5,8 +5,8 @@ from abc import abstractmethod
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jax.scipy.special import digamma, gammaln, xlogy
 from jax._src.random import Shape
+from jax.scipy.special import digamma, gammaln, xlogy
 from jaxtyping import Array, PRNGKeyArray
 
 from evermore.util import atleast_1d_float_array
