@@ -71,7 +71,7 @@ instance/
 # Sphinx documentation
 docs/_build/
 docs/composition.html
-docs/jupyter-execute
+docs/jupyter_execute
 
 # PyBuilder
 .pybuilder/

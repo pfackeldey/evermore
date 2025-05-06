@@ -27,6 +27,7 @@ __all__ = [
     "modifier",
     "parameter",
     "pdf",
+    "sample",
     "staterror",
     "transform",
     "util",
@@ -52,6 +53,7 @@ from evermore.binned import (  # noqa: E402
 from evermore.binned.modifier import Modifier  # noqa: E402
 from evermore.parameters import (  # noqa: E402
     parameter,
+    sample,
     transform,
 )
 from evermore.parameters.parameter import (  # noqa: E402
