@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import abc
 from collections.abc import Callable
 from typing import Literal
@@ -7,8 +9,7 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, PyTree
 
-from evermore.custom_types import OffsetAndScale
-from evermore.parameter import Parameter
+from evermore.parameters.parameter import Parameter
 from evermore.util import atleast_1d_float_array
 from evermore.visualization import SupportsTreescope
 
@@ -23,6 +24,18 @@ __all__ = [
 
 def __dir__():
     return __all__
+
+
+class OffsetAndScale(eqx.Module):
+    offset: Array = eqx.field(converter=atleast_1d_float_array, default=0.0)
+    scale: Array = eqx.field(converter=atleast_1d_float_array, default=1.0)
+
+    def broadcast(self) -> OffsetAndScale:
+        shape = jnp.broadcast_shapes(self.offset.shape, self.scale.shape)
+        return type(self)(
+            offset=jnp.broadcast_to(self.offset, shape),
+            scale=jnp.broadcast_to(self.scale, shape),
+        )
 
 
 class Effect(eqx.Module, SupportsTreescope):

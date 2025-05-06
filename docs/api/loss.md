@@ -1,4 +1,4 @@
-# evermore.loss
+# Loss
 
 ```{eval-rst}
 .. automodule:: evermore.loss

@@ -1,7 +1,7 @@
-# evermore.parameter
+# Parameters
 
 ```{eval-rst}
-.. automodule:: evermore.parameter
+.. automodule:: evermore.parameters.parameter
     :show-inheritance:
     :members:
 ```

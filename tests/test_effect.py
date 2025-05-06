@@ -3,11 +3,11 @@ from __future__ import annotations
 import jax.numpy as jnp
 
 from evermore import Parameter
-from evermore.custom_types import OffsetAndScale
-from evermore.effect import (
+from evermore.binned.effect import (
     AsymmetricExponential,
     Identity,
     Linear,
+    OffsetAndScale,
     VerticalTemplateMorphing,
 )
 

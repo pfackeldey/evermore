@@ -1,7 +1,7 @@
-# evermore.modifier
+# evermore.binned.modifier
 
 ```{eval-rst}
-.. automodule:: evermore.modifier
+.. automodule:: evermore.binned.modifier
     :show-inheritance:
     :members:
 ```

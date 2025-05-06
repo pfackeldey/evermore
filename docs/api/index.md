@@ -1,10 +1,11 @@
 # API Reference
 
 ```{toctree}
-effect.md
-loss.md
-modifier.md
 parameter.md
+transform.md
+effect.md
+modifier.md
+loss.md
 pdf.md
 util.md
 ```

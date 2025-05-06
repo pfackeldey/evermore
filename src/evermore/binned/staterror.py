@@ -7,10 +7,9 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, PyTree
 
-from evermore.custom_types import ModifierLike
-from evermore.effect import Identity
-from evermore.modifier import Modifier, Where
-from evermore.parameter import NormalParameter
+from evermore.binned.effect import Identity
+from evermore.binned.modifier import Modifier, ModifierLike, Where
+from evermore.parameters.parameter import NormalParameter
 from evermore.util import sum_over_leaves
 from evermore.visualization import SupportsTreescope
 

@@ -5,7 +5,7 @@ evermore: Differentiable (binned) likelihoods in JAX.
 from __future__ import annotations
 
 __author__ = "Peter Fackeldey"
-__email__ = "peter.fackeldey@rwth-aachen.de"
+__email__ = "peter.fackeldey@princeton.edu"
 __copyright__ = "Copyright 2023, Peter Fackeldey"
 __credits__ = ["Peter Fackeldey"]
 __contact__ = "https://github.com/pfackeldey/evermore"
@@ -28,6 +28,7 @@ __all__ = [
     "parameter",
     "pdf",
     "staterror",
+    "transform",
     "util",
     "visualization",
 ]
@@ -38,17 +39,22 @@ def __dir__():
 
 
 from evermore import (  # noqa: E402
-    effect,
     loss,
-    modifier,
-    parameter,
     pdf,
-    staterror,
     util,
     visualization,
 )
-from evermore.modifier import Modifier  # noqa: E402
-from evermore.parameter import (  # noqa: E402,
+from evermore.binned import (  # noqa: E402
+    effect,
+    modifier,
+    staterror,
+)
+from evermore.binned.modifier import Modifier  # noqa: E402
+from evermore.parameters import (  # noqa: E402
+    parameter,
+    transform,
+)
+from evermore.parameters.parameter import (  # noqa: E402
     NormalParameter,
     Parameter,
 )

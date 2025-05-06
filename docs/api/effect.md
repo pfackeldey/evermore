@@ -1,7 +1,7 @@
-# evermore.effect
+# Effects
 
 ```{eval-rst}
-.. automodule:: evermore.effect
+.. automodule:: evermore.binned.effect
     :show-inheritance:
     :members:
 ```

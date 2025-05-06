@@ -3,21 +3,20 @@ from __future__ import annotations
 import abc
 from collections.abc import Callable
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike, PyTree
 
-from evermore.custom_types import ModifierLike, OffsetAndScale
-from evermore.effect import DEFAULT_EFFECT
-from evermore.parameter import Parameter
+from evermore.binned.effect import DEFAULT_EFFECT, OffsetAndScale
+from evermore.parameters.parameter import Parameter
 from evermore.util import tree_stack
 from evermore.visualization import SupportsTreescope
 
 if TYPE_CHECKING:
-    from evermore.effect import Effect
+    from evermore.binned.effect import Effect
 
 __all__ = [
     "BooleanMask",
@@ -35,6 +34,13 @@ def __dir__():
     return __all__
 
 
+@runtime_checkable
+class ModifierLike(Protocol):
+    def offset_and_scale(self, hist: Array) -> OffsetAndScale: ...
+    def __call__(self, hist: Array) -> Array: ...
+    def __matmul__(self, other: ModifierLike) -> Compose: ...
+
+
 class AbstractModifier(eqx.Module):
     @abc.abstractmethod
     def offset_and_scale(self: ModifierLike, hist: Array) -> OffsetAndScale: ...
@@ -46,19 +52,19 @@ class AbstractModifier(eqx.Module):
     def __matmul__(self: ModifierLike, other: ModifierLike) -> Compose: ...
 
 
-class ApplyFn(eqx.Module):
+class ApplyFn(AbstractModifier):
     @jax.named_scope("evm.modifier.ApplyFn")
     def __call__(self: ModifierLike, hist: Array) -> Array:
         os = self.offset_and_scale(hist=hist)
         return os.scale * (hist + os.offset)
 
 
-class MatMulCompose(eqx.Module):
+class MatMulCompose(AbstractModifier):
     def __matmul__(self: ModifierLike, other: ModifierLike) -> Compose:
         return Compose(self, other)
 
 
-class ModifierBase(ApplyFn, MatMulCompose, AbstractModifier, SupportsTreescope):
+class ModifierBase(ApplyFn, MatMulCompose, SupportsTreescope):
     """
     This serves as a base class for all modifiers.
     It automatically implements the __call__ method to apply the scale factors to the hist array
