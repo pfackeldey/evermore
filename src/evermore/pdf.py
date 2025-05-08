@@ -38,9 +38,6 @@ class PDF(eqx.Module, SupportsTreescope):
     @abc.abstractmethod
     def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array: ...
 
-    def translate_from_unit_normal(self, x: Array) -> Array:
-        raise NotImplementedError()
-
     def prob(self, x: Array, **kwargs) -> Array:
         return jnp.exp(self.log_prob(x, **kwargs))
 
@@ -62,7 +59,7 @@ class Normal(PDF):
     def inv_cdf(self, x: Array) -> Array:
         return jax.scipy.stats.norm.ppf(x, loc=self.mean, scale=self.width)
 
-    def translate_from_unit_normal(self, x: Array) -> Array:
+    def __evermore_from_unit_normal__(self, x: Array) -> Array:
         return self.mean + self.width * x
 
     def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array:
@@ -70,7 +67,7 @@ class Normal(PDF):
         if shape is None:
             shape = ()
         # sample parameter from pdf
-        return self.translate_from_unit_normal(jax.random.normal(key, shape=shape))
+        return self.__evermore_from_unit_normal__(jax.random.normal(key, shape=shape))
 
 
 class PoissonBase(PDF):

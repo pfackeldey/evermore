@@ -47,10 +47,11 @@ def get_log_probs(params: PyTree) -> PyTree:
         #
         # Some priors, such as other Normals, can do a shortcut to save compute:
         # e.g. for Normal: x = mean + width * v
+        # these shortcuts are implemented by '__evermore_from_unit_normal__'
         #
         # (in the following: x=x and v=param.value)
-        if hasattr(prior, "translate_from_unit_normal"):
-            x = prior.translate_from_unit_normal(param.value)
+        if hasattr(prior, "__evermore_from_unit_normal__"):
+            x = prior.__evermore_from_unit_normal__(param.value)
         else:
             # this is a general implementation to translate from a unit normal to any target PDF
             # the only requirement is that the target pdf implements `.inv_cdf`.
