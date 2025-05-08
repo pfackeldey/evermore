@@ -81,11 +81,11 @@ class PoissonDiscrete(PoissonBase):
     def log_prob(self, x: Array, normalize: bool = True) -> Array:
         x = jnp.floor(x)
 
-        unnormalized = jax.scipy.stats.poisson.pmf(x, self.lamb)
+        unnormalized = jax.scipy.stats.poisson.logpmf(x, self.lamb)
         if not normalize:
             return unnormalized
 
-        logpdf_max = jax.scipy.stats.poisson.pmf(x, x)
+        logpdf_max = jax.scipy.stats.poisson.logpmf(x, x)
         return unnormalized - logpdf_max
 
     def param_to_pdf(self, value: Array) -> Array:

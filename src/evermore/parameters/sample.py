@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import cast
-
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -45,7 +43,6 @@ def sample_uncorrelated(params: _ParamsTree, key: PRNGKeyArray) -> _ParamsTree:
     def _sample(param: Parameter, key: Parameter) -> Array:
         if isinstance(param.prior, PDF):
             pdf = param.prior
-            pdf = cast(PDF, pdf)
 
             # Sample new value from the prior pdf
             sampled_value = pdf.sample(key.value)
