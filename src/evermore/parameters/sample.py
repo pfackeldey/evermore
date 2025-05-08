@@ -8,7 +8,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, PRNGKeyArray
 
 from evermore.parameters.parameter import Parameter, _ParamsTree, is_parameter
-from evermore.pdf import PDFLike, Poisson
+from evermore.pdf import PDFLike, PoissonBase
 
 __all__ = [
     "sample_uncorrelated",
@@ -51,7 +51,7 @@ def sample_uncorrelated(params: _ParamsTree, key: PRNGKeyArray) -> _ParamsTree:
             sampled_value = pdf.sample(key.value)
 
             # TODO: Make this compatible with externally provided Poisson PDFs
-            if isinstance(pdf, Poisson):
+            if isinstance(pdf, PoissonBase):
                 sampled_value = (sampled_value / pdf.lamb) - 1
         else:
             assert param.prior is None, f"Unknown prior type: {param.prior}."

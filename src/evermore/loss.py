@@ -36,7 +36,7 @@ def get_log_probs(params: PyTree) -> PyTree:
         prior = param.prior
         if isinstance(prior, PDFLike):
             prior = cast(PDFLike, prior)
-            x = prior.scale_std(param.value)
+            x = prior.param_to_pdf(param.value)
             return prior.log_prob(x)
         return jnp.array([0.0])
 
