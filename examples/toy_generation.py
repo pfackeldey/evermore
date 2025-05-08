@@ -8,7 +8,7 @@ import evermore as evm
 key = jax.random.PRNGKey(0)
 
 # generate a new model with sampled parameters according to their constraint pdfs
-toymodel = evm.parameter.sample(model, key)
+toymodel = evm.sample.sample_uncorrelated(model, key)
 
 
 # generate new expectation based on the toy model
@@ -17,7 +17,7 @@ def toy_expectation(
     module: eqx.Module,
     hists: dict,
 ) -> Array:
-    toymodel = evm.parameter.sample(model, key)
+    toymodel = evm.sample.sample_uncorrelated(model, key)
     expectations = toymodel(hists)
     return evm.util.sum_over_leaves(expectations)
 
