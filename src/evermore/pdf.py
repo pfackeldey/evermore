@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import abc
-from typing import Protocol, runtime_checkable
 
 import equinox as eqx
 import jax
@@ -24,16 +23,6 @@ __all__ = [
 
 def __dir__():
     return __all__
-
-
-@runtime_checkable
-class PDFLike(Protocol):
-    """Mirrors the (relevant) interface of `tfp.distributions.Distribution` & `distrax.Distribution`."""
-
-    def log_prob(self, x: Array) -> Array: ...
-    def scale_std(self, value: Array) -> Array: ...
-    def sample(self, key: PRNGKeyArray) -> Array: ...
-    def prob(self, x: Array) -> Array: ...
 
 
 class PDF(eqx.Module, SupportsTreescope):
@@ -134,7 +123,6 @@ class PoissonDiscrete(PoissonBase):
 
 
 class PoissonContinuous(PoissonBase):
-
     def log_prob(
         self, x: Array, normalize: bool = True, shift_mode: bool = False
     ) -> Array:

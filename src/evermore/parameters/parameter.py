@@ -7,7 +7,7 @@ import equinox as eqx
 import jax
 from jaxtyping import Array, ArrayLike, PyTree
 
-from evermore.pdf import Normal, PDFLike
+from evermore.pdf import PDF, Normal
 from evermore.util import atleast_1d_float_array, filter_tree_map
 from evermore.visualization import SupportsTreescope
 
@@ -38,7 +38,7 @@ class Parameter(eqx.Module, SupportsTreescope):
         name (str | None): An optional name for the parameter.
         lower (Array | None): The lower boundary of the parameter.
         upper (Array | None): The upper boundary of the parameter.
-        prior (PDFLike | None): The prior distribution of the parameter.
+        prior (PDF | None): The prior distribution of the parameter.
         frozen (bool): Indicates if the parameter is frozen during optimization.
         transform (ParameterTransformation | None): An optional transformation applied to the parameter.
 
@@ -60,7 +60,7 @@ class Parameter(eqx.Module, SupportsTreescope):
     name: str | None = eqx.field(static=True, default=None)
     lower: Array | None = eqx.field(default=None)
     upper: Array | None = eqx.field(default=None)
-    prior: PDFLike | None = eqx.field(default=None)
+    prior: PDF | None = eqx.field(default=None)
     frozen: bool = eqx.field(static=True, default=False)
     transform: ParameterTransformation | None = eqx.field(default=None)
 
@@ -92,12 +92,10 @@ class NormalParameter(Parameter):
     It also provides additional methods for scaling and morphing the parameter.
 
     Attributes:
-        prior (PDFLike | None): The prior distribution of the parameter, defaulting to a Normal distribution with mean 0.0 and width 1.0.
+        prior (PDF | None): The prior distribution of the parameter, defaulting to a Normal distribution with mean 0.0 and width 1.0.
     """
 
-    prior: PDFLike | None = eqx.field(
-        default_factory=lambda: Normal(mean=0.0, width=1.0)
-    )
+    prior: PDF | None = eqx.field(default_factory=lambda: Normal(mean=0.0, width=1.0))
 
     def scale_log(self, up: ArrayLike, down: ArrayLike) -> Modifier:
         """

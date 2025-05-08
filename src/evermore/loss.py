@@ -1,10 +1,8 @@
-from typing import cast
-
 import jax.numpy as jnp
 from jaxtyping import Array, PyTree
 
 from evermore.parameters.parameter import Parameter, _params_map
-from evermore.pdf import PDFLike
+from evermore.pdf import PDF
 
 __all__ = [
     "get_log_probs",
@@ -34,11 +32,12 @@ def get_log_probs(params: PyTree) -> PyTree:
 
     def _constraint(param: Parameter) -> Array:
         prior = param.prior
-        if isinstance(prior, PDFLike):
-            prior = cast(PDFLike, prior)
-            x = prior.param_to_pdf(param.value)
-            return prior.log_prob(x)
-        return jnp.array([0.0])
+        if prior is None:
+            return jnp.array([0.0])
+
+        assert isinstance(prior, PDF), f"Prior must be a PDF object, got {type(prior)}"
+        x = prior.param_to_pdf(param.value)
+        return prior.log_prob(x)
 
     # constraints from pdfs
     return _params_map(_constraint, params)

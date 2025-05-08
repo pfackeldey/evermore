@@ -34,7 +34,7 @@ expectations = toy_expectation_vec(keys, model, hists)
 
 
 # just sample observations with poisson
-poisson_obs = evm.pdf.PoissonContinuous(observation)
+poisson_obs = evm.pdf.PoissonDiscrete(observation)
 sampled_observation = poisson_obs.sample(key)
 
 # vectorized sampling
