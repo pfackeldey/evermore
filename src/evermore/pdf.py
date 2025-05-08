@@ -64,9 +64,7 @@ class Normal(PDF):
         if shape is None:
             shape = ()
         # sample parameter from pdf
-        return self.mean + self.width * self.param_to_pdf(
-            jax.random.normal(key, shape=shape)
-        )
+        return self.mean + self.width * jax.random.normal(key, shape=shape)
 
 
 class PoissonBase(PDF):
