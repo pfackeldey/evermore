@@ -43,10 +43,12 @@ def get_log_probs(params: PyTree) -> PyTree:
         # - param.value=-1: -1 sigma shift, calculate the -1 sigma constrain based on prior pdf
         #
         # Translating between this "unit_normal" pdf and any other pdf works as follows:
-        # x' = AnyOtherPDF.inv_cdf(unit_normal.cdf(x))
+        # x = AnyOtherPDF.inv_cdf(unit_normal.cdf(v))
         #
         # Some priors, such as other Normals, can do a shortcut to save compute:
-        # e.g. for Normal: mean + width * param.value
+        # e.g. for Normal: x = mean + width * v
+        #
+        # (in the following: x=x and v=param.value)
         if hasattr(prior, "translate_from_unit_normal"):
             x = prior.translate_from_unit_normal(param.value)
         else:
