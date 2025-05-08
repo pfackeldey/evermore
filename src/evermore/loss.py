@@ -2,7 +2,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, PyTree
 
 from evermore.parameters.parameter import Parameter, _params_map
-from evermore.pdf import PDF
+from evermore.pdf import PDF, Normal
 
 __all__ = [
     "get_log_probs",
@@ -36,7 +36,18 @@ def get_log_probs(params: PyTree) -> PyTree:
             return jnp.array([0.0])
 
         assert isinstance(prior, PDF), f"Prior must be a PDF object, got {type(prior)}"
-        x = prior.param_to_pdf(param.value)
+
+        # all constrained parameters are 'moving' on a 'unit_normal' distribution (mean=0, width=1), ie:
+        # - param.value=0: no shift, no constrain
+        # - param.value=+1: +1 sigma shift, calculate the +1 sigma constrain based on prior pdf
+        # - param.value=-1: -1 sigma shift, calculate the -1 sigma constrain based on prior pdf
+        # Translating between this "unit_normal" pdf and any other pdf works as follows:
+        # x' = AnyOtherPDF.inv_cdf(unit_normal.cdf(x))
+        unit_normal = Normal(
+            mean=jnp.zeros_like(param.value), width=jnp.ones_like(param.value)
+        )
+        cdf = unit_normal.cdf(param.value)
+        x = prior.inv_cdf(cdf)
         return prior.log_prob(x)
 
     # constraints from pdfs
