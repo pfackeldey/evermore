@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from typing import cast
-
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, PRNGKeyArray
 
 from evermore.parameters.parameter import Parameter, _ParamsTree, is_parameter
-from evermore.pdf import PDFLike, Poisson
+from evermore.pdf import PDF, PoissonBase
 
 __all__ = [
     "sample_uncorrelated",
@@ -43,15 +41,14 @@ def sample_uncorrelated(params: _ParamsTree, key: PRNGKeyArray) -> _ParamsTree:
     keys_tree = jax.tree.unflatten(params_structure, keys)
 
     def _sample(param: Parameter, key: Parameter) -> Array:
-        if isinstance(param.prior, PDFLike):
+        if isinstance(param.prior, PDF):
             pdf = param.prior
-            pdf = cast(PDFLike, pdf)
 
             # Sample new value from the prior pdf
             sampled_value = pdf.sample(key.value)
 
             # TODO: Make this compatible with externally provided Poisson PDFs
-            if isinstance(pdf, Poisson):
+            if isinstance(pdf, PoissonBase):
                 sampled_value = (sampled_value / pdf.lamb) - 1
         else:
             assert param.prior is None, f"Unknown prior type: {param.prior}."

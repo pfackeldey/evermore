@@ -10,7 +10,7 @@ def loss(model, hists, observation):
     expectations = model(hists)
     constraints = evm.loss.get_log_probs(model)
     loss_val = (
-        evm.pdf.Poisson(lamb=evm.util.sum_over_leaves(expectations))
+        evm.pdf.PoissonContinuous(lamb=evm.util.sum_over_leaves(expectations))
         .log_prob(
             observation,
         )

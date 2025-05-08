@@ -139,7 +139,7 @@ class Modifier(ModifierBase):
 
         # poisson effect
         hist = jnp.array([10, 20, 30])
-        parameter = evm.Parameter(value=1.0, prior=evm.pdf.Poisson(lamb=hist))
+        parameter = evm.Parameter(value=1.0, prior=evm.pdf.PoissonDiscrete(lamb=hist))
         modify = evm.Modifier(parameter=parameter, effect=evm.effect.Linear(offset=1, slope=1))
         # or shorthand
         modify = norm.scale(offset=1, slope=1)

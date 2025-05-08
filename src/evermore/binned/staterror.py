@@ -49,7 +49,7 @@ class StatErrors(eqx.Module, SupportsTreescope):
         )
 
         # Create a modifier for the qcd process, `getter` is a function
-        # that finds the corresponding parameter from for the Poissons and Gaussians
+        # that finds the corresponding gaussian parameter
         getter = itemgetter("qcd")
         mod = staterrors.modifier(getter=getter)
         # apply the modifier to the parameter
