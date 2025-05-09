@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import typing as tp
 
 import equinox as eqx
 import jax
@@ -25,15 +26,20 @@ def __dir__():
     return __all__
 
 
+@tp.runtime_checkable
+class ImplementsFromUnitNormalConversion(tp.Protocol):
+    def __evermore_from_unit_normal__(self, x: Array) -> Array: ...
+
+
 class PDF(eqx.Module, SupportsTreescope):
     @abc.abstractmethod
     def log_prob(self, x: Array) -> Array: ...
 
     @abc.abstractmethod
-    def param_to_pdf(self, value: Array) -> Array: ...
+    def cdf(self, x: Array) -> Array: ...
 
     @abc.abstractmethod
-    def pdf_to_param(self, x: Array) -> Array: ...
+    def inv_cdf(self, x: Array) -> Array: ...
 
     @abc.abstractmethod
     def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array: ...
@@ -53,19 +59,21 @@ class Normal(PDF):
         unnormalized = jax.scipy.stats.norm.logpdf(x, loc=self.mean, scale=self.width)
         return unnormalized - logpdf_max
 
-    def param_to_pdf(self, value: Array) -> Array:
-        # normal scaling via mean and width
-        return self.mean + self.width * value
+    def cdf(self, x: Array) -> Array:
+        return jax.scipy.stats.norm.cdf(x, loc=self.mean, scale=self.width)
 
-    def pdf_to_param(self, x: Array) -> Array:
-        return (x - self.mean) / self.width
+    def inv_cdf(self, x: Array) -> Array:
+        return jax.scipy.stats.norm.ppf(x, loc=self.mean, scale=self.width)
+
+    def __evermore_from_unit_normal__(self, x: Array) -> Array:
+        return self.mean + self.width * x
 
     def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array:
         # jax.random.normal does not accept None shape
         if shape is None:
             shape = ()
         # sample parameter from pdf
-        return self.param_to_pdf(jax.random.normal(key, shape=shape))
+        return self.__evermore_from_unit_normal__(jax.random.normal(key, shape=shape))
 
 
 class PoissonBase(PDF):
@@ -88,32 +96,27 @@ class PoissonDiscrete(PoissonBase):
         logpdf_max = jax.scipy.stats.poisson.logpmf(x, x)
         return unnormalized - logpdf_max
 
-    def param_to_pdf(self, value: Array) -> Array:
-        # convert the value to a normal cdf value to look for
-        target_cdf = jax.scipy.stats.norm.cdf(value)
+    def cdf(self, x: Array) -> Array:
+        return jax.scipy.stats.poisson.cdf(x, self.lamb)
 
+    def inv_cdf(self, x: Array) -> Array:
         # perform an iterative search
         # see: https://num.pyro.ai/en/stable/tutorials/truncated_distributions.html?highlight=poisson%20inverse#5.3-Example:-Left-truncated-Poisson
         def cond_fn(val):
             _, cdf = val
-            return jnp.any(cdf < target_cdf)
+            return jnp.any(cdf < x)
 
         def body_fn(val):
             n, cdf = val
-            n_new = jnp.where(cdf < target_cdf, n + 1, n)
+            n_new = jnp.where(cdf < x, n + 1, n)
             return n_new, jax.scipy.stats.poisson.cdf(n_new, self.lamb)
 
-        start_n = jnp.zeros_like(value, dtype=jnp.result_type(int))
-        start_cdf = jnp.zeros_like(value, dtype=jnp.result_type(float))
+        start_n = jnp.zeros_like(x, dtype=jnp.result_type(int))
+        start_cdf = jnp.zeros_like(x, dtype=jnp.result_type(float))
         n, _ = jax.lax.while_loop(cond_fn, body_fn, (start_n, start_cdf))
 
         # since we check for cdf < value, n will always refer to the next value
         return jnp.clip(n - 1, min=0)
-
-    def pdf_to_param(self, x: Array) -> Array:
-        x = jnp.floor(x)
-        cdf = jax.scipy.stats.poisson.cdf(x, self.lamb)
-        return jax.scipy.stats.norm.ppf(cdf)
 
     def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array:
         # jax.random.poisson does not accept empty tuple shape
@@ -141,12 +144,12 @@ class PoissonContinuous(PoissonBase):
         logpdf_max = _log_prob(*args)
         return unnormalized - logpdf_max
 
-    def param_to_pdf(self, value: Array) -> Array:
-        err = f"{self.__class__.__name__} does not support param_to_pdf"
+    def cdf(self, x: Array) -> Array:
+        err = f"{self.__class__.__name__} does not support cdf"
         raise Exception(err)
 
-    def pdf_to_param(self, x: Array) -> Array:
-        err = f"{self.__class__.__name__} does not support pdf_to_param"
+    def inv_cdf(self, x: Array) -> Array:
+        err = f"{self.__class__.__name__} does not support inv_cdf"
         raise Exception(err)
 
     def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array:
