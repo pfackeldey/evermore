@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import typing as tp
 
 import equinox as eqx
 import jax
@@ -23,6 +24,11 @@ __all__ = [
 
 def __dir__():
     return __all__
+
+
+@tp.runtime_checkable
+class ImplementsFromUnitNormalConversion(tp.Protocol):
+    def __evermore_from_unit_normal__(self, x: Array) -> Array: ...
 
 
 class PDF(eqx.Module, SupportsTreescope):

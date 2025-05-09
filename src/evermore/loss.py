@@ -2,7 +2,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, PyTree
 
 from evermore.parameters.parameter import Parameter, _params_map
-from evermore.pdf import PDF, Normal
+from evermore.pdf import PDF, ImplementsFromUnitNormalConversion, Normal
 
 __all__ = [
     "get_log_probs",
@@ -47,10 +47,12 @@ def get_log_probs(params: PyTree) -> PyTree:
         #
         # Some priors, such as other Normals, can do a shortcut to save compute:
         # e.g. for Normal: x = mean + width * v
-        # these shortcuts are implemented by '__evermore_from_unit_normal__'
+        # these shortcuts are implemented by '__evermore_from_unit_normal__' as defined by the
+        # ImplementsFromUnitNormalConversion protocol.
         #
         # (in the following: x=x and v=param.value)
-        if hasattr(prior, "__evermore_from_unit_normal__"):
+        if isinstance(prior, ImplementsFromUnitNormalConversion):
+            # this is the fast-path
             x = prior.__evermore_from_unit_normal__(param.value)
         else:
             # this is a general implementation to translate from a unit normal to any target PDF
