@@ -103,7 +103,7 @@ class PoissonDiscrete(PoissonBase):
         # perform an iterative search
         # see: https://num.pyro.ai/en/stable/tutorials/truncated_distributions.html?highlight=poisson%20inverse#5.3-Example:-Left-truncated-Poisson
         def cond_fn(val):
-            n, cdf = val
+            _, cdf = val
             return jnp.any(cdf < x)
 
         def body_fn(val):
