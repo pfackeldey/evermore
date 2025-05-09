@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import jax.numpy as jnp
+import numpy as np
 import pytest
 
 import evermore as evm
@@ -16,3 +18,20 @@ def test_get_log_probs():
     assert log_probs["a"] == pytest.approx(-0.125)
     assert log_probs["b"] == pytest.approx(0.0)
     assert log_probs["c"] == pytest.approx(0.0)
+
+
+def test_compute_covariance():
+    def loss_fn(params):
+        return (
+            params["a"] ** 2 + 2 * params["b"] ** 2 + (params["a"] + params["c"]) ** 2
+        )
+
+    params = {"a": jnp.array(2.0), "b": jnp.array(3.0), "c": jnp.array(4.0)}
+
+    cov = evm.loss.compute_covariance(loss_fn, params)
+
+    assert cov.shape == (3, 3)
+    np.testing.assert_allclose(
+        cov,
+        jnp.array([[1.0, 0.0, -0.7071067], [0.0, 1.0, 0.0], [-0.7071067, 0.0, 1.0]]),
+    )
