@@ -127,8 +127,6 @@ def compute_covariance(
 
     # normalize via D^-1 @ cov @ D^-1 with D being the diagnonal standard deviation matrix
     d = jnp.sqrt(jnp.diag(cov))
-
-    # normalize
     cov = cov / jnp.outer(d, d)
 
     # to avoid numerical issues, fix the diagonal to 1
