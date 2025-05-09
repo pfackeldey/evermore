@@ -1,4 +1,4 @@
-# evermore.binned.modifier
+# Modifier
 
 ```{eval-rst}
 .. automodule:: evermore.binned.modifier
