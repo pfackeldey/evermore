@@ -84,6 +84,22 @@ def compute_covariance(
     parameter values at a given loss function. The covariance is computed using the inverted Hessian
     under the Laplace assumption of normality, followed by a normalization step.
 
+    .. code-block:: python
+
+        import jax.numpy as jnp
+        import evermore as evm
+
+        params = {"a": jnp.array(2.0), "b": jnp.array(3.0), "c": jnp.array(4.0)}
+
+
+        def loss_fn(params):
+            # some loss function depending on params["a"], params["b"] and params["c"]
+            return ...
+
+
+        # compute the covariance matrix
+        cov = evm.loss.compute_covariance(loss_fn, params)
+
     Args:
         loss_fn (Callable): A callable whose gradients are evaluated for the computation.
         params (PyTree): A PyTree containing parameters to compute the covariance for.
