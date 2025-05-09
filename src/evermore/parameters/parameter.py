@@ -64,6 +64,12 @@ class Parameter(eqx.Module, SupportsTreescope):
     frozen: bool = eqx.field(static=True, default=False)
     transform: ParameterTransformation | None = eqx.field(default=None)
 
+    def __check_init__(self):
+        # runtime check to be sure
+        if self.prior is not None and not isinstance(self.prior, PDF):
+            msg = f"Prior must be a PDF object for a constrained Parameter (or 'None' for an unconstrained one), got {self.prior=} ({type(self.prior)=})"  # type: ignore[unreachable]
+            raise ValueError(msg)
+
     def scale(self, slope: ArrayLike = 1.0, offset: ArrayLike = 0.0) -> Modifier:
         """
         Applies a linear scaling effect to the parameter.
