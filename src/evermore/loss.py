@@ -1,3 +1,8 @@
+import collections
+import typing as tp
+
+import jax
+import jax.flatten_util
 import jax.numpy as jnp
 from jaxtyping import Array, PyTree
 
@@ -5,6 +10,7 @@ from evermore.parameters.parameter import Parameter, _params_map
 from evermore.pdf import PDF, ImplementsFromUnitNormalConversion, Normal
 
 __all__ = [
+    "compute_correlation",
     "get_log_probs",
 ]
 
@@ -66,3 +72,21 @@ def get_log_probs(params: PyTree) -> PyTree:
 
     # constraints from pdfs
     return _params_map(_constraint, params)
+
+
+def compute_correlation(
+    loss_fn: collections.abc.Callable,
+    params: PyTree,
+    args: tuple[tp.Any, ...] = (),
+) -> Array:
+    # create a flattened version of the parameters and the loss
+    flat_params, unravel_fn = jax.flatten_util.ravel_pytree(params)
+
+    def flat_loss_fn(flat_params: Array) -> float:
+        return loss_fn(unravel_fn(flat_params), *args)
+
+    # compute the hessian at the current parameters
+    h = jax.hessian(flat_loss_fn)(flat_params)
+
+    # invert to get the correlation matrix under the Laplace assumption of normality
+    return jnp.linalg.inv(h)
