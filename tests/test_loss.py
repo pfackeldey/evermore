@@ -7,7 +7,7 @@ import evermore as evm
 
 def test_get_log_probs():
     params = {
-        "a": evm.NormalParameter(value=0.5),
+        "a": evm.NormalParameter(value=0.5),  # type: ignore[arg-type]
         "b": evm.NormalParameter(),
         "c": evm.Parameter(),
     }

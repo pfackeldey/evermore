@@ -18,8 +18,8 @@ class LinearConstrained(eqx.Module):
         )
         self.weights = evm.Parameter(
             value=jax.random.normal(wkey, (out_size, in_size)),
-            lower=-jnp.inf,
-            upper=jnp.inf,
+            lower=-jnp.inf,  # type: ignore[arg-type]
+            upper=jnp.inf,  # type: ignore[arg-type]
             prior=normal,
         )
 

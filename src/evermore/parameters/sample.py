@@ -3,7 +3,7 @@ from __future__ import annotations
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, PRNGKeyArray
+from jaxtyping import Array, ArrayLike, PRNGKeyArray
 
 from evermore.parameters.parameter import Parameter, _ParamsTree, is_parameter
 from evermore.pdf import PDF, PoissonBase
@@ -52,18 +52,25 @@ def sample_uncorrelated(params: _ParamsTree, key: PRNGKeyArray) -> _ParamsTree:
                 sampled_value = (sampled_value / pdf.lamb) - 1
         else:
             assert param.prior is None, f"Unknown prior type: {param.prior}."
+            if (param.lower is None and param.upper is not None) or (
+                param.lower is not None and param.upper is None
+            ):
+                msg = f"{param} must have both lower and upper boundaries set, or none of them."
+                raise ValueError(msg)
+            lower: ArrayLike = param.lower  # type: ignore[assignment]
+            upper: ArrayLike = param.upper  # type: ignore[assignment]
             msg = f"Can't sample uniform from {param} (no given prior). "
             param = eqx.error_if(
-                param, ~jnp.isfinite(param.lower), msg + "No lower bound given."
+                param, ~jnp.isfinite(lower), msg + "No lower bound given."
             )
             param = eqx.error_if(
-                param, ~jnp.isfinite(param.upper), msg + "No upper bound given."
+                param, ~jnp.isfinite(upper), msg + "No upper bound given."
             )
             sampled_value = jax.random.uniform(
                 key.value,
                 shape=param.value.shape,
-                minval=param.lower,
-                maxval=param.upper,
+                minval=lower,
+                maxval=upper,
             )
 
         # Replace the sampled parameter value and return new parameter

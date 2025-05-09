@@ -46,7 +46,7 @@ class Effect(eqx.Module, SupportsTreescope):
 class Identity(Effect):
     @jax.named_scope("evm.effect.Identity")
     def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
-        return OffsetAndScale(offset=0.0, scale=1.0)
+        return OffsetAndScale(offset=0.0, scale=1.0)  # type: ignore[arg-type]
 
 
 class Lambda(Effect):
@@ -62,9 +62,9 @@ class Lambda(Effect):
             return res
         if isinstance(res, Array):
             if self.normalize_by == "offset":
-                return OffsetAndScale(offset=(res - hist), scale=1.0)
+                return OffsetAndScale(offset=(res - hist), scale=1.0)  # type: ignore[arg-type]
             if self.normalize_by == "scale":
-                return OffsetAndScale(offset=0.0, scale=(res / hist))
+                return OffsetAndScale(offset=0.0, scale=(res / hist))  # type: ignore[arg-type]
         msg = f"Unknown normalization type '{self.normalize_by}' for '{res}'"
         raise ValueError(msg)
 
@@ -77,10 +77,10 @@ class Linear(Effect):
     def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
         assert isinstance(parameter, Parameter)
         sf = parameter.value * self.slope + self.offset
-        return OffsetAndScale(offset=0.0, scale=sf)
+        return OffsetAndScale(offset=0.0, scale=sf)  # type: ignore[arg-type]
 
 
-DEFAULT_EFFECT: Linear = Linear(offset=0.0, slope=1.0)
+DEFAULT_EFFECT: Linear = Linear(offset=0.0, slope=1.0)  # type: ignore[arg-type]
 
 
 class VerticalTemplateMorphing(Effect):
@@ -109,7 +109,7 @@ class VerticalTemplateMorphing(Effect):
     def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
         assert isinstance(parameter, Parameter)
         offset = self.vshift(parameter.value, hist=hist)
-        return OffsetAndScale(offset=offset, scale=1.0)
+        return OffsetAndScale(offset=offset, scale=1.0)  # type: ignore[arg-type]
 
 
 class AsymmetricExponential(Effect):
@@ -135,4 +135,4 @@ class AsymmetricExponential(Effect):
     def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
         assert isinstance(parameter, Parameter)
         interp = self.interpolate(parameter.value)
-        return OffsetAndScale(offset=0.0, scale=jnp.exp(parameter.value * interp))
+        return OffsetAndScale(offset=0.0, scale=jnp.exp(parameter.value * interp))  # type: ignore[arg-type]

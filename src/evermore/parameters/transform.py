@@ -5,6 +5,7 @@ import abc
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+from jaxtyping import ArrayLike
 
 from evermore.parameters.parameter import Parameter, _params_map, _ParamsTree
 
@@ -155,16 +156,18 @@ class MinuitTransform(ParameterTransformation):
         ):
             msg = f"{parameter} must have both lower and upper boundaries set, or none of them."
             raise ValueError(msg)
+        lower: ArrayLike = parameter.lower  # type: ignore[assignment]
+        upper: ArrayLike = parameter.upper  # type: ignore[assignment]
         # check for finite boundaries
         error_msg = f"Bounds of {parameter} must be finite, got {parameter.lower=}, {parameter.upper=}."
         parameter = eqx.error_if(
             parameter,
-            ~jnp.isfinite(parameter.lower),
+            ~jnp.isfinite(lower),
             error_msg,
         )
         return eqx.error_if(
             parameter,
-            ~jnp.isfinite(parameter.upper),
+            ~jnp.isfinite(upper),
             error_msg,
         )
 
