@@ -5,7 +5,7 @@ from evermore.pdf import Normal
 
 
 def test_Parameter():
-    p = evm.Parameter(value=1.0, lower=0.0, upper=2.0)
+    p = evm.Parameter(value=1.0, lower=0.0, upper=2.0)  # type: ignore[arg-type]
     assert p.value == 1.0
     assert p.lower == 0.0
     assert p.upper == 2.0
@@ -13,7 +13,7 @@ def test_Parameter():
 
 
 def test_NormalParameter():
-    p = evm.NormalParameter(value=1.0, lower=0.0, upper=2.0)
+    p = evm.NormalParameter(value=1.0, lower=0.0, upper=2.0)  # type: ignore[arg-type]
     assert p.value == 1.0
     assert p.lower == 0.0
     assert p.upper == 2.0

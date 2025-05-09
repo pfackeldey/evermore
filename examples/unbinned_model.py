@@ -1,3 +1,5 @@
+# mypy: disable-error-code="arg-type"
+
 import jax.numpy as jnp
 from jaxtyping import Array
 

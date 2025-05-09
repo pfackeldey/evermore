@@ -7,7 +7,7 @@ import evermore as evm
 
 
 def test_Modifier():
-    param = evm.Parameter(value=1.1)
+    param = evm.Parameter(value=1.1)  # type: ignore[arg-type]
     modifier = param.scale()
 
     hist = jnp.array([1, 2, 3])
@@ -17,8 +17,8 @@ def test_Modifier():
 
 
 def test_Where():
-    param1 = evm.Parameter(value=1.0)
-    param2 = evm.Parameter(value=1.1)
+    param1 = evm.Parameter(value=1.0)  # type: ignore[arg-type]
+    param2 = evm.Parameter(value=1.1)  # type: ignore[arg-type]
     modifier1 = param1.scale()
     modifier2 = param2.scale()
 
@@ -29,7 +29,7 @@ def test_Where():
 
 
 def test_BooleanMask():
-    param = evm.Parameter(value=1.1)
+    param = evm.Parameter(value=1.1)  # type: ignore[arg-type]
     modifier = param.scale()
 
     hist = jnp.array([1, 2, 3])
@@ -39,7 +39,7 @@ def test_BooleanMask():
 
 
 def test_Transform():
-    param = evm.Parameter(value=1.1)
+    param = evm.Parameter(value=1.1)  # type: ignore[arg-type]
     modifier = param.scale()
 
     hist = jnp.array([1, 2, 3])
@@ -51,7 +51,7 @@ def test_Transform():
 
 
 def test_mix_modifiers():
-    param = evm.Parameter(value=1.1)
+    param = evm.Parameter(value=1.1)  # type: ignore[arg-type]
     modifier = param.scale()
 
     hist = jnp.array([1, 2, 3])
@@ -66,8 +66,8 @@ def test_mix_modifiers():
 
 
 def test_Compose():
-    param1 = evm.Parameter(value=1.0)
-    param2 = evm.Parameter(value=1.1)
+    param1 = evm.Parameter(value=1.0)  # type: ignore[arg-type]
+    param2 = evm.Parameter(value=1.1)  # type: ignore[arg-type]
     modifier1 = param1.scale()
     modifier2 = param2.scale()
 

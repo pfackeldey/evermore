@@ -61,7 +61,7 @@ hists = {
 }
 
 model = SPlusBModel(
-    mu=evm.Parameter(value=0.0, lower=0.0, upper=10.0),
+    mu=evm.Parameter(value=0.0, lower=0.0, upper=10.0),  # type: ignore[arg-type]
     norm1=evm.NormalParameter(),
     norm2=evm.NormalParameter(),
     shape1=evm.NormalParameter(),

@@ -31,9 +31,9 @@ def atleast_1d_float_array(x: Any) -> Array:
 
 def filter_tree_map(
     fun: Callable,
-    module: eqx.Module,
+    module: PyTree,
     filter: Callable,
-) -> eqx.Module:
+) -> PyTree:
     params = eqx.filter(module, filter, is_leaf=filter)
     return jax.tree.map(
         fun,

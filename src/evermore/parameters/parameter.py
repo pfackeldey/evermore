@@ -80,7 +80,7 @@ class Parameter(eqx.Module, SupportsTreescope):
 
         return Modifier(
             parameter=self,
-            effect=Linear(slope=slope, offset=offset),
+            effect=Linear(slope=slope, offset=offset),  # type: ignore[arg-type]
         )
 
 
@@ -95,7 +95,7 @@ class NormalParameter(Parameter):
         prior (PDF | None): The prior distribution of the parameter, defaulting to a Normal distribution with mean 0.0 and width 1.0.
     """
 
-    prior: PDF | None = eqx.field(default_factory=lambda: Normal(mean=0.0, width=1.0))
+    prior: PDF | None = eqx.field(default_factory=lambda: Normal(mean=0.0, width=1.0))  # type: ignore[arg-type]
 
     def scale_log(self, up: ArrayLike, down: ArrayLike) -> Modifier:
         """
@@ -111,7 +111,7 @@ class NormalParameter(Parameter):
         from evermore.binned.effect import AsymmetricExponential
         from evermore.binned.modifier import Modifier
 
-        return Modifier(parameter=self, effect=AsymmetricExponential(up=up, down=down))
+        return Modifier(parameter=self, effect=AsymmetricExponential(up=up, down=down))  # type: ignore[arg-type]
 
     def morphing(self, up_template: Array, down_template: Array) -> Modifier:
         """
