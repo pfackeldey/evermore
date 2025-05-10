@@ -217,7 +217,7 @@ def discrete_inv_cdf_search(
     x_shape = x.shape
     x = jnp.reshape(x, (-1, 1))
 
-    # store masks for injecting exact values for known edge cases later one
+    # store masks for injecting exact values for known edge cases later on
     # inject 0 for x == 0
     zero_mask = x == 0.0
     # inject inf for x == 1

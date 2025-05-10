@@ -45,7 +45,7 @@ def test_discrete_inv_cdf_search():
     assert discrete_inv_cdf_search(jnp.array([0.9]), cdf_fn, start_fn, "ceil") == 8
     assert discrete_inv_cdf_search(jnp.array([0.9]), cdf_fn, start_fn, "closest") == 8
 
-    # test individual solutions in vmapped mode plus preservation
+    # test individual solutions in vmapped mode plus shape preservation
     k = discrete_inv_cdf_search(jnp.array([0.9, 0.95, 0.99]), cdf_fn, start_fn, "floor")
     np.testing.assert_allclose(k, jnp.array([7.0, 8.0, 10.0]))
     k = discrete_inv_cdf_search(jnp.array([0.9, 0.95, 0.99]), cdf_fn, start_fn, "ceil")
