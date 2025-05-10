@@ -236,7 +236,7 @@ def discrete_inv_cdf_search(
         # compute the current integral
         itg = cdf_fn(k)
         # special case: itg is the exact solution
-        stop = jnp.logical_or(stop, itg == target_itg)
+        stop |= itg == target_itg
         # if no previous integral is available or if we have not yet "cornered" the target value
         # with the current and previous integrals, make a step in the right direction
         make_step = (
@@ -261,7 +261,7 @@ def discrete_inv_cdf_search(
             )
         k += k_shift
         # update the stop flag and end
-        stop = jnp.logical_or(stop, k_found)
+        stop |= k_found
         return (k, target_itg, itg, stop)
 
     def search(start_k, target_itg, stop):
