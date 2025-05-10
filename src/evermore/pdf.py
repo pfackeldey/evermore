@@ -213,6 +213,12 @@ def discrete_inv_cdf_search(
     Returns:
         Array: The computed inverse CDF values in the same shape as *x*.
     """
+    # check rounding
+    known_roundings = {"floor", "ceil", "closest"}
+    if rounding not in known_roundings:
+        msg = f"unknown rounding '{rounding}', expected one of {', '.join(known_roundings)}"
+        raise ValueError(msg)
+
     # flatten input
     x_shape = x.shape
     x = jnp.reshape(x, (-1, 1))
