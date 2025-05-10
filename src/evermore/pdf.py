@@ -269,7 +269,7 @@ def discrete_inv_cdf_search(
         val = (start_k, target_itg, prev_itg, stop)
         return jax.lax.while_loop(cond_fn, body_fn, val)[0]
 
-    # vamp
+    # vmap
     vsearch = jax.vmap(search, in_axes=(0, 0, 0))
 
     # define starting point and stop flag (eagerly skipping edge cases), then search
