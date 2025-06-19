@@ -190,28 +190,29 @@ process. The threshold value is negative by default, meaning that the per-proces
 treatment is always applied.
 
 ```{code-block} python
-from operator import itemgetter
+import jax
 import jax.numpy as jnp
 import evermore as evm
 
 
+# `hists` corresponds to sumw of the TH1 histograms
 hists = {"signal": jnp.array([12]), "bkg1": jnp.array([50]), "bkg2": jnp.array([30])}
 
 # `histsw2` corresponds to sumw2 of the TH1 histograms
 histsw2 = {"signal": jnp.array([12]), "bkg1": jnp.array([50]), "bkg2": jnp.array([30])}
 
-# Additional `Combine` options:
-# hist-mode: not available in evermore
-# include-signal: not available in evermore, use separate StatErrors objects instead
 
-staterrors = evm.staterror.StatErrors.from_hists_and_variances(hists, histsw2)
+# setup modifiers
+staterrors = jax.tree.map(
+  evm.staterror.StatErrors,
+  hists,
+  histsw2,
+)
 
-# Create a modifier for the qcd process, `getter` is a function
-# that finds the corresponding parameter from `staterrors.params_per_process`
-getter = itemgetter("bkg1")
-mod = staterrors.modifier(getter=getter)
-# apply the modifier
-mod(getter(hists))
+# apply the modifier scaling to the histograms
+modified_signal_hist = staterrors["signal"](hists["signal"])
+modified_bkg1_hist = staterrors["bkg1"](hists["bkg1"])
+modified_bkg2_hist = staterrors["bkg2"](hists["bkg2"])
 ```
 
 :::
