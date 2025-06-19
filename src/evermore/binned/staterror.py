@@ -35,7 +35,7 @@ class StatErrors(ModifierBase):
         hists = {"qcd": jnp.array([10.0, 20.0, 30.0]), "signal": jnp.array([5.0, 10.0, 15.0])}
         histsw2 = {"qcd": jnp.array([12.0, 21.0, 29.0]), "signal": jnp.array([5.0, 8.0, 11.0])}
 
-        # BB-lite example:
+        # BB-full example:
         staterrors = jtu.tree_map(
             evm.staterror.StatErrors,
             hists,
@@ -46,7 +46,7 @@ class StatErrors(ModifierBase):
         modified_qcd = staterrors["qcd"](hists["qcd"])
         modified_signal = staterrors["signal"](hists["signal"])
 
-        # BB-full example:
+        # BB-lite example:
         staterrors = evm.staterror.StatErrors(
             evm.util.sum_over_leaves(hists),
             evm.util.sum_over_leaves(histsw2),
