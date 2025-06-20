@@ -51,26 +51,26 @@ def model(
 
 hists = {
     "nominal": {
-        "signal": jnp.array([3]),
-        "bkg1": jnp.array([10]),
-        "bkg2": jnp.array([20]),
+        "signal": jnp.array([3.0]),
+        "bkg1": jnp.array([10.0]),
+        "bkg2": jnp.array([20.0]),
     },
     "shape_up": {
-        "bkg1": jnp.array([12]),
-        "bkg2": jnp.array([23]),
+        "bkg1": jnp.array([12.0]),
+        "bkg2": jnp.array([23.0]),
     },
     "shape_down": {
-        "bkg1": jnp.array([8]),
-        "bkg2": jnp.array([19]),
+        "bkg1": jnp.array([8.0]),
+        "bkg2": jnp.array([19.0]),
     },
 }
 
 params = Params(
-    mu=evm.Parameter(value=0.0, lower=0.0, upper=10.0),  # type: ignore[arg-type]
+    mu=evm.Parameter(),  # type: ignore[arg-type]
     norm1=evm.NormalParameter(),
     norm2=evm.NormalParameter(),
     shape1=evm.NormalParameter(),
 )
 
-observation = jnp.array([37])
+observation = jnp.array([37.0])
 expectations = model(params, hists)

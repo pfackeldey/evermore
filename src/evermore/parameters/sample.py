@@ -1,15 +1,21 @@
 from __future__ import annotations
 
+import typing as tp
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, ArrayLike, PRNGKeyArray
+from jaxtyping import Array, Float
 
-from evermore.parameters.parameter import Parameter, _ParamsTree, is_parameter
-from evermore.pdf import PDF, PoissonBase
+from evermore.parameters.parameter import (
+    _params_map,
+    _ParamsTree,
+    is_parameter,
+)
 
 __all__ = [
-    "sample_uncorrelated",
+    "compute_covariance_matrix",
+    "sample_from_covariance_matrix",
 ]
 
 
@@ -17,69 +23,64 @@ def __dir__():
     return __all__
 
 
-def sample_uncorrelated(params: _ParamsTree, key: PRNGKeyArray) -> _ParamsTree:
-    """
-    Samples from the individual prior distributions of the parameters in the given PyTree.
-    Note that no correlations between parameters are taken into account during sampling.
+def compute_covariance_matrix(
+    loss: tp.Callable,
+    params: _ParamsTree,
+    *,
+    args: tuple[tp.Any, ...] = (),
+) -> Float[Array, "nparams nparams"]:
+    # first, compute the hessian at the current point
+    values = _params_map(lambda p: p.value, params)
+    flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
 
-    Args:
-        params (_ParamsTree): A PyTree of parameters from which to sample.
-        key (PRNGKeyArray): A JAX random key used for generating random samples.
+    def _flat_loss(flat_values: Float[Array, ...]) -> Float[Array, ""]:
+        param_values = unravel_fn(flat_values)
 
-    Returns:
-        _ParamsTree: A new PyTree with the parameters sampled from their respective prior distributions.
+        def _replace_value(param, value):
+            return eqx.tree_at(lambda p: p.value, param, value)
 
-    Example:
-        See examples/toy_generation.py for an example usage.
-    """
-    # Partition the tree into parameters and the rest
-    params_tree, rest_tree = eqx.partition(params, is_parameter, is_leaf=is_parameter)
-    params_structure = jax.tree.structure(params_tree)
-    n_params = params_structure.num_leaves  # type: ignore[attr-defined]
+        _params = jax.tree.map(
+            _replace_value, params, param_values, is_leaf=is_parameter
+        )
+        return loss(_params, *args)
 
-    keys = jax.random.split(key, n_params)
-    keys_tree = jax.tree.unflatten(params_structure, keys)
+    # calculate hessian
+    hessian = jax.hessian(_flat_loss)(flat_values)
 
-    def _sample(param: Parameter, key: Parameter) -> Array:
-        if isinstance(param.prior, PDF):
-            pdf = param.prior
+    # invert to get the correlation matrix under the Laplace assumption of normality
+    return jnp.linalg.inv(hessian)
 
-            # Sample new value from the prior pdf
-            sampled_value = pdf.sample(key.value)
 
-            # TODO: Make this compatible with externally provided Poisson PDFs
-            if isinstance(pdf, PoissonBase):
-                sampled_value = (sampled_value / pdf.lamb) - 1
-        else:
-            assert param.prior is None, f"Unknown prior type: {param.prior}."
-            if (param.lower is None and param.upper is not None) or (
-                param.lower is not None and param.upper is None
-            ):
-                msg = f"{param} must have both lower and upper boundaries set, or none of them."
-                raise ValueError(msg)
-            lower: ArrayLike = param.lower  # type: ignore[assignment]
-            upper: ArrayLike = param.upper  # type: ignore[assignment]
-            msg = f"Can't sample uniform from {param} (no given prior). "
-            param = eqx.error_if(
-                param, ~jnp.isfinite(lower), msg + "No lower bound given."
-            )
-            param = eqx.error_if(
-                param, ~jnp.isfinite(upper), msg + "No upper bound given."
-            )
-            sampled_value = jax.random.uniform(
-                key.value,
-                shape=param.value.shape,
-                minval=lower,
-                maxval=upper,
-            )
+def sample_from_covariance_matrix(
+    key: jax.random.PRNGKey,
+    params: _ParamsTree,
+    *,
+    covariance_matrix: Float[Array, "nparams nparams"],
+    n_samples: int = 1,
+) -> _ParamsTree:
+    # get the value & make sure it has at least 1d so we insert a batch dim later
+    values = _params_map(lambda p: jnp.atleast_1d(p.value), params)
+    flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
 
-        # Replace the sampled parameter value and return new parameter
-        return eqx.tree_at(lambda p: p.value, param, sampled_value)
-
-    # Sample for each parameter
-    sampled_params_tree = jax.tree.map(
-        _sample, params_tree, keys_tree, is_leaf=is_parameter
+    # sample parameter sets from the correlation matrix
+    # note that the sampling should be centered around the current parameters,
+    # but 0 is chosen here since they are used as offsets
+    flat_sampled_offsets = jax.random.multivariate_normal(
+        key=key,
+        mean=jnp.zeros_like(flat_values),
+        cov=covariance_matrix,
+        shape=(n_samples,),
     )
 
-    # Combine the sampled parameters with the rest of the model and return it
-    return eqx.combine(sampled_params_tree, rest_tree, is_leaf=is_parameter)
+    # insert batch dim
+    sampled_param_values = jax.vmap(unravel_fn, in_axes=(0,))(
+        flat_values + flat_sampled_offsets
+    )
+
+    # put them into the original structure again
+    def _replace_value(param, value):
+        return eqx.tree_at(lambda p: p.value, param, value)
+
+    return jax.tree.map(
+        _replace_value, params, sampled_param_values, is_leaf=is_parameter
+    )
