@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import equinox as eqx
-from model import model
+from model import params
 
 # see: https://docs.kidger.site/equinox/api/serialisation/
 
-# save processes and parameters
-eqx.tree_serialise_leaves("some_filename.eqx", model)
+# save parameters
+eqx.tree_serialise_leaves("some_filename.eqx", params)
 
-# load processes and parameters back into model
-model_loaded = eqx.tree_deserialise_leaves("some_filename.eqx", model)
+# load parameters back into params
+params_loaded = eqx.tree_deserialise_leaves("some_filename.eqx", params)

@@ -8,13 +8,14 @@ from typing import Any
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, PyTree
+from jaxtyping import Array, Float, PyTree, Shaped
 
 __all__ = [
-    "atleast_1d_float_array",
+    "_missing",
     "dump_hlo_graph",
     "dump_jaxpr",
     "filter_tree_map",
+    "float_array",
     "sum_over_leaves",
     "tree_stack",
 ]
@@ -24,17 +25,27 @@ def __dir__():
     return __all__
 
 
-def atleast_1d_float_array(x: Any) -> Array:
-    float_type = jnp.result_type(float)
-    return jnp.atleast_1d(jnp.asarray(x, dtype=float_type))
+def float_array(x: Any) -> Float[Array, ...]:
+    return jnp.asarray(x, jnp.result_type(float))
+
+
+class _Missing:
+    __slots__ = ()
+
+    def __repr__(self):
+        return "--"
+
+
+_missing = _Missing()
+del _Missing
 
 
 def filter_tree_map(
     fun: Callable,
-    module: PyTree,
+    tree: PyTree,
     filter: Callable,
 ) -> PyTree:
-    params = eqx.filter(module, filter, is_leaf=filter)
+    params = eqx.filter(tree, filter, is_leaf=filter)
     return jax.tree.map(
         fun,
         params,
@@ -46,9 +57,13 @@ def sum_over_leaves(tree: PyTree) -> Array:
     return jax.tree.reduce(operator.add, tree)
 
 
-def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
+def tree_stack(
+    trees: list[PyTree[Shaped[Array, " ..."]]],
+    *,
+    broadcast_leaves: bool = False,
+) -> PyTree[Shaped[Array, "batch_dim ..."]]:
     """
-    Turns e.g. an array of evm.Modifier(s) into a evm.Modifier of arrays.
+    Turns e.g. an array of evm.Modifier(s) into a evm.Modifier of arrays. (AOS -> SOA)
 
     It is important that the jax.Array(s) of the underlying Arrays have the same shape.
     Same applies for the effect leaves (e.g. width). However, the effect leaves can be
@@ -91,9 +106,12 @@ def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
         leaves_list.append(leaves)
         treedef_list.append(treedef)
 
-    grouped_leaves = zip(*leaves_list, strict=False)
+    grouped_leaves = jax.util.safe_zip(*leaves_list)
     stacked_leaves = []
-    for leaves in grouped_leaves:  # type: ignore[assignment]
+    # make sure we can build a batch dimension ("batch_dim" in type annotation of the result type),
+    # so we do `atleast_1d` once on each leaf
+    for leaves in jax.tree.map(jnp.atleast_1d, grouped_leaves):  # type: ignore[assignment]
+        # make sure we can build a batch dimension
         if broadcast_leaves:
             shape = jnp.broadcast_shapes(*[leaf.shape for leaf in leaves])
             stacked_leaves.append(

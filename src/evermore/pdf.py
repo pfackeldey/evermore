@@ -8,9 +8,9 @@ import jax
 import jax.numpy as jnp
 from jax._src.random import Shape
 from jax.scipy.special import digamma, gammaln, xlogy
-from jaxtyping import Array, PRNGKeyArray
+from jaxtyping import Array, Float, PRNGKeyArray
 
-from evermore.util import atleast_1d_float_array
+from evermore.util import float_array
 from evermore.visualization import SupportsTreescope
 
 __all__ = [
@@ -28,47 +28,53 @@ def __dir__():
 
 @tp.runtime_checkable
 class ImplementsFromUnitNormalConversion(tp.Protocol):
-    def __evermore_from_unit_normal__(self, x: Array) -> Array: ...
+    def __evermore_from_unit_normal__(
+        self, x: Float[Array, ...]
+    ) -> Float[Array, ...]: ...
 
 
 class PDF(eqx.Module, SupportsTreescope):
     @abc.abstractmethod
-    def log_prob(self, x: Array) -> Array: ...
+    def log_prob(self, x: Float[Array, ...]) -> Float[Array, ...]: ...
 
     @abc.abstractmethod
-    def cdf(self, x: Array) -> Array: ...
+    def cdf(self, x: Float[Array, ...]) -> Float[Array, ...]: ...
 
     @abc.abstractmethod
-    def inv_cdf(self, x: Array) -> Array: ...
+    def inv_cdf(self, x: Float[Array, ...]) -> Float[Array, ...]: ...
 
     @abc.abstractmethod
-    def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array: ...
+    def sample(
+        self, key: PRNGKeyArray, shape: Shape | None = None
+    ) -> Float[Array, ...]: ...
 
-    def prob(self, x: Array, **kwargs) -> Array:
+    def prob(self, x: Float[Array, ...], **kwargs) -> Float[Array, ...]:
         return jnp.exp(self.log_prob(x, **kwargs))
 
 
 class Normal(PDF):
-    mean: Array = eqx.field(converter=atleast_1d_float_array)
-    width: Array = eqx.field(converter=atleast_1d_float_array)
+    mean: Float[Array, ...] = eqx.field(converter=float_array)
+    width: Float[Array, ...] = eqx.field(converter=float_array)
 
-    def log_prob(self, x: Array) -> Array:
+    def log_prob(self, x: Float[Array, ...]) -> Float[Array, ...]:
         logpdf_max = jax.scipy.stats.norm.logpdf(
             self.mean, loc=self.mean, scale=self.width
         )
         unnormalized = jax.scipy.stats.norm.logpdf(x, loc=self.mean, scale=self.width)
         return unnormalized - logpdf_max
 
-    def cdf(self, x: Array) -> Array:
+    def cdf(self, x: Float[Array, ...]) -> Float[Array, ...]:
         return jax.scipy.stats.norm.cdf(x, loc=self.mean, scale=self.width)
 
-    def inv_cdf(self, x: Array) -> Array:
+    def inv_cdf(self, x: Float[Array, ...]) -> Float[Array, ...]:
         return jax.scipy.stats.norm.ppf(x, loc=self.mean, scale=self.width)
 
     def __evermore_from_unit_normal__(self, x: Array) -> Array:
         return self.mean + self.width * x
 
-    def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array:
+    def sample(
+        self, key: PRNGKeyArray, shape: Shape | None = None
+    ) -> Float[Array, ...]:
         # jax.random.normal does not accept None shape
         if shape is None:
             shape = ()
@@ -77,7 +83,7 @@ class Normal(PDF):
 
 
 class PoissonBase(PDF):
-    lamb: Array = eqx.field(converter=atleast_1d_float_array)
+    lamb: Float[Array, ...] = eqx.field(converter=float_array)
 
 
 class PoissonDiscrete(PoissonBase):
@@ -86,7 +92,9 @@ class PoissonDiscrete(PoissonBase):
     See https://root.cern.ch/doc/master/RooPoisson_8cxx_source.html#l00057 for reference.
     """
 
-    def log_prob(self, x: Array, normalize: bool = True) -> Array:
+    def log_prob(
+        self, x: Float[Array, ...], normalize: bool = True
+    ) -> Float[Array, ...]:
         x = jnp.floor(x)
 
         unnormalized = jax.scipy.stats.poisson.logpmf(x, self.lamb)
@@ -96,10 +104,10 @@ class PoissonDiscrete(PoissonBase):
         logpdf_max = jax.scipy.stats.poisson.logpmf(x, x)
         return unnormalized - logpdf_max
 
-    def cdf(self, x: Array) -> Array:
+    def cdf(self, x: Float[Array, ...]) -> Float[Array, ...]:
         return jax.scipy.stats.poisson.cdf(x, self.lamb)
 
-    def inv_cdf(self, x: Array) -> Array:
+    def inv_cdf(self, x: Float[Array, ...]) -> Float[Array, ...]:
         # perform an iterative search
         # see: https://num.pyro.ai/en/stable/tutorials/truncated_distributions.html?highlight=poisson%20inverse#5.3-Example:-Left-truncated-Poisson
         def cond_fn(val):
@@ -118,7 +126,9 @@ class PoissonDiscrete(PoissonBase):
         # since we check for cdf < value, n will always refer to the next value
         return jnp.clip(n - 1, min=0)
 
-    def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array:
+    def sample(
+        self, key: PRNGKeyArray, shape: Shape | None = None
+    ) -> Float[Array, ...]:
         # jax.random.poisson does not accept empty tuple shape
         if shape == ():
             shape = None
@@ -127,8 +137,8 @@ class PoissonDiscrete(PoissonBase):
 
 class PoissonContinuous(PoissonBase):
     def log_prob(
-        self, x: Array, normalize: bool = True, shift_mode: bool = False
-    ) -> Array:
+        self, x: Float[Array, ...], normalize: bool = True, shift_mode: bool = False
+    ) -> Float[Array, ...]:
         # optionally adjust lambda to a higher value such that the new mode is the current lambda
         lamb = jnp.exp(digamma(self.lamb + 1)) if shift_mode else self.lamb
 
@@ -144,14 +154,16 @@ class PoissonContinuous(PoissonBase):
         logpdf_max = _log_prob(*args)
         return unnormalized - logpdf_max
 
-    def cdf(self, x: Array) -> Array:
+    def cdf(self, x: Float[Array, ...]) -> Float[Array, ...]:
         err = f"{self.__class__.__name__} does not support cdf"
         raise Exception(err)
 
-    def inv_cdf(self, x: Array) -> Array:
+    def inv_cdf(self, x: Float[Array, ...]) -> Float[Array, ...]:
         err = f"{self.__class__.__name__} does not support inv_cdf"
         raise Exception(err)
 
-    def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array:
+    def sample(
+        self, key: PRNGKeyArray, shape: Shape | None = None
+    ) -> Float[Array, ...]:
         msg = f"{self.__class__.__name__} does not support sampling, use PoissonDiscrete instead"
         raise Exception(msg)

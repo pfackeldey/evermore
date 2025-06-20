@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 import equinox as eqx
 import jax
-from jaxtyping import Array, ArrayLike, PyTree
+from jaxtyping import Array, ArrayLike, Float, PyTree
 
 from evermore.pdf import PDF, Normal
-from evermore.util import atleast_1d_float_array, filter_tree_map
+from evermore.util import _missing, filter_tree_map, float_array
 from evermore.visualization import SupportsTreescope
 
 if TYPE_CHECKING:
@@ -56,12 +56,12 @@ class Parameter(eqx.Module, SupportsTreescope):
         frozen_parameter = evm.Parameter(value=1.0, frozen=True)
     """
 
-    value: Array = eqx.field(converter=atleast_1d_float_array, default=0.0)
-    name: str | None = eqx.field(static=True, default=None)
-    lower: Array | None = eqx.field(default=None)
-    upper: Array | None = eqx.field(default=None)
+    value: Float[Array, ...] = eqx.field(converter=float_array, default=0.0)
+    name: str | None = eqx.field(default=None)
+    lower: Float[Array, ...] | None = eqx.field(default=None)
+    upper: Float[Array, ...] | None = eqx.field(default=None)
     prior: PDF | None = eqx.field(default=None)
-    frozen: bool = eqx.field(static=True, default=False)
+    frozen: bool = eqx.field(default=False)
     transform: ParameterTransformation | None = eqx.field(default=None)
 
     def __check_init__(self):
@@ -103,13 +103,13 @@ class NormalParameter(Parameter):
 
     prior: PDF | None = eqx.field(default_factory=lambda: Normal(mean=0.0, width=1.0))  # type: ignore[arg-type]
 
-    def scale_log(self, up: ArrayLike, down: ArrayLike) -> Modifier:
+    def scale_log(self, up: Float[Array, ...], down: Float[Array, ...]) -> Modifier:
         """
         Applies an asymmetric exponential scaling to the parameter.
 
         Args:
-            up (ArrayLike): The scaling factor for the upward direction.
-            down (ArrayLike): The scaling factor for the downward direction.
+            up (Float[Array, "..."]): The scaling factor for the upward direction.
+            down (Float[Array, "..."]): The scaling factor for the downward direction.
 
         Returns:
             Modifier: A Modifier instance with the asymmetric exponential effect applied.
@@ -119,13 +119,15 @@ class NormalParameter(Parameter):
 
         return Modifier(parameter=self, effect=AsymmetricExponential(up=up, down=down))  # type: ignore[arg-type]
 
-    def morphing(self, up_template: Array, down_template: Array) -> Modifier:
+    def morphing(
+        self, up_template: Float[Array, ...], down_template: Float[Array, ...]
+    ) -> Modifier:
         """
         Applies vertical template morphing to the parameter.
 
         Args:
-            up_template (Array): The template for the upward shift.
-            down_template (Array): The template for the downward shift.
+            up_template (Float[Array, "..."]): The template for the upward shift.
+            down_template (Float[Array, "..."]): The template for the downward shift.
 
         Returns:
             Modifier: A Modifier instance with the vertical template morphing effect applied.
@@ -198,16 +200,21 @@ def value_filter_spec(tree: _ParamsTree) -> _ParamsTree:
             # use the parameters to calculate the model as usual
             ...
     """
-    # 1. set the filter_spec to False for all non-static leaves
+    # 1. set the filter_spec to False for all (non-static) leaves
     filter_spec = jax.tree.map(lambda _: False, tree)
 
-    # 2. set the filter_spec to True for each parameter value
-    def _replace_value(leaf: Any) -> Any:
-        if isinstance(leaf, Parameter):
-            leaf = eqx.tree_at(lambda p: p.value, leaf, not leaf.frozen)
-        return leaf
+    # 2. set the filter_spec to True for each parameter value,
+    # and _only_ the .value, because we don't want do optimize against anything else!
+    def _replace_value(filter_leaf: Any, tree_leaf: Any) -> Any:
+        if isinstance(filter_leaf, Parameter):
+            filter_leaf = eqx.tree_at(
+                lambda fl: fl.value,
+                filter_leaf,
+                not tree_leaf.frozen,
+            )
+        return filter_leaf
 
-    return jax.tree.map(_replace_value, filter_spec, is_leaf=is_parameter)
+    return jax.tree.map(_replace_value, filter_spec, tree, is_leaf=is_parameter)
 
 
 def partition(tree: _ParamsTree) -> tuple[_ParamsTree, _ParamsTree]:
@@ -231,14 +238,57 @@ def partition(tree: _ParamsTree) -> tuple[_ParamsTree, _ParamsTree]:
 
         import evermore as evm
 
+        params = {"a": evm.Parameter(1.0), "b": evm.Parameter(2.0, frozen=True)}
+
         # Verbose:
         filter_spec = evm.parameter.value_filter_spec(params)
-        diffable, static = eqx.partition(params, filter_spec)
+        diffable, static = eqx.partition(params, filter_spec, replace=evm.util._missing)
+        print(diffable)
+        # >> {'a': Parameter(value=f32[1]), 'b': Parameter(value=--, frozen=True)}
+
+        print(static)
+        # >> {'a': Parameter(value=--), 'b': Parameter(value=f32[1], frozen=True)}
 
         # Short hand:
         diffable, static = evm.parameter.partition(params)
     """
-    return eqx.partition(tree, filter_spec=value_filter_spec(tree))
+    return eqx.partition(tree, filter_spec=value_filter_spec(tree), replace=_missing)
+
+
+def combine(*trees: tuple[_ParamsTree]) -> _ParamsTree:
+    """
+    Combines multiple PyTrees of parameters into a single PyTree.
+
+    For each leaf position, returns the first non-_missing value found among the input trees.
+    If all values _missing at a given position, returns _missing for that position.
+
+    Args:
+        *trees (_ParamsTree): One or more PyTrees to be combined.
+
+    Returns:
+        _ParamsTree: A PyTree with the same structure as the inputs, where each leaf is the first non-_missing value found at that position.
+
+    Example:
+
+    .. code-block:: python
+
+        import evermore as evm
+
+        params = {"a": evm.Parameter(1.0), "b": evm.Parameter(2.0, frozen=True)}
+
+        diffable, static = evm.parameter.partition(params)
+        reconstructed_params = evm.parameter.combine(diffable, static)  # inverse of `partition`
+        print(reconstructed_params)
+        # >> {"a": evm.Parameter(1.0), "b": evm.Parameter(2.0)}
+    """
+
+    def _combine(*args):
+        for arg in args:
+            if arg is not _missing:
+                return arg
+        return _missing
+
+    return jax.tree.map(_combine, *trees, is_leaf=lambda x: x is _missing)
 
 
 def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
@@ -308,10 +358,10 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
     def _correlate(parameter: Parameter) -> tuple[Parameter, Parameter]:
         ps = (first, parameter)
 
-        def where(ps: tuple[Parameter, Parameter]) -> Array:
+        def where(ps: tuple[Parameter, Parameter]) -> Float[Array, ...]:
             return ps[1].value
 
-        def get(ps: tuple[Parameter, Parameter]) -> Array:
+        def get(ps: tuple[Parameter, Parameter]) -> Float[Array, ...]:
             return ps[0].value
 
         shared = eqx.nn.Shared(ps, where, get)
@@ -319,6 +369,7 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
 
     correlated = [first]
     for p in rest:
+        # is this error really needed? shouldn't it be safe to broadcast here?
         if p.value.shape != first.value.shape:
             msg = f"Can't correlate parameters {first} and {p}! Must have the same shape, got {first.value.shape} and {p.value.shape}."
             raise ValueError(msg)

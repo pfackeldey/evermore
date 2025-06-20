@@ -75,10 +75,10 @@ def test_VerticalTemplateMorphing():
 
     assert effect(
         parameter=Parameter(value=0.0), hist=jnp.array([10])
-    ) == OffsetAndScale(offset=0.0, scale=1.0)
+    ) == OffsetAndScale(offset=[0.0], scale=[1.0])
     assert effect(
         parameter=Parameter(value=+1.0), hist=jnp.array([10])
-    ) == OffsetAndScale(offset=2.0, scale=1.0)
+    ) == OffsetAndScale(offset=[2.0], scale=[1.0])
     assert effect(
         parameter=Parameter(value=-1.0), hist=jnp.array([10])
-    ) == OffsetAndScale(offset=-3.0, scale=1.0)
+    ) == OffsetAndScale(offset=[-3.0], scale=[1.0])

@@ -202,7 +202,7 @@ hists = {"signal": jnp.array([12]), "bkg1": jnp.array([50]), "bkg2": jnp.array([
 histsw2 = {"signal": jnp.array([12]), "bkg1": jnp.array([50]), "bkg2": jnp.array([30])}
 
 
-# setup modifiers
+# setup modifiers (Barlow-Beeston-full)
 staterrors = jax.tree.map(
   evm.staterror.StatErrors,
   hists,

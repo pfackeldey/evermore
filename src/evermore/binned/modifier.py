@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, ArrayLike, PyTree
+from jaxtyping import Array, Bool, Float, PyTree
 
 from evermore.binned.effect import DEFAULT_EFFECT, OffsetAndScale
 from evermore.parameters.parameter import Parameter
@@ -36,17 +36,19 @@ def __dir__():
 
 @runtime_checkable
 class ModifierLike(Protocol):
-    def offset_and_scale(self, hist: Array) -> OffsetAndScale: ...
-    def __call__(self, hist: Array) -> Array: ...
+    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale: ...
+    def __call__(self, hist: Float[Array, ...]) -> Float[Array, ...]: ...
     def __matmul__(self, other: ModifierLike) -> Compose: ...
 
 
 class AbstractModifier(eqx.Module):
     @abc.abstractmethod
-    def offset_and_scale(self: ModifierLike, hist: Array) -> OffsetAndScale: ...
+    def offset_and_scale(
+        self: ModifierLike, hist: Float[Array, ...]
+    ) -> OffsetAndScale: ...
 
     @abc.abstractmethod
-    def __call__(self: ModifierLike, hist: Array) -> Array: ...
+    def __call__(self: ModifierLike, hist: Float[Array, ...]) -> Float[Array, ...]: ...
 
     @abc.abstractmethod
     def __matmul__(self: ModifierLike, other: ModifierLike) -> Compose: ...
@@ -54,7 +56,7 @@ class AbstractModifier(eqx.Module):
 
 class ApplyFn(AbstractModifier):
     @jax.named_scope("evm.modifier.ApplyFn")
-    def __call__(self: ModifierLike, hist: Array) -> Array:
+    def __call__(self: ModifierLike, hist: Float[Array, ...]) -> Float[Array, ...]:
         os = self.offset_and_scale(hist=hist)
         return os.scale * (hist + os.offset)
 
@@ -166,7 +168,7 @@ class Modifier(ModifierBase):
         self.parameter = parameter
         self.effect = effect
 
-    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
         return self.effect(parameter=self.parameter, hist=hist)
 
 
@@ -205,15 +207,18 @@ class Where(ModifierBase):
         # -> Array([ 5.1593127, 20.281374 , 30.181376 ], dtype=float32)
     """
 
-    condition: Array
+    condition: Bool[Array, ...]
     modifier_true: ModifierLike
     modifier_false: ModifierLike
 
-    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
         true_os = self.modifier_true.offset_and_scale(hist)
         false_os = self.modifier_false.offset_and_scale(hist)
 
-        def _where(true: Array, false: Array) -> Array:
+        def _where(
+            true: Bool[Array, ...],
+            false: Bool[Array, ...],
+        ) -> Bool[Array, ...]:
             return jnp.where(self.condition, true, false)
 
         return jax.tree.map(_where, true_os, false_os)
@@ -246,13 +251,16 @@ class BooleanMask(ModifierBase):
         # -> Array([ 5.049494, 20.      , 30.296963], dtype=float32)
     """
 
-    mask: Array
+    mask: Bool[Array, ...]
     modifier: ModifierLike
 
-    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
         os = self.modifier.offset_and_scale(hist)
 
-        def _mask(true: ArrayLike, false: ArrayLike) -> Array:
+        def _mask(
+            true: Bool[Array, ...],
+            false: Bool[Array, ...],
+        ) -> Bool[Array, ...]:
             return jnp.where(self.mask, true, false)
 
         return OffsetAndScale(
@@ -293,7 +301,7 @@ class Transform(ModifierBase):
     transform_fn: Callable = eqx.field(static=True)
     modifier: ModifierLike
 
-    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
         os = self.modifier.offset_and_scale(hist)
         return jax.tree.map(self.transform_fn, os)
 
@@ -302,7 +310,7 @@ class TransformOffset(ModifierBase):
     transform_fn: Callable = eqx.field(static=True)
     modifier: ModifierLike
 
-    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
         os = self.modifier.offset_and_scale(hist)
         return OffsetAndScale(offset=self.transform_fn(os.offset), scale=os.scale)
 
@@ -311,7 +319,7 @@ class TransformScale(ModifierBase):
     transform_fn: Callable = eqx.field(static=True)
     modifier: ModifierLike
 
-    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
         os = self.modifier.offset_and_scale(hist)
         return OffsetAndScale(offset=os.offset, scale=self.transform_fn(os.scale))
 
@@ -384,7 +392,7 @@ class Compose(ModifierBase):
     def __len__(self) -> int:
         return len(self.unroll_modifiers())
 
-    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
         from collections import defaultdict
 
         # initial scale and offset

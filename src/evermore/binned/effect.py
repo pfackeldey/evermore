@@ -7,10 +7,10 @@ from typing import Literal
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, PyTree
+from jaxtyping import Array, Float, PyTree
 
 from evermore.parameters.parameter import Parameter
-from evermore.util import atleast_1d_float_array
+from evermore.util import float_array
 from evermore.visualization import SupportsTreescope
 
 __all__ = [
@@ -27,8 +27,8 @@ def __dir__():
 
 
 class OffsetAndScale(eqx.Module):
-    offset: Array = eqx.field(converter=atleast_1d_float_array, default=0.0)
-    scale: Array = eqx.field(converter=atleast_1d_float_array, default=1.0)
+    offset: Float[Array, ...] = eqx.field(converter=float_array, default=0.0)
+    scale: Float[Array, ...] = eqx.field(converter=float_array, default=1.0)
 
     def broadcast(self) -> OffsetAndScale:
         shape = jnp.broadcast_shapes(self.offset.shape, self.scale.shape)
@@ -40,41 +40,50 @@ class OffsetAndScale(eqx.Module):
 
 class Effect(eqx.Module, SupportsTreescope):
     @abc.abstractmethod
-    def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale: ...
+    def __call__(
+        self, parameter: PyTree[Parameter], hist: Float[Array, ...]
+    ) -> OffsetAndScale: ...
 
 
 class Identity(Effect):
     @jax.named_scope("evm.effect.Identity")
-    def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
+    def __call__(
+        self, parameter: PyTree[Parameter], hist: Float[Array, ...]
+    ) -> OffsetAndScale:
         return OffsetAndScale(offset=0.0, scale=1.0)  # type: ignore[arg-type]
 
 
 class Lambda(Effect):
-    fun: Callable[[PyTree[Parameter], Array], OffsetAndScale | Array]
+    fun: Callable[
+        [PyTree[Parameter], Float[Array, ...]], OffsetAndScale | Float[Array, ...]
+    ]
     normalize_by: Literal["offset", "scale"] | None = eqx.field(
         static=True, default=None
     )
 
     @jax.named_scope("evm.effect.Lambda")
-    def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
+    def __call__(
+        self, parameter: PyTree[Parameter], hist: Float[Array, ...]
+    ) -> OffsetAndScale:
         res = self.fun(parameter, hist)
         if isinstance(res, OffsetAndScale) and self.normalize_by is None:
             return res
-        if isinstance(res, Array):
-            if self.normalize_by == "offset":
-                return OffsetAndScale(offset=(res - hist), scale=1.0)  # type: ignore[arg-type]
-            if self.normalize_by == "scale":
-                return OffsetAndScale(offset=0.0, scale=(res / hist))  # type: ignore[arg-type]
+        if self.normalize_by == "offset":
+            return OffsetAndScale(offset=(res - hist), scale=1.0)  # type: ignore[arg-type]
+        if self.normalize_by == "scale":
+            return OffsetAndScale(offset=0.0, scale=(res / hist))  # type: ignore[arg-type]
         msg = f"Unknown normalization type '{self.normalize_by}' for '{res}'"
         raise ValueError(msg)
 
 
 class Linear(Effect):
-    offset: Array = eqx.field(converter=atleast_1d_float_array)
-    slope: Array = eqx.field(converter=atleast_1d_float_array)
+    offset: Float[Array, ...] = eqx.field(converter=float_array)
+    slope: Float[Array, ...] = eqx.field(converter=float_array)
 
     @jax.named_scope("evm.effect.Linear")
-    def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
+    def __call__(
+        self, parameter: PyTree[Parameter], hist: Float[Array, ...]
+    ) -> OffsetAndScale:
         assert isinstance(parameter, Parameter)
         sf = parameter.value * self.slope + self.offset
         return OffsetAndScale(offset=0.0, scale=sf)  # type: ignore[arg-type]
@@ -84,10 +93,12 @@ DEFAULT_EFFECT: Linear = Linear(offset=0.0, slope=1.0)  # type: ignore[arg-type]
 
 
 class VerticalTemplateMorphing(Effect):
-    up_template: Array = eqx.field(converter=atleast_1d_float_array)  # + 1 sigma
-    down_template: Array = eqx.field(converter=atleast_1d_float_array)  # - 1 sigma
+    up_template: Float[Array, ...] = eqx.field(converter=float_array)  # + 1 sigma
+    down_template: Float[Array, ...] = eqx.field(converter=float_array)  # - 1 sigma
 
-    def vshift(self, x: Array, hist: Array) -> Array:
+    def vshift(
+        self, x: Float[Array, ...], hist: Float[Array, ...]
+    ) -> Float[Array, ...]:
         dx_sum = self.up_template + self.down_template - 2 * hist
         dx_diff = self.up_template - self.down_template
 
@@ -106,17 +117,19 @@ class VerticalTemplateMorphing(Effect):
         )
 
     @jax.named_scope("evm.effect.VerticalTemplateMorphing")
-    def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
+    def __call__(
+        self, parameter: PyTree[Parameter], hist: Float[Array, ...]
+    ) -> OffsetAndScale:
         assert isinstance(parameter, Parameter)
         offset = self.vshift(parameter.value, hist=hist)
-        return OffsetAndScale(offset=offset, scale=1.0)  # type: ignore[arg-type]
+        return OffsetAndScale(offset=offset, scale=jnp.ones_like(hist))  # type: ignore[arg-type]
 
 
 class AsymmetricExponential(Effect):
-    up: Array = eqx.field(converter=atleast_1d_float_array)
-    down: Array = eqx.field(converter=atleast_1d_float_array)
+    up: Float[Array, ...] = eqx.field(converter=float_array)
+    down: Float[Array, ...] = eqx.field(converter=float_array)
 
-    def interpolate(self, x: Array) -> Array:
+    def interpolate(self, x: Float[Array, ...]) -> Float[Array, ...]:
         # https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/be488af288361ef101859a398ae618131373cad7/src/ProcessNormalization.cc#L112-L129
         lo, hi = self.down, self.up
         hi = jnp.log(hi)
@@ -132,7 +145,9 @@ class AsymmetricExponential(Effect):
         )
 
     @jax.named_scope("evm.effect.AsymmetricExponential")
-    def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
+    def __call__(
+        self, parameter: PyTree[Parameter], hist: Float[Array, ...]
+    ) -> OffsetAndScale:
         assert isinstance(parameter, Parameter)
         interp = self.interpolate(parameter.value)
         return OffsetAndScale(offset=0.0, scale=jnp.exp(parameter.value * interp))  # type: ignore[arg-type]
