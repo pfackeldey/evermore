@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import typing as tp
+
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array
+from jaxtyping import Array, Bool, Float, Scalar
 
 from evermore.binned.effect import Identity, OffsetAndScale
-from evermore.binned.modifier import Modifier, ModifierBase, ModifierLike, Where
+from evermore.binned.modifier import Modifier, ModifierBase, Where
 from evermore.parameters.parameter import NormalParameter
 from evermore.util import atleast_1d_float_array
 
@@ -16,6 +18,9 @@ __all__ = [
 
 def __dir__():
     return __all__
+
+
+FloatHist: tp.TypeAlias = Float[Array, " nbins"]  # type: ignore[name-defined]
 
 
 class StatErrors(ModifierBase):
@@ -57,36 +62,40 @@ class StatErrors(ModifierBase):
         modified_signal = staterrors(hists["signal"])
     """
 
-    modifier: ModifierLike
+    eps: Float[Scalar, ""]
+    n_entries: FloatHist
+    non_empty_mask: Bool[Array, " nbins"]
+    relative_error: FloatHist
+    parameter: NormalParameter
 
     def __init__(
         self,
-        hist: Array,
-        variance: Array,
+        hist: FloatHist,
+        variance: FloatHist,
     ):
         # make sure they are of dtype float
         hist, variance = jax.tree.map(atleast_1d_float_array, (hist, variance))
 
-        eps = jnp.finfo(variance.dtype).eps
+        self.eps = jnp.finfo(variance.dtype).eps
 
-        n_entries = jnp.where(
+        self.n_entries = jnp.where(
             variance != 0.0,
-            (hist**2 / (variance + jnp.where(variance != 0.0, 0.0, eps))),
+            (hist**2 / (variance + jnp.where(variance != 0.0, 0.0, self.eps))),
             0.0,
         )
-        parameter = NormalParameter(value=jnp.zeros_like(n_entries))
-
-        non_empty_mask = n_entries != 0.0
-        rel_err = jnp.where(
-            non_empty_mask,
-            1.0 / jnp.sqrt(n_entries + jnp.where(non_empty_mask, 0.0, eps)),
+        self.non_empty_mask = self.n_entries != 0.0
+        self.relative_error = jnp.where(
+            self.non_empty_mask,
+            1.0
+            / jnp.sqrt(self.n_entries + jnp.where(self.non_empty_mask, 0.0, self.eps)),
             1.0,
         )
-        self.modifier = Where(
-            non_empty_mask,
-            parameter.scale(slope=rel_err, offset=1.0),
-            Modifier(parameter=parameter, effect=Identity()),
-        )
+        self.parameter = NormalParameter(value=jnp.zeros_like(self.n_entries))
 
-    def offset_and_scale(self, hist: Array) -> OffsetAndScale:
-        return self.modifier.offset_and_scale(hist)
+    def offset_and_scale(self, hist: FloatHist) -> OffsetAndScale:
+        modifier = Where(
+            self.non_empty_mask,
+            self.parameter.scale(slope=self.relative_error, offset=1.0),
+            Modifier(parameter=self.parameter, effect=Identity()),
+        )
+        return modifier.offset_and_scale(hist)
