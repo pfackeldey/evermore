@@ -1,7 +1,7 @@
 # Staterrors
 
 ```{eval-rst}
-.. automodule:: evermore.binned.staterrror
+.. automodule:: evermore.binned.staterror
     :show-inheritance:
     :members:
 ```
