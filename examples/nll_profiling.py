@@ -2,12 +2,12 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optax
-from jaxtyping import Array
+from jaxtyping import Array, Float, PyTree
 
 import evermore as evm
 
 
-def fixed_mu_fit(mu: Array) -> Array:
+def fixed_mu_fit(mu: Float[Array, ""]) -> Float[Array, ""]:
     from model import hists, model, observation, params
 
     optim = optax.sgd(learning_rate=1e-2)
@@ -18,7 +18,12 @@ def fixed_mu_fit(mu: Array) -> Array:
     params = eqx.tree_at(lambda t: t.mu.frozen, params, True)
 
     @eqx.filter_jit
-    def loss(diffable, static, hists, observation):
+    def loss(
+        diffable: PyTree[evm.Parameter],
+        static: PyTree[evm.Parameter],
+        hists: PyTree[Float[Array, " nbins"]],
+        observation: Float[Array, " nbins"],
+    ) -> Float[Array, ""]:
         params = evm.parameter.combine(diffable, static)
         expectations = model(params, hists)
         constraints = evm.loss.get_log_probs(params)
@@ -32,7 +37,12 @@ def fixed_mu_fit(mu: Array) -> Array:
         return -2 * jnp.sum(loss_val)
 
     @eqx.filter_jit
-    def make_step(params, opt_state, hists, observation):
+    def make_step(
+        params: PyTree[evm.Parameter],
+        opt_state: PyTree,
+        hists: PyTree[Float[Array, " nbins"]],
+        observation: Float[Array, " nbins"],
+    ) -> tuple[PyTree[evm.Parameter], PyTree]:
         # differentiate
         diffable, static = evm.parameter.partition(params)
         grads = eqx.filter_grad(loss)(diffable, static, hists, observation)

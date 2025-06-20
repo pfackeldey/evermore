@@ -2,6 +2,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optax
+from jaxtyping import Array, Float, PyTree
 from model import hists, model, observation, params
 
 import evermore as evm
@@ -11,7 +12,12 @@ opt_state = optim.init(eqx.filter(model, eqx.is_inexact_array))
 
 
 @eqx.filter_jit
-def loss(diffable, static, hists, observation):
+def loss(
+    diffable: PyTree[evm.Parameter],
+    static: PyTree[evm.Parameter],
+    hists: PyTree[Float[Array, " nbins"]],
+    observation: Float[Array, " nbins"],
+) -> Float[Array, ""]:
     params = evm.parameter.combine(diffable, static)
     expectations = model(params, hists)
     constraints = evm.loss.get_log_probs(params)
@@ -25,11 +31,16 @@ def loss(diffable, static, hists, observation):
     return -jnp.sum(loss_val)
 
 
-# @eqx.filter_jit
-def make_step(params, opt_state, events, observation):
+@eqx.filter_jit
+def make_step(
+    params: PyTree[evm.Parameter],
+    opt_state: PyTree,
+    hists: PyTree[Float[Array, " nbins"]],
+    observation: Float[Array, " nbins"],
+) -> tuple[PyTree[evm.Parameter], PyTree]:
     # differentiate full analysis
     diffable, static = evm.parameter.partition(params)
-    grads = eqx.filter_grad(loss)(diffable, static, events, observation)
+    grads = eqx.filter_grad(loss)(diffable, static, hists, observation)
     updates, opt_state = optim.update(grads, opt_state)
     # apply nuisance parameter and DNN weight updates
     params = eqx.apply_updates(params, updates)
@@ -49,7 +60,7 @@ for step in range(1000):
 # In case you want to jit the for loop, you can use the following function,
 # this will prevent jax from unrolling the loop and creating a huge graph
 @jax.jit
-def fit(steps: int = 1000) -> tuple[eqx.Module, tuple]:
+def fit(steps: int = 1000) -> tuple[PyTree[evm.Parameter], PyTree]:
     def fun(step, params_optstate):
         params, opt_state = params_optstate
         return make_step(params, opt_state, hists, observation)

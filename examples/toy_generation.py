@@ -1,5 +1,5 @@
 import jax
-from jaxtyping import Array, PRNGKeyArray, PyTree
+from jaxtyping import Array, Float, PRNGKeyArray, PyTree
 from model import hists, model, observation, params
 
 import evermore as evm
@@ -14,8 +14,8 @@ toy_params = evm.sample.sample_uncorrelated(params, key)
 def toy_expectation(
     key: PRNGKeyArray,
     params: PyTree[evm.Parameter],
-    hists: dict,
-) -> Array:
+    hists: PyTree[Float[Array, " nbins"]],
+) -> Float[Array, " nbins"]:
     toy_params = evm.sample.sample_uncorrelated(params, key)
     expectations = model(toy_params, hists)
     return evm.util.sum_over_leaves(expectations)

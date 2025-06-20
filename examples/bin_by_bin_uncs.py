@@ -1,38 +1,28 @@
 from __future__ import annotations
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array
+from jaxtyping import Array, Float, PyTree
 
 import evermore as evm
 
 
-class SPlusBModel(eqx.Module):
-    staterrors: evm.staterror.StatErrors
+def model(
+    staterrors: evm.staterror.StatErrors, hists: PyTree[Float[Array, " nbins"]]
+) -> PyTree[Float[Array, " nbins"]]:
+    expectations = {}
 
-    def __init__(self, hists: dict[str, Array], histsw2: dict[str, Array]) -> None:
-        # create the staterrors (barlow-beeston-full -> per-process)
-        self.staterrors = jax.tree.map(
-            evm.staterror.StatErrors,
-            hists,
-            histsw2,
-        )
+    # signal process
+    expectations["signal"] = staterrors["signal"](hists["signal"])
 
-    def __call__(self, hists: dict) -> dict[str, Array]:
-        expectations = {}
+    # bkg1 process
+    expectations["bkg1"] = staterrors["bkg1"](hists["bkg1"])
 
-        # signal process
-        expectations["signal"] = self.staterrors["signal"](hists["signal"])
+    # bkg2 process
+    expectations["bkg2"] = staterrors["bkg2"](hists["bkg2"])
 
-        # bkg1 process
-        expectations["bkg1"] = self.staterrors["bkg1"](hists["bkg1"])
-
-        # bkg2 process
-        expectations["bkg2"] = self.staterrors["bkg2"](hists["bkg2"])
-
-        # return the modified expectations
-        return expectations
+    # return the modified expectations
+    return expectations
 
 
 hists = {
@@ -47,7 +37,12 @@ histsw2 = {
 }
 observation = jnp.array([34.0])
 
-model = SPlusBModel(hists, histsw2)
+# `staterrors` is just a pytree of `evm.Parameter`(s)
+staterrors = jax.tree.map(
+    evm.staterror.StatErrors,
+    hists,
+    histsw2,
+)
 
 # test the model
-expectations = model(hists)
+expectations = model(staterrors, hists)

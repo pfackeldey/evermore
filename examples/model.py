@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, PyTree
+from jaxtyping import Array, Float, PyTree
 
 import evermore as evm
 
@@ -15,7 +15,10 @@ class Params(eqx.Module):
     shape1: evm.NormalParameter
 
 
-def model(params: PyTree[evm.Parameter], hists: dict) -> dict[str, Array]:
+def model(
+    params: PyTree[evm.Parameter],
+    hists: PyTree[Float[Array, " nbins"]],
+) -> PyTree[Float[Array, " nbins"]]:
     expectations = {}
 
     # signal process
