@@ -10,7 +10,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, PyTree
 
 from evermore.parameters.parameter import Parameter
-from evermore.util import atleast_1d_float_array
+from evermore.util import float_array
 from evermore.visualization import SupportsTreescope
 
 __all__ = [
@@ -27,8 +27,8 @@ def __dir__():
 
 
 class OffsetAndScale(eqx.Module):
-    offset: Array = eqx.field(converter=atleast_1d_float_array, default=0.0)
-    scale: Array = eqx.field(converter=atleast_1d_float_array, default=1.0)
+    offset: Array = eqx.field(converter=float_array, default=0.0)
+    scale: Array = eqx.field(converter=float_array, default=1.0)
 
     def broadcast(self) -> OffsetAndScale:
         shape = jnp.broadcast_shapes(self.offset.shape, self.scale.shape)
@@ -70,8 +70,8 @@ class Lambda(Effect):
 
 
 class Linear(Effect):
-    offset: Array = eqx.field(converter=atleast_1d_float_array)
-    slope: Array = eqx.field(converter=atleast_1d_float_array)
+    offset: Array = eqx.field(converter=float_array)
+    slope: Array = eqx.field(converter=float_array)
 
     @jax.named_scope("evm.effect.Linear")
     def __call__(self, parameter: PyTree[Parameter], hist: Array) -> OffsetAndScale:
@@ -84,8 +84,8 @@ DEFAULT_EFFECT: Linear = Linear(offset=0.0, slope=1.0)  # type: ignore[arg-type]
 
 
 class VerticalTemplateMorphing(Effect):
-    up_template: Array = eqx.field(converter=atleast_1d_float_array)  # + 1 sigma
-    down_template: Array = eqx.field(converter=atleast_1d_float_array)  # - 1 sigma
+    up_template: Array = eqx.field(converter=float_array)  # + 1 sigma
+    down_template: Array = eqx.field(converter=float_array)  # - 1 sigma
 
     def vshift(self, x: Array, hist: Array) -> Array:
         dx_sum = self.up_template + self.down_template - 2 * hist
@@ -113,8 +113,8 @@ class VerticalTemplateMorphing(Effect):
 
 
 class AsymmetricExponential(Effect):
-    up: Array = eqx.field(converter=atleast_1d_float_array)
-    down: Array = eqx.field(converter=atleast_1d_float_array)
+    up: Array = eqx.field(converter=float_array)
+    down: Array = eqx.field(converter=float_array)
 
     def interpolate(self, x: Array) -> Array:
         # https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/be488af288361ef101859a398ae618131373cad7/src/ProcessNormalization.cc#L112-L129

@@ -1,14 +1,15 @@
 import equinox as eqx
+import jax
 import jax.numpy as jnp
-from model import hists, model, observation
+from model import hists, model, observation, params
 
 import evermore as evm
 
 
 @eqx.filter_jit
-def loss(model, hists, observation):
-    expectations = model(hists)
-    constraints = evm.loss.get_log_probs(model)
+def loss(params, hists, observation):
+    expectations = model(params, hists)
+    constraints = evm.loss.get_log_probs(params)
     loss_val = (
         evm.pdf.PoissonContinuous(lamb=evm.util.sum_over_leaves(expectations))
         .log_prob(
@@ -21,5 +22,10 @@ def loss(model, hists, observation):
     return -jnp.sum(loss_val)
 
 
-loss_val = loss(model, hists, observation)
-grads = eqx.filter_grad(loss)(model, hists, observation)
+loss_val = loss(params, hists, observation)
+print(f"{loss_val=}")
+grads = eqx.filter_grad(loss)(params, hists, observation)
+print(
+    "Gradients:",
+    jax.tree.map(lambda p: p.value.item(), grads, is_leaf=evm.parameter.is_parameter),
+)
