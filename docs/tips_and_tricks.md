@@ -117,17 +117,14 @@ params = {
     "b": evm.Parameter(),
 }
 
-# split the PyTree into diffable and the static parts
-filter_spec = evm.parameter.value_filter_spec(params)
-diffable, static = eqx.partition(params, filter_spec)
-
-# or
-# diffable, static = evm.parameter.partition(params)
+diffable, static = evm.parameter.partition(params)
+print(f"{diffable=}")
+print(f"{static=}")
 
 # loss's first argument is only the diffable part of the parameter Pytree!
 def loss(diffable: PyTree[evm.Parameter], static: PyTree[evm.Parameter], hists: PyTree[Array]) -> Array:
     # combine the diffable and static parts of the parameter PyTree
-    parameters = eqx.combine(diffable, static)
+    parameters = evm.parameter.combine(diffable, static)
     assert parameters == params
     # use the parameters to calculate the loss as usual
     ...
@@ -135,7 +132,8 @@ def loss(diffable: PyTree[evm.Parameter], static: PyTree[evm.Parameter], hists: 
 grad_loss = eqx.filter_grad(loss)(diffable, static, ...)
 ```
 
-If you need to further exclude parameter from being optimized you can either set `frozen=True` or set the corresponding leaf in `filter_spec` from `True` to `False`.
+If you need to further exclude parameter from being optimized you can either set `frozen=True`.
+For a more precise handling of the partitioning and combining step, have a look at `eqx.partition`, `eqx.combine`, and `evm.parameter.value_filter_spec`.
 
 
 ## JAX Transformations
