@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 import equinox as eqx
 import jax
-from jaxtyping import Array, ArrayLike, PyTree
+from jaxtyping import Array, ArrayLike, Float, PyTree
 
 from evermore.pdf import PDF, Normal
 from evermore.util import _missing, filter_tree_map, float_array
@@ -56,10 +56,10 @@ class Parameter(eqx.Module, SupportsTreescope):
         frozen_parameter = evm.Parameter(value=1.0, frozen=True)
     """
 
-    value: Array = eqx.field(converter=float_array, default=0.0)
+    value: Float[Array, ...] = eqx.field(converter=float_array, default=0.0)
     name: str | None = eqx.field(default=None)
-    lower: Array | None = eqx.field(default=None)
-    upper: Array | None = eqx.field(default=None)
+    lower: Float[Array, ...] | None = eqx.field(default=None)
+    upper: Float[Array, ...] | None = eqx.field(default=None)
     prior: PDF | None = eqx.field(default=None)
     frozen: bool = eqx.field(default=False)
     transform: ParameterTransformation | None = eqx.field(default=None)
@@ -103,13 +103,13 @@ class NormalParameter(Parameter):
 
     prior: PDF | None = eqx.field(default_factory=lambda: Normal(mean=0.0, width=1.0))  # type: ignore[arg-type]
 
-    def scale_log(self, up: ArrayLike, down: ArrayLike) -> Modifier:
+    def scale_log(self, up: Float[Array, ...], down: Float[Array, ...]) -> Modifier:
         """
         Applies an asymmetric exponential scaling to the parameter.
 
         Args:
-            up (ArrayLike): The scaling factor for the upward direction.
-            down (ArrayLike): The scaling factor for the downward direction.
+            up (Float[Array, "..."]): The scaling factor for the upward direction.
+            down (Float[Array, "..."]): The scaling factor for the downward direction.
 
         Returns:
             Modifier: A Modifier instance with the asymmetric exponential effect applied.
@@ -119,13 +119,15 @@ class NormalParameter(Parameter):
 
         return Modifier(parameter=self, effect=AsymmetricExponential(up=up, down=down))  # type: ignore[arg-type]
 
-    def morphing(self, up_template: Array, down_template: Array) -> Modifier:
+    def morphing(
+        self, up_template: Float[Array, ...], down_template: Float[Array, ...]
+    ) -> Modifier:
         """
         Applies vertical template morphing to the parameter.
 
         Args:
-            up_template (Array): The template for the upward shift.
-            down_template (Array): The template for the downward shift.
+            up_template (Float[Array, "..."]): The template for the upward shift.
+            down_template (Float[Array, "..."]): The template for the downward shift.
 
         Returns:
             Modifier: A Modifier instance with the vertical template morphing effect applied.
@@ -205,12 +207,12 @@ def value_filter_spec(tree: _ParamsTree) -> _ParamsTree:
     # and _only_ the .value, because we don't want do optimize against anything else!
     def _replace_value(filter_leaf: Any, tree_leaf: Any) -> Any:
         if isinstance(filter_leaf, Parameter):
-            leaf = eqx.tree_at(
+            filter_leaf = eqx.tree_at(
                 lambda fl: fl.value,
                 filter_leaf,
                 not tree_leaf.frozen,
             )
-        return leaf
+        return filter_leaf
 
     return jax.tree.map(_replace_value, filter_spec, tree, is_leaf=is_parameter)
 
@@ -356,10 +358,10 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
     def _correlate(parameter: Parameter) -> tuple[Parameter, Parameter]:
         ps = (first, parameter)
 
-        def where(ps: tuple[Parameter, Parameter]) -> Array:
+        def where(ps: tuple[Parameter, Parameter]) -> Float[Array, ...]:
             return ps[1].value
 
-        def get(ps: tuple[Parameter, Parameter]) -> Array:
+        def get(ps: tuple[Parameter, Parameter]) -> Float[Array, ...]:
             return ps[0].value
 
         shared = eqx.nn.Shared(ps, where, get)

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import typing as tp
-
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float, Scalar
@@ -9,7 +7,7 @@ from jaxtyping import Array, Bool, Float, Scalar
 from evermore.binned.effect import Identity, OffsetAndScale
 from evermore.binned.modifier import Modifier, ModifierBase, Where
 from evermore.parameters.parameter import NormalParameter
-from evermore.util import atleast_1d_float_array
+from evermore.util import float_array
 
 __all__ = [
     "StatErrors",
@@ -18,9 +16,6 @@ __all__ = [
 
 def __dir__():
     return __all__
-
-
-FloatHist: tp.TypeAlias = Float[Array, " nbins"]  # type: ignore[name-defined]
 
 
 class StatErrors(ModifierBase):
@@ -63,18 +58,18 @@ class StatErrors(ModifierBase):
     """
 
     eps: Float[Scalar, ""]
-    n_entries: FloatHist
+    n_entries: Float[Array, ...]
     non_empty_mask: Bool[Array, " nbins"]
-    relative_error: FloatHist
+    relative_error: Float[Array, ...]
     parameter: NormalParameter
 
     def __init__(
         self,
-        hist: FloatHist,
-        variance: FloatHist,
+        hist: Float[Array, ...],
+        variance: Float[Array, ...],
     ):
         # make sure they are of dtype float
-        hist, variance = jax.tree.map(atleast_1d_float_array, (hist, variance))
+        hist, variance = jax.tree.map(float_array, (hist, variance))
 
         self.eps = jnp.finfo(variance.dtype).eps
 
@@ -92,7 +87,7 @@ class StatErrors(ModifierBase):
         )
         self.parameter = NormalParameter(value=jnp.zeros_like(self.n_entries))
 
-    def offset_and_scale(self, hist: FloatHist) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
         modifier = Where(
             self.non_empty_mask,
             self.parameter.scale(slope=self.relative_error, offset=1.0),

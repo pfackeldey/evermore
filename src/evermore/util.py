@@ -8,7 +8,7 @@ from typing import Any
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, PyTree
+from jaxtyping import Array, Float, PyTree, Shaped
 
 __all__ = [
     "_missing",
@@ -25,7 +25,7 @@ def __dir__():
     return __all__
 
 
-def float_array(x: Any) -> Array:
+def float_array(x: Any) -> Float[Array, ...]:
     return jnp.asarray(x, jnp.result_type(float))
 
 
@@ -57,7 +57,11 @@ def sum_over_leaves(tree: PyTree) -> Array:
     return jax.tree.reduce(operator.add, tree)
 
 
-def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
+def tree_stack(
+    trees: list[PyTree[Shaped[Array, " ..."]]],
+    *,
+    broadcast_leaves: bool = False,
+) -> PyTree[Shaped[Array, "batch_dim ..."]]:
     """
     Turns e.g. an array of evm.Modifier(s) into a evm.Modifier of arrays. (AOS -> SOA)
 
@@ -104,7 +108,8 @@ def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
 
     grouped_leaves = jax.util.safe_zip(*leaves_list)
     stacked_leaves = []
-    # make sure we can build a batch dimension so we do `atleast_1d` once
+    # make sure we can build a batch dimension ("batch_dim" in type annotation of the result type),
+    # so we do `atleast_1d` once on each leaf
     for leaves in jax.tree.map(jnp.atleast_1d, grouped_leaves):  # type: ignore[assignment]
         # make sure we can build a batch dimension
         if broadcast_leaves:

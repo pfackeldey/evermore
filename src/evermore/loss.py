@@ -3,9 +3,9 @@ import typing as tp
 import jax
 import jax.flatten_util
 import jax.numpy as jnp
-from jaxtyping import Array, PyTree
+from jaxtyping import Array, Float, Scalar
 
-from evermore.parameters.parameter import Parameter, _params_map
+from evermore.parameters.parameter import Parameter, _params_map, _ParamsTree
 from evermore.pdf import PDF, ImplementsFromUnitNormalConversion, Normal
 
 __all__ = [
@@ -18,7 +18,7 @@ def __dir__():
     return __all__
 
 
-def get_log_probs(params: PyTree) -> PyTree:
+def get_log_probs(params: _ParamsTree) -> _ParamsTree:
     """
     Compute the log probabilities for all parameters.
 
@@ -35,7 +35,7 @@ def get_log_probs(params: PyTree) -> PyTree:
         is replaced by its corresponding log probability.
     """
 
-    def _constraint(param: Parameter) -> Array:
+    def _constraint(param: Parameter) -> Float[Array, "..."]:
         prior: PDF | None = param.prior
 
         # unconstrained case is easy:
@@ -75,7 +75,7 @@ def get_log_probs(params: PyTree) -> PyTree:
 
 def compute_covariance(
     loss_fn: tp.Callable,
-    params: PyTree,
+    params: _ParamsTree,
     args: tuple[tp.Any, ...] = (),
     kwargs: dict[str, tp.Any] | None = None,
 ) -> Array:
@@ -116,7 +116,7 @@ def compute_covariance(
     # create a flattened version of the parameters and the loss
     flat_params, unravel_fn = jax.flatten_util.ravel_pytree(params)
 
-    def flat_loss_fn(flat_params: Array) -> float:
+    def flat_loss_fn(flat_params: Float[Array, "..."]) -> Float[Scalar, ""]:
         return loss_fn(unravel_fn(flat_params), *args, **kwargs)
 
     # compute the hessian at the current parameters
