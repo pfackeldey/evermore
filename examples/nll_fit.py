@@ -38,12 +38,12 @@ def make_step(
     hists: PyTree[Float[Array, " nbins"]],
     observation: Float[Array, " nbins"],
 ) -> tuple[PyTree[evm.Parameter], PyTree]:
-    # differentiate full analysis
     diffable, static = evm.parameter.partition(params)
     grads = eqx.filter_grad(loss)(diffable, static, hists, observation)
     updates, opt_state = optim.update(grads, opt_state)
-    # apply nuisance parameter and DNN weight updates
-    params = eqx.apply_updates(params, updates)
+    # apply parameter updates
+    diffable = eqx.apply_updates(diffable, updates)
+    params = evm.parameter.combine(diffable, static)
     return params, opt_state
 
 

@@ -29,6 +29,7 @@ def float_array(x: Any) -> Float[Array, ...]:
     return jnp.asarray(x, jnp.result_type(float))
 
 
+@jax.tree_util.register_static
 class _Missing:
     __slots__ = ()
 
