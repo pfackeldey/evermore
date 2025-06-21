@@ -47,12 +47,12 @@ def make_step(
     hists: PyTree[Float[Array, " nbins"]],
     observation: Float[Array, " nbins"],
 ) -> tuple[PyTree[evm.Parameter], PyTree]:
-    # differentiate full analysis
     diffable, static = evm.parameter.partition(params)
     grads = eqx.filter_grad(loss)(diffable, static, hists, observation)
     updates, opt_state = optim.update(grads, opt_state)
-    # apply nuisance parameter and DNN weight updates
-    params = eqx.apply_updates(params, updates)
+    # apply parameter updates
+    diffable = eqx.apply_updates(diffable, updates)
+    params = evm.parameter.combine(diffable, static)
     return params, opt_state
 
 
@@ -73,28 +73,22 @@ covariance_matrix = fast_covariance_matrix(
 )
 
 
-# --- Prefit sampling ---
-# use the following instead of the code above for decorrelated (prefit) sampling:
-# (the following creates a Identity matrix based the number of parameter in an arbitrary pytree)
-# values = jax.tree.map(lambda p: p.value, params, is_leaf=evm.parameter.is_parameter)
-# flat_values, _ = jax.flatten_util.ravel_pytree(values)
-# covariance_matrix = jnp.eye(flat_values.shape[0])
-
-
-# generate new expectation based on the toy parameters
-# @eqx.filter_jit
-def toy_expectation(
+# generate new expectation based on the postfit toy parameters
+@eqx.filter_jit
+def postfit_toy_expectation(
     key: PRNGKeyArray,
-    params: PyTree[evm.Parameter],
+    diffable: PyTree[evm.Parameter],
+    static: PyTree[evm.Parameter],
     *,
     n_samples: int = 1,
 ) -> Float[Array, " nbins"]:
-    toy_params = evm.sample.sample_from_covariance_matrix(
+    toy_diffable = evm.sample.sample_from_covariance_matrix(
         key=key,
-        params=params,
+        params=diffable,
         covariance_matrix=covariance_matrix,
         n_samples=n_samples,
     )
+    toy_params = evm.parameter.combine(toy_diffable, static)
     expectations = model(toy_params, hists)
     return evm.util.sum_over_leaves(expectations)
 
@@ -103,13 +97,35 @@ print("Exp.:", evm.util.sum_over_leaves(model(params, hists)))
 print("Obs.:", observation)
 
 # create 1 toy
-expectation = toy_expectation(key, params)
-print("1 toy:", expectation)
+expectation = postfit_toy_expectation(key, diffable, static)
+print("1 toy (postfit):", expectation)
 
 # vectorized toy expectation for 10k toys
-expectations = toy_expectation(key, params, n_samples=10_000)
-print("Mean of 10.000 toys:", jnp.mean(expectations, axis=0))
-print("Std of 10.000 toys:", jnp.std(expectations, axis=0))
+expectations = postfit_toy_expectation(key, diffable, static, n_samples=10_000)
+print("Mean of 10.000 toys (postfit):", jnp.mean(expectations, axis=0))
+print("Std of 10.000 toys (postfit):", jnp.std(expectations, axis=0))
+
+
+# --- Prefit sampling ---
+# use the following code for decorrelated (prefit) sampling:
+# (samples from each parameters prior pdf)
+
+
+def prefit_toy_expectation(params, key):
+    sampled_params = evm.sample.sample_from_priors(params, key)
+    expectations = model(sampled_params, hists)
+    return evm.util.sum_over_leaves(expectations)
+
+
+# create 1 toy
+expectation = prefit_toy_expectation(params, key)
+print("1 toy (prefit):", expectation)
+
+# vectorized toy expectation for 10k toys
+keys = jax.random.split(key, 10_000)
+expectations = jax.vmap(prefit_toy_expectation, in_axes=(None, 0))(params, keys)
+print("Mean of 10.000 toys (prefit):", jnp.mean(expectations, axis=0))
+print("Std of 10.000 toys (prefit):", jnp.std(expectations, axis=0))
 
 
 # just sample observations with poisson
