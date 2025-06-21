@@ -42,14 +42,14 @@ def compute_covariance_matrix(
     *,
     args: tuple[tp.Any, ...] = (),
 ) -> Float[Array, "nparams nparams"]:
-    """
+    r"""
     Computes the covariance matrix of the parameters under the Laplace approximation,
     by inverting the Hessian of the loss function at the current parameter values.
 
-    See examples/toy_generation.py for an example usage.
+    See ``examples/toy_generation.py`` for an example usage.
 
     Args:
-        loss (Callable): The loss function. Should accept (params, *args) as arguments.
+        loss (Callable): The loss function. Should accept (params, \*args) as arguments.
         params (_ParamsTree): A PyTree of parameters.
         args (tuple, optional): Additional arguments to pass to the loss function.
 
@@ -104,7 +104,7 @@ def sample_from_covariance_matrix(
     Samples parameter sets from a multivariate normal distribution defined by the given covariance matrix,
     centered around the current parameter values.
 
-    See examples/toy_generation.py for an example usage.
+    See ``examples/toy_generation.py`` for an example usage.
 
     Args:
         key (jax.random.PRNGKey): A JAX random key used for generating random samples.
@@ -161,7 +161,7 @@ def sample_from_priors(params: _ParamsTree, key: PRNGKeyArray) -> _ParamsTree:
     Samples from the individual prior distributions of the parameters in the given PyTree.
     Note that no correlations between parameters are taken into account during sampling.
 
-    See examples/toy_generation.py for an example usage.
+    See ``examples/toy_generation.py`` for an example usage.
 
     Args:
         params (_ParamsTree): A PyTree of parameters from which to sample.
