@@ -150,9 +150,9 @@ import treescope
 params = {"a": evm.NormalParameter(), "b": evm.NormalParameter()}
 
 rng_key = jax.random.key(0)
-rng_keys = jax.random.split(rng_key, 100)
+rng_keys = jax.random.split(rng_key, 10_000)
 
-vec_sample = jax.vmap(evm.sample.sample_uncorrelated, in_axes=(None, 0))
+vec_sample = jax.vmap(evm.sample.sample_from_priors, in_axes=(None, 0))
 
 with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
     tree = vec_sample(params, rng_keys)
