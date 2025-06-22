@@ -8,6 +8,7 @@ import jax.numpy as jnp
 from jaxtyping import ArrayLike
 
 from evermore.parameters.parameter import Parameter, _params_map, _ParamsTree
+from evermore.util import _missing
 
 __all__ = [
     "MinuitTransform",
@@ -119,17 +120,18 @@ class MinuitTransform(ParameterTransformation):
             import evermore as evm
             import wadler_lindig as wl
 
+            from evermore.parameters.transform import MinuitTransform, unwrap, wrap
 
-            minuit_transform = evm.parameter.MinuitTransform()
+            minuit_transform = MinuitTransform()
             pytree = {
                 "a": evm.Parameter(2.0, lower=-0.1, upper=2.2, transform=minuit_transform),
                 "b": evm.Parameter(0.1, lower=0.0, upper=1.1, transform=minuit_transform),
             }
 
             # unwrap (or "transform")
-            pytree_t = evm.parameter.unwrap(pytree)
+            pytree_t = unwrap(pytree)
             # wrap back (or "inverse transform")
-            pytree_tt = evm.parameter.wrap(pytree_t)
+            pytree_tt = wrap(pytree_t)
 
             wl.pprint(pytree, width=150, short_arrays=False)
             # {
@@ -197,7 +199,9 @@ class MinuitTransform(ParameterTransformation):
             / (parameter.upper - parameter.lower)  # type: ignore[operator]
             - 1.0
         )
-        return eqx.tree_at(lambda p: p.value, parameter, value_t)
+        return eqx.tree_at(
+            lambda p: p.value, parameter, value_t, is_leaf=lambda leaf: leaf is _missing
+        )
 
     def wrap(self, parameter: Parameter) -> Parameter:
         # short-cut
@@ -209,7 +213,9 @@ class MinuitTransform(ParameterTransformation):
         value_t = parameter.lower + (parameter.upper - parameter.lower) / 2 * (  # type: ignore[operator]
             jnp.sin(parameter.value) + 1
         )
-        return eqx.tree_at(lambda p: p.value, parameter, value_t)
+        return eqx.tree_at(
+            lambda p: p.value, parameter, value_t, is_leaf=lambda leaf: leaf is _missing
+        )
 
 
 class SoftPlusTransform(ParameterTransformation):
@@ -226,17 +232,18 @@ class SoftPlusTransform(ParameterTransformation):
         import evermore as evm
         import wadler_lindig as wl
 
+        from evermore.parameters.transform import SoftPlusTransform, unwrap, wrap
 
-        enforce_positivity = evm.parameter.SoftPlusTransform()
+        enforce_positivity = SoftPlusTransform()
         pytree = {
             "a": evm.Parameter(2.0, transform=enforce_positivity),
             "b": evm.Parameter(0.1, transform=enforce_positivity),
         }
 
         # unwrap (or "transform")
-        pytree_t = evm.parameter.unwrap(pytree)
+        pytree_t = unwrap(pytree)
         # wrap back (or "inverse transform")
-        pytree_tt = evm.parameter.wrap(pytree_t)
+        pytree_tt = wrap(pytree_t)
 
         wl.pprint(pytree, width=150, short_arrays=False)
         # {

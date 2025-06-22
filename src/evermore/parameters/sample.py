@@ -31,9 +31,12 @@ def _replace_param_value(
     param: Parameter,
     value: Float[Array, ...],
 ) -> Parameter:
-    if param.value is _missing:
-        return param
-    return eqx.tree_at(lambda p: p.value, param, value)
+    return eqx.tree_at(
+        lambda p: p.value,
+        param,
+        value,
+        is_leaf=lambda leaf: leaf is _missing,
+    )
 
 
 def compute_covariance_matrix(
@@ -57,22 +60,28 @@ def compute_covariance_matrix(
         Float[Array, "nparams nparams"]: The covariance matrix of the parameters.
 
     Example:
-        >>> import evermore as evm
-        >>> import jax
-        >>> import jax.numpy as jnp
-        >>>
-        >>>
-        >>> def loss_fn(params):
-        ...     x = params["a"].value
-        ...     y = params["b"].value
-        ...     return jnp.sum((x - 1.0) ** 2 + (y - 2.0) ** 2)
-        >>> params = {
-        ...     "a": evm.Parameter(value=jnp.array([1.0]), prior=None, lower=0.0, upper=2.0),
-        ...     "b": evm.Parameter(value=jnp.array([2.0]), prior=None, lower=1.0, upper=3.0),
-        ... }
-        >>> cov = evm.sample.compute_covariance_matrix(loss_fn, params)
-        >>> cov.shape
-        (2, 2)
+
+    .. code-block:: python
+
+        import evermore as evm
+        import jax
+        import jax.numpy as jnp
+
+
+        def loss_fn(params):
+            x = params["a"].value
+            y = params["b"].value
+            return jnp.sum((x - 1.0) ** 2 + (y - 2.0) ** 2)
+
+
+        params = {
+            "a": evm.Parameter(value=jnp.array([1.0]), prior=None, lower=0.0, upper=2.0),
+            "b": evm.Parameter(value=jnp.array([2.0]), prior=None, lower=1.0, upper=3.0),
+        }
+
+        cov = evm.sample.compute_covariance_matrix(loss_fn, params)
+        cov.shape
+        # (2, 2)
     """
     # first, compute the hessian at the current point
     values = _params_map(lambda p: p.value, params)
@@ -117,21 +126,25 @@ def sample_from_covariance_matrix(
         by a sampled value. If `n_samples > 1`, the parameter values will have a batch dimension as the first axis.
 
     Example:
-        >>> import evermore as evm
-        >>> import jax
-        >>> import jax.numpy as jnp
-        >>>
-        >>>
-        >>> param1 = evm.Parameter(value=jnp.array([1.0]), prior=None, lower=0.0, upper=2.0)
-        >>> param2 = evm.Parameter(value=jnp.array([2.0]), prior=None, lower=1.0, upper=3.0)
-        >>> params = {"a": param1, "b": param2}
-        >>> cov = jnp.array([[1.0, 0.5], [0.5, 2.0]])
-        >>> key = jax.random.PRNGKey(0)
-        >>> sampled = evm.sample.sample_from_covariance_matrix(key, params, covariance_matrix=cov, n_samples=3)
-        >>> sampled["a"].value.shape
-        (3, 1)
-        >>> sampled["b"].value.shape
-        (3, 1)
+
+    .. code-block:: python
+
+        import evermore as evm
+        import jax
+        import jax.numpy as jnp
+
+        param1 = evm.Parameter(value=jnp.array([1.0]), prior=None, lower=0.0, upper=2.0)
+        param2 = evm.Parameter(value=jnp.array([2.0]), prior=None, lower=1.0, upper=3.0)
+        params = {"a": param1, "b": param2}
+        cov = jnp.array([[1.0, 0.5], [0.5, 2.0]])
+        key = jax.random.PRNGKey(0)
+        sampled = evm.sample.sample_from_covariance_matrix(
+            key, params, covariance_matrix=cov, n_samples=3
+        )
+        sampled["a"].value.shape
+        # (3, 1)
+        sampled["b"].value.shape
+        # (3, 1)
     """
     # get the value & make sure it has at least 1d so we insert a batch dim later
     values = _params_map(
@@ -171,20 +184,23 @@ def sample_from_priors(params: _ParamsTree, key: PRNGKeyArray) -> _ParamsTree:
         _ParamsTree: A new PyTree with the parameters sampled from their respective prior distributions.
 
     Example:
-        >>> import evermore as evm
-        >>> import jax
-        >>> import jax.numpy as jnp
-        >>>
-        >>>
-        >>> param1 = evm.Parameter(value=jnp.array([0.0]))
-        >>> param2 = evm.NormalParameter(value=jnp.array([0.0]))
-        >>> params = {"a": param1, "b": param2}
-        >>> key = jax.random.PRNGKey(0)
-        >>> sampled = evm.sample.sample_from_priors(params, key)
-        >>> sampled["a"].value.shape
-        (1,)
-        >>> sampled["b"].value.shape
-        (1,)
+
+    .. code-block:: python
+
+        import evermore as evm
+        import jax
+        import jax.numpy as jnp
+
+
+        param1 = evm.Parameter(value=jnp.array([0.0]))
+        param2 = evm.NormalParameter(value=jnp.array([0.0]))
+        params = {"a": param1, "b": param2}
+        key = jax.random.PRNGKey(0)
+        sampled = evm.sample.sample_from_priors(params, key)
+        sampled["a"].value.shape
+        # (1,)
+        sampled["b"].value.shape
+        # (1,)
     """
     flat_params, treedef = jax.tree.flatten(params, is_leaf=is_parameter)
     n_params = len(flat_params)
