@@ -211,6 +211,7 @@ def value_filter_spec(tree: _ParamsTree) -> _ParamsTree:
                 lambda fl: fl.value,
                 filter_leaf,
                 not tree_leaf.frozen,
+                is_leaf=lambda leaf: leaf is _missing,
             )
         return filter_leaf
 
