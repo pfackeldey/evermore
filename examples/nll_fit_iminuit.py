@@ -24,12 +24,12 @@ def update_params(
 
 @eqx.filter_jit
 def loss(
-    diffable: PyTree[evm.Parameter],
+    dynamic: PyTree[evm.Parameter],
     static: PyTree[evm.Parameter],
     hists: PyTree[Float[Array, " nbins"]],
     observation: Float[Array, " nbins"],
 ) -> Float[Array, ""]:
-    params = evm.parameter.combine(diffable, static)
+    params = evm.parameter.combine(dynamic, static)
     expectations = model(params, hists)
     constraints = evm.loss.get_log_probs(params)
     loss_val = (
@@ -43,12 +43,12 @@ def loss(
 
 
 def fit(params, hists, observation):
-    # partition into diffable and static parts
-    diffable, static = evm.parameter.partition(params)
+    # partition into dynamic and static parts
+    dynamic, static = evm.parameter.partition(params)
 
     # flatten parameter.value for iminuit
     values = jax.tree.map(
-        lambda p: p.value, diffable, is_leaf=evm.parameter.is_parameter
+        lambda p: p.value, dynamic, is_leaf=evm.parameter.is_parameter
     )
     flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
 
@@ -56,8 +56,8 @@ def fit(params, hists, observation):
     @eqx.filter_jit
     def flat_loss(flat_values: Float[Array, "..."]) -> Float[Array, ""]:
         param_values = unravel_fn(flat_values)
-        _diffable = update_params(diffable, param_values)
-        return loss(_diffable, static, hists, observation)
+        _dynamic = update_params(dynamic, param_values)
+        return loss(_dynamic, static, hists, observation)
 
     minuit = iminuit.Minuit(flat_loss, flat_values, grad=eqx.filter_grad(flat_loss))
     minuit.errordef = iminuit.Minuit.LIKELIHOOD
@@ -72,10 +72,10 @@ def fit(params, hists, observation):
     bestfit_wrapped = unravel_fn(bestfit)
 
     # wrap into pytree of parameters
-    bestfit_diffable = update_params(diffable, bestfit_wrapped)
+    bestfit_dynamic = update_params(dynamic, bestfit_wrapped)
 
     # combine with static pytree
-    return evm.parameter.combine(bestfit_diffable, static)
+    return evm.parameter.combine(bestfit_dynamic, static)
 
 
 if __name__ == "__main__":

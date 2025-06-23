@@ -39,12 +39,12 @@ def model(params: PyTree, hists: dict[str, Array]) -> Array:
 
 
 def loss(
-    diffable: PyTree,
+    dynamic: PyTree,
     static: PyTree,
     hists: dict[str, Array],
     observation: Array,
 ) -> Array:
-    params = evm.parameter.combine(diffable, static)
+    params = evm.parameter.combine(dynamic, static)
     expectation = model(params, hists)
     # Poisson NLL of the expectation and observation
     log_likelihood = evm.pdf.PoissonContinuous(lamb=expectation).log_prob(observation).sum()
@@ -68,12 +68,12 @@ class Params(NamedTuple):
 params = Params(mu=evm.Parameter(1.0), syst=evm.NormalParameter(0.0))
 
 # split tree of parameters in a differentiable part and a static part
-diffable, static = evm.parameter.partition(params)
+dynamic, static = evm.parameter.partition(params)
 
 # Calculate negative log-likelihood/loss
-loss_val = loss(diffable, static, hists, observation)
-# gradients of negative log-likelihood w.r.t. diffable parameters
-grads = eqx.filter_grad(loss)(diffable, static, hists, observation)
+loss_val = loss(dynamic, static, hists, observation)
+# gradients of negative log-likelihood w.r.t. dynamic parameters
+grads = eqx.filter_grad(loss)(dynamic, static, hists, observation)
 print(f"{grads.mu.value=}, {grads.syst.value=}")
 # -> grads.mu.value=Array(-0.46153846, dtype=float64), grads.syst.value=Array(-0.15436207, dtype=float64)
 ```

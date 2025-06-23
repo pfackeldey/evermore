@@ -19,12 +19,12 @@ def fixed_mu_fit(mu: Float[Array, ""]) -> Float[Array, ""]:
 
     @eqx.filter_jit
     def loss(
-        diffable: PyTree[evm.Parameter],
+        dynamic: PyTree[evm.Parameter],
         static: PyTree[evm.Parameter],
         hists: PyTree[Float[Array, " nbins"]],
         observation: Float[Array, " nbins"],
     ) -> Float[Array, ""]:
-        params = evm.parameter.combine(diffable, static)
+        params = evm.parameter.combine(dynamic, static)
         expectations = model(params, hists)
         constraints = evm.loss.get_log_probs(params)
         loss_val = (
@@ -38,24 +38,24 @@ def fixed_mu_fit(mu: Float[Array, ""]) -> Float[Array, ""]:
 
     @eqx.filter_jit
     def make_step(
-        diffable: PyTree[evm.Parameter],
+        dynamic: PyTree[evm.Parameter],
         static: PyTree[evm.Parameter],
         opt_state: PyTree,
         hists: PyTree[Float[Array, " nbins"]],
         observation: Float[Array, " nbins"],
     ) -> tuple[PyTree[evm.Parameter], PyTree]:
-        grads = eqx.filter_grad(loss)(diffable, static, hists, observation)
+        grads = eqx.filter_grad(loss)(dynamic, static, hists, observation)
         updates, opt_state = optim.update(grads, opt_state)
         # apply parameter updates
-        diffable = eqx.apply_updates(diffable, updates)
-        return diffable, opt_state
+        dynamic = eqx.apply_updates(dynamic, updates)
+        return dynamic, opt_state
 
-    diffable, static = evm.parameter.partition(params)
+    dynamic, static = evm.parameter.partition(params)
 
     # minimize params with 1000 steps
     for _ in range(1000):
-        diffable, opt_state = make_step(diffable, static, opt_state, hists, observation)
-    return loss(diffable, static, hists, observation)
+        dynamic, opt_state = make_step(dynamic, static, opt_state, hists, observation)
+    return loss(dynamic, static, hists, observation)
 
 
 if __name__ == "__main__":

@@ -117,19 +117,19 @@ params = {
     "b": evm.Parameter(),
 }
 
-diffable, static = evm.parameter.partition(params)
-print(f"{diffable=}")
+dynamic, static = evm.parameter.partition(params)
+print(f"{dynamic=}")
 print(f"{static=}")
 
-# loss's first argument is only the diffable part of the parameter Pytree!
-def loss(diffable: PyTree[evm.Parameter], static: PyTree[evm.Parameter], hists: PyTree[Array]) -> Array:
-    # combine the diffable and static parts of the parameter PyTree
-    parameters = evm.parameter.combine(diffable, static)
+# loss's first argument is only the dynamic part of the parameter Pytree!
+def loss(dynamic: PyTree[evm.Parameter], static: PyTree[evm.Parameter], hists: PyTree[Array]) -> Array:
+    # combine the dynamic and static parts of the parameter PyTree
+    parameters = evm.parameter.combine(dynamic, static)
     assert parameters == params
     # use the parameters to calculate the loss as usual
     ...
 
-grad_loss = eqx.filter_grad(loss)(diffable, static, ...)
+grad_loss = eqx.filter_grad(loss)(dynamic, static, ...)
 ```
 
 If you need to further exclude parameter from being optimized you can either set `frozen=True`.

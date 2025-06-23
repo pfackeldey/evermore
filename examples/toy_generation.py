@@ -21,12 +21,12 @@ key = jax.random.PRNGKey(42)
 # first we have to run a fit to get the cov matrix
 @eqx.filter_jit
 def loss(
-    diffable: PyTree[evm.Parameter],
+    dynamic: PyTree[evm.Parameter],
     static: PyTree[evm.Parameter],
     hists: PyTree[Float[Array, " nbins"]],
     observation: Float[Array, " nbins"],
 ) -> Float[Array, ""]:
-    params = evm.parameter.combine(diffable, static)
+    params = evm.parameter.combine(dynamic, static)
     expectations = model(params, hists)
     constraints = evm.loss.get_log_probs(params)
     loss_val = (
@@ -40,20 +40,20 @@ def loss(
 
 
 @eqx.filter_jit
-def optx_loss(diffable, args):
-    return loss(diffable, *args)
+def optx_loss(dynamic, args):
+    return loss(dynamic, *args)
 
 
 @eqx.filter_jit
 def fit(params, hists, observation):
     solver = optx.BFGS(rtol=1e-5, atol=1e-7)
 
-    diffable, static = evm.parameter.partition(params)
+    dynamic, static = evm.parameter.partition(params)
 
     fitresult = optx.minimise(
         optx_loss,
         solver,
-        diffable,
+        dynamic,
         has_aux=False,
         args=(static, hists, observation),
         options={},
@@ -67,18 +67,18 @@ def fit(params, hists, observation):
 @eqx.filter_jit
 def postfit_toy_expectation(
     key: PRNGKeyArray,
-    diffable: PyTree[evm.Parameter],
+    dynamic: PyTree[evm.Parameter],
     static: PyTree[evm.Parameter],
     covariance_matrix: Float[Array, "x x"],
     n_samples: int = 1,
 ) -> Float[Array, " nbins"]:
-    toy_diffable = evm.sample.sample_from_covariance_matrix(
+    toy_dynamic = evm.sample.sample_from_covariance_matrix(
         key=key,
-        params=diffable,
+        params=dynamic,
         covariance_matrix=covariance_matrix,
         n_samples=n_samples,
     )
-    toy_params = evm.parameter.combine(toy_diffable, static)
+    toy_params = evm.parameter.combine(toy_dynamic, static)
     expectations = model(toy_params, hists)
     return evm.util.sum_over_leaves(expectations)
 
@@ -96,21 +96,21 @@ if __name__ == "__main__":
 
     # --- Postfit sampling ---
     bestfit_params = fit(params, hists, observation)
-    diffable, static = evm.parameter.partition(bestfit_params)
+    dynamic, static = evm.parameter.partition(bestfit_params)
 
     # partial it to only depend on `params`
     loss_fn = partial(optx_loss, args=(static, hists, observation))
 
     fast_covariance_matrix = eqx.filter_jit(evm.loss.compute_covariance)
-    covariance_matrix = fast_covariance_matrix(loss_fn, diffable)
+    covariance_matrix = fast_covariance_matrix(loss_fn, dynamic)
 
     # create 1 toy
-    expectation = postfit_toy_expectation(key, diffable, static, covariance_matrix)
+    expectation = postfit_toy_expectation(key, dynamic, static, covariance_matrix)
     print("1 toy (postfit):", expectation)
 
     # vectorized toy expectation for 10k toys
     expectations = postfit_toy_expectation(
-        key, diffable, static, covariance_matrix, n_samples=10_000
+        key, dynamic, static, covariance_matrix, n_samples=10_000
     )
     print("Mean of 10.000 toys (postfit):", jnp.mean(expectations, axis=0))
     print("Std of 10.000 toys (postfit):", jnp.std(expectations, axis=0))

@@ -13,12 +13,12 @@ jax.config.update("jax_enable_x64", True)
 
 @eqx.filter_jit
 def loss(
-    diffable: PyTree[evm.Parameter],
+    dynamic: PyTree[evm.Parameter],
     static: PyTree[evm.Parameter],
     hists: PyTree[Float[Array, " nbins"]],
     observation: Float[Array, " nbins"],
 ) -> Float[Array, ""]:
-    params = evm.parameter.combine(diffable, static)
+    params = evm.parameter.combine(dynamic, static)
     expectations = model(params, hists)
     constraints = evm.loss.get_log_probs(params)
     loss_val = (
@@ -34,15 +34,15 @@ def loss(
 def fit(params, hists, observation):
     solver = optx.BFGS(rtol=1e-5, atol=1e-7)
 
-    diffable, static = evm.parameter.partition(params)
+    dynamic, static = evm.parameter.partition(params)
 
-    def optx_loss(diffable, args):
-        return loss(diffable, *args)
+    def optx_loss(dynamic, args):
+        return loss(dynamic, *args)
 
     fitresult = optx.minimise(
         optx_loss,
         solver,
-        diffable,
+        dynamic,
         has_aux=False,
         args=(static, hists, observation),
         options={},

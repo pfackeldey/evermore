@@ -188,7 +188,7 @@ def value_filter_spec(tree: _ParamsTree) -> _ParamsTree:
 
     Returns:
         _ParamsTree: A PyTree with the same structure as the input, but with boolean values indicating
-        which parts of the tree are diffable (True) and which are static (False).
+        which parts of the tree are dynamic (True) and which are static (False).
 
     Usage:
 
@@ -203,14 +203,14 @@ def value_filter_spec(tree: _ParamsTree) -> _ParamsTree:
             "b": evm.Parameter(value=2.0),
         }
 
-        # split the PyTree into diffable and the static parts
+        # split the PyTree into dynamic and the static parts
         filter_spec = evm.parameter.value_filter_spec(params)
-        diffable, static = eqx.partition(params, filter_spec)
+        dynamic, static = eqx.partition(params, filter_spec)
 
-        # model's first argument is only the diffable part of the parameter PyTree!!
-        def model(diffable, static, hists) -> Array:
-            # combine the diffable and static parts of the parameter PyTree
-            parameters = eqx.combine(diffable, static)
+        # model's first argument is only the dynamic part of the parameter PyTree!!
+        def model(dynamic, static, hists) -> Array:
+            # combine the dynamic and static parts of the parameter PyTree
+            parameters = eqx.combine(dynamic, static)
             assert parameters == params
             # use the parameters to calculate the model as usual
             ...
@@ -235,7 +235,7 @@ def value_filter_spec(tree: _ParamsTree) -> _ParamsTree:
 
 def partition(tree: _ParamsTree) -> tuple[_ParamsTree, _ParamsTree]:
     """
-    Partitions a PyTree of parameters into two separate PyTrees: one containing the diffable (optimizable) parts
+    Partitions a PyTree of parameters into two separate PyTrees: one containing the dynamic (optimizable) parts
     and the other containing the static parts.
 
     This function serves as a shorthand for manually creating a filter specification and then using `eqx.partition`
@@ -245,7 +245,7 @@ def partition(tree: _ParamsTree) -> tuple[_ParamsTree, _ParamsTree]:
         tree (_ParamsTree): A PyTree of parameters to be partitioned.
 
     Returns:
-        tuple[_ParamsTree, _ParamsTree]: A tuple containing two PyTrees. The first PyTree contains the diffable parts
+        tuple[_ParamsTree, _ParamsTree]: A tuple containing two PyTrees. The first PyTree contains the dynamic parts
         of the parameters, and the second PyTree contains the static parts.
 
     Example:
@@ -258,15 +258,15 @@ def partition(tree: _ParamsTree) -> tuple[_ParamsTree, _ParamsTree]:
 
         # Verbose:
         filter_spec = evm.parameter.value_filter_spec(params)
-        diffable, static = eqx.partition(params, filter_spec, replace=evm.util._missing)
-        print(diffable)
+        dynamic, static = eqx.partition(params, filter_spec, replace=evm.util._missing)
+        print(dynamic)
         # >> {'a': Parameter(value=f32[1]), 'b': Parameter(value=--, frozen=True)}
 
         print(static)
         # >> {'a': Parameter(value=--), 'b': Parameter(value=f32[1], frozen=True)}
 
         # Short hand:
-        diffable, static = evm.parameter.partition(params)
+        dynamic, static = evm.parameter.partition(params)
     """
     return eqx.partition(tree, filter_spec=value_filter_spec(tree), replace=_missing)
 
@@ -292,8 +292,8 @@ def combine(*trees: tuple[_ParamsTree]) -> _ParamsTree:
 
         params = {"a": evm.Parameter(1.0), "b": evm.Parameter(2.0, frozen=True)}
 
-        diffable, static = evm.parameter.partition(params)
-        reconstructed_params = evm.parameter.combine(diffable, static)  # inverse of `partition`
+        dynamic, static = evm.parameter.partition(params)
+        reconstructed_params = evm.parameter.combine(dynamic, static)  # inverse of `partition`
         print(reconstructed_params)
         # >> {"a": evm.Parameter(1.0), "b": evm.Parameter(2.0)}
     """
