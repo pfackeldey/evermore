@@ -36,19 +36,23 @@ def __dir__():
 
 @runtime_checkable
 class ModifierLike(Protocol):
-    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale: ...
-    def __call__(self, hist: Float[Array, ...]) -> Float[Array, ...]: ...
+    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale: ...  # noqa: UP037
+    def __call__(self, hist: Float[Array, "..."]) -> Float[Array, "..."]: ...  # noqa: UP037
     def __matmul__(self, other: ModifierLike) -> Compose: ...
 
 
 class AbstractModifier(eqx.Module):
     @abc.abstractmethod
     def offset_and_scale(
-        self: ModifierLike, hist: Float[Array, ...]
+        self: ModifierLike,
+        hist: Float[Array, "..."],  # noqa: UP037
     ) -> OffsetAndScale: ...
 
     @abc.abstractmethod
-    def __call__(self: ModifierLike, hist: Float[Array, ...]) -> Float[Array, ...]: ...
+    def __call__(
+        self: ModifierLike,
+        hist: Float[Array, "..."],  # noqa: UP037
+    ) -> Float[Array, "..."]: ...  # noqa: UP037
 
     @abc.abstractmethod
     def __matmul__(self: ModifierLike, other: ModifierLike) -> Compose: ...
@@ -56,7 +60,7 @@ class AbstractModifier(eqx.Module):
 
 class ApplyFn(AbstractModifier):
     @jax.named_scope("evm.modifier.ApplyFn")
-    def __call__(self: ModifierLike, hist: Float[Array, ...]) -> Float[Array, ...]:
+    def __call__(self: ModifierLike, hist: Float[Array, "..."]) -> Float[Array, "..."]:  # noqa: UP037
         os = self.offset_and_scale(hist=hist)
         return os.scale * (hist + os.offset)
 
@@ -168,7 +172,7 @@ class Modifier(ModifierBase):
         self.parameter = parameter
         self.effect = effect
 
-    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
         return self.effect(parameter=self.parameter, hist=hist)
 
 
@@ -211,7 +215,7 @@ class Where(ModifierBase):
     modifier_true: ModifierLike
     modifier_false: ModifierLike
 
-    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
         true_os = self.modifier_true.offset_and_scale(hist)
         false_os = self.modifier_false.offset_and_scale(hist)
 
@@ -254,7 +258,7 @@ class BooleanMask(ModifierBase):
     mask: Bool[Array, ...]
     modifier: ModifierLike
 
-    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
         os = self.modifier.offset_and_scale(hist)
 
         def _mask(
@@ -301,7 +305,7 @@ class Transform(ModifierBase):
     transform_fn: Callable = eqx.field(static=True)
     modifier: ModifierLike
 
-    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
         os = self.modifier.offset_and_scale(hist)
         return jax.tree.map(self.transform_fn, os)
 
@@ -310,7 +314,7 @@ class TransformOffset(ModifierBase):
     transform_fn: Callable = eqx.field(static=True)
     modifier: ModifierLike
 
-    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
         os = self.modifier.offset_and_scale(hist)
         return OffsetAndScale(offset=self.transform_fn(os.offset), scale=os.scale)
 
@@ -319,7 +323,7 @@ class TransformScale(ModifierBase):
     transform_fn: Callable = eqx.field(static=True)
     modifier: ModifierLike
 
-    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
         os = self.modifier.offset_and_scale(hist)
         return OffsetAndScale(offset=os.offset, scale=self.transform_fn(os.scale))
 
@@ -392,7 +396,7 @@ class Compose(ModifierBase):
     def __len__(self) -> int:
         return len(self.unroll_modifiers())
 
-    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
         from collections import defaultdict
 
         # initial scale and offset

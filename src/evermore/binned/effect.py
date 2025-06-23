@@ -27,8 +27,8 @@ def __dir__():
 
 
 class OffsetAndScale(eqx.Module):
-    offset: Float[Array, ...] = eqx.field(converter=float_array, default=0.0)
-    scale: Float[Array, ...] = eqx.field(converter=float_array, default=1.0)
+    offset: Float[Array, "..."] = eqx.field(converter=float_array, default=0.0)  # noqa: UP037
+    scale: Float[Array, "..."] = eqx.field(converter=float_array, default=1.0)  # noqa: UP037
 
     def broadcast(self) -> OffsetAndScale:
         shape = jnp.broadcast_shapes(self.offset.shape, self.scale.shape)
@@ -41,21 +41,25 @@ class OffsetAndScale(eqx.Module):
 class Effect(eqx.Module, SupportsTreescope):
     @abc.abstractmethod
     def __call__(
-        self, parameter: PyTree[Parameter], hist: Float[Array, ...]
+        self,
+        parameter: PyTree[Parameter],
+        hist: Float[Array, "..."],  # noqa: UP037
     ) -> OffsetAndScale: ...
 
 
 class Identity(Effect):
     @jax.named_scope("evm.effect.Identity")
     def __call__(
-        self, parameter: PyTree[Parameter], hist: Float[Array, ...]
+        self,
+        parameter: PyTree[Parameter],
+        hist: Float[Array, "..."],  # noqa: UP037
     ) -> OffsetAndScale:
         return OffsetAndScale(offset=0.0, scale=1.0)  # type: ignore[arg-type]
 
 
 class Lambda(Effect):
     fun: Callable[
-        [PyTree[Parameter], Float[Array, ...]], OffsetAndScale | Float[Array, ...]
+        [PyTree[Parameter], Float[Array, "..."]], OffsetAndScale | Float[Array, "..."]  # noqa: UP037
     ]
     normalize_by: Literal["offset", "scale"] | None = eqx.field(
         static=True, default=None
@@ -63,7 +67,9 @@ class Lambda(Effect):
 
     @jax.named_scope("evm.effect.Lambda")
     def __call__(
-        self, parameter: PyTree[Parameter], hist: Float[Array, ...]
+        self,
+        parameter: PyTree[Parameter],
+        hist: Float[Array, "..."],  # noqa: UP037
     ) -> OffsetAndScale:
         res = self.fun(parameter, hist)
         if isinstance(res, OffsetAndScale) and self.normalize_by is None:
@@ -77,12 +83,14 @@ class Lambda(Effect):
 
 
 class Linear(Effect):
-    offset: Float[Array, ...] = eqx.field(converter=float_array)
-    slope: Float[Array, ...] = eqx.field(converter=float_array)
+    offset: Float[Array, "..."] = eqx.field(converter=float_array)  # noqa: UP037
+    slope: Float[Array, "..."] = eqx.field(converter=float_array)  # noqa: UP037
 
     @jax.named_scope("evm.effect.Linear")
     def __call__(
-        self, parameter: PyTree[Parameter], hist: Float[Array, ...]
+        self,
+        parameter: PyTree[Parameter],
+        hist: Float[Array, "..."],  # noqa: UP037
     ) -> OffsetAndScale:
         assert isinstance(parameter, Parameter)
         sf = parameter.value * self.slope + self.offset
@@ -93,12 +101,16 @@ DEFAULT_EFFECT: Linear = Linear(offset=0.0, slope=1.0)  # type: ignore[arg-type]
 
 
 class VerticalTemplateMorphing(Effect):
-    up_template: Float[Array, ...] = eqx.field(converter=float_array)  # + 1 sigma
-    down_template: Float[Array, ...] = eqx.field(converter=float_array)  # - 1 sigma
+    # + 1 sigma
+    up_template: Float[Array, "..."] = eqx.field(converter=float_array)  # noqa: UP037
+    # - 1 sigma
+    down_template: Float[Array, "..."] = eqx.field(converter=float_array)  # noqa: UP037
 
     def vshift(
-        self, x: Float[Array, ...], hist: Float[Array, ...]
-    ) -> Float[Array, ...]:
+        self,
+        x: Float[Array, "..."],  # noqa: UP037
+        hist: Float[Array, "..."],  # noqa: UP037
+    ) -> Float[Array, "..."]:  # noqa: UP037
         dx_sum = self.up_template + self.down_template - 2 * hist
         dx_diff = self.up_template - self.down_template
 
@@ -118,7 +130,9 @@ class VerticalTemplateMorphing(Effect):
 
     @jax.named_scope("evm.effect.VerticalTemplateMorphing")
     def __call__(
-        self, parameter: PyTree[Parameter], hist: Float[Array, ...]
+        self,
+        parameter: PyTree[Parameter],
+        hist: Float[Array, "..."],  # noqa: UP037
     ) -> OffsetAndScale:
         assert isinstance(parameter, Parameter)
         offset = self.vshift(parameter.value, hist=hist)
@@ -126,10 +140,10 @@ class VerticalTemplateMorphing(Effect):
 
 
 class AsymmetricExponential(Effect):
-    up: Float[Array, ...] = eqx.field(converter=float_array)
-    down: Float[Array, ...] = eqx.field(converter=float_array)
+    up: Float[Array, "..."] = eqx.field(converter=float_array)  # noqa: UP037
+    down: Float[Array, "..."] = eqx.field(converter=float_array)  # noqa: UP037
 
-    def interpolate(self, x: Float[Array, ...]) -> Float[Array, ...]:
+    def interpolate(self, x: Float[Array, "..."]) -> Float[Array, "..."]:  # noqa: UP037
         # https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/be488af288361ef101859a398ae618131373cad7/src/ProcessNormalization.cc#L112-L129
         lo, hi = self.down, self.up
         hi = jnp.log(hi)
@@ -146,7 +160,9 @@ class AsymmetricExponential(Effect):
 
     @jax.named_scope("evm.effect.AsymmetricExponential")
     def __call__(
-        self, parameter: PyTree[Parameter], hist: Float[Array, ...]
+        self,
+        parameter: PyTree[Parameter],
+        hist: Float[Array, "..."],  # noqa: UP037
     ) -> OffsetAndScale:
         assert isinstance(parameter, Parameter)
         interp = self.interpolate(parameter.value)

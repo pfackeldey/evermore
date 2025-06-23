@@ -65,12 +65,15 @@ for step in range(3_000):
     params, opt_state = make_step(params, opt_state, hists, observation)
 
 diffable, static = evm.parameter.partition(params)
-fast_covariance_matrix = eqx.filter_jit(evm.sample.compute_covariance_matrix)
-covariance_matrix = fast_covariance_matrix(
-    loss=loss,
-    params=diffable,
-    args=(static, hists, observation),
-)
+fast_covariance_matrix = eqx.filter_jit(evm.loss.compute_covariance)
+
+
+# partial it to only depend on `params`
+def loss_fn(params):
+    return loss(params, static, hists, observation)
+
+
+covariance_matrix = fast_covariance_matrix(loss_fn, diffable)
 
 
 # generate new expectation based on the postfit toy parameters

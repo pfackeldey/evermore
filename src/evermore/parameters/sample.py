@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import typing as tp
-
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -11,13 +9,13 @@ from evermore.parameters.parameter import (
     Parameter,
     _params_map,
     _ParamsTree,
+    _replace_parameter_value,
     is_parameter,
 )
 from evermore.pdf import PDF, PoissonBase
 from evermore.util import _missing
 
 __all__ = [
-    "compute_covariance_matrix",
     "sample_from_covariance_matrix",
     "sample_from_priors",
 ]
@@ -25,81 +23,6 @@ __all__ = [
 
 def __dir__():
     return __all__
-
-
-def _replace_param_value(
-    param: Parameter,
-    value: Float[Array, ...],
-) -> Parameter:
-    return eqx.tree_at(
-        lambda p: p.value,
-        param,
-        value,
-        is_leaf=lambda leaf: leaf is _missing,
-    )
-
-
-def compute_covariance_matrix(
-    loss: tp.Callable,
-    params: _ParamsTree,
-    *,
-    args: tuple[tp.Any, ...] = (),
-) -> Float[Array, "nparams nparams"]:
-    r"""
-    Computes the covariance matrix of the parameters under the Laplace approximation,
-    by inverting the Hessian of the loss function at the current parameter values.
-
-    See ``examples/toy_generation.py`` for an example usage.
-
-    Args:
-        loss (Callable): The loss function. Should accept (params, \*args) as arguments.
-        params (_ParamsTree): A PyTree of parameters.
-        args (tuple, optional): Additional arguments to pass to the loss function.
-
-    Returns:
-        Float[Array, "nparams nparams"]: The covariance matrix of the parameters.
-
-    Example:
-
-    .. code-block:: python
-
-        import evermore as evm
-        import jax
-        import jax.numpy as jnp
-
-
-        def loss_fn(params):
-            x = params["a"].value
-            y = params["b"].value
-            return jnp.sum((x - 1.0) ** 2 + (y - 2.0) ** 2)
-
-
-        params = {
-            "a": evm.Parameter(value=jnp.array([1.0]), prior=None, lower=0.0, upper=2.0),
-            "b": evm.Parameter(value=jnp.array([2.0]), prior=None, lower=1.0, upper=3.0),
-        }
-
-        cov = evm.sample.compute_covariance_matrix(loss_fn, params)
-        cov.shape
-        # (2, 2)
-    """
-    # first, compute the hessian at the current point
-    values = _params_map(lambda p: p.value, params)
-    flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
-
-    def _flat_loss(flat_values: Float[Array, ...]) -> Float[Array, ""]:
-        param_values = unravel_fn(flat_values)
-
-        _params = jax.tree.map(
-            _replace_param_value, params, param_values, is_leaf=is_parameter
-        )
-        return loss(_params, *args)
-
-    # calculate hessian
-    hessian = jax.hessian(_flat_loss)(flat_values)
-
-    # invert to get the correlation matrix under the Laplace assumption of normality
-    return jnp.linalg.inv(hessian)
 
 
 def sample_from_covariance_matrix(
@@ -165,7 +88,7 @@ def sample_from_covariance_matrix(
 
     # put them into the original structure again
     return jax.tree.map(
-        _replace_param_value, params, sampled_param_values, is_leaf=is_parameter
+        _replace_parameter_value, params, sampled_param_values, is_leaf=is_parameter
     )
 
 

@@ -25,7 +25,7 @@ def __dir__():
     return __all__
 
 
-def float_array(x: Any) -> Float[Array, ...]:
+def float_array(x: Any) -> Float[Array, "..."]:  # noqa: UP037
     return jnp.asarray(x, jnp.result_type(float))
 
 

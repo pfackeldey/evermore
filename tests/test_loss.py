@@ -23,10 +23,12 @@ def test_get_log_probs():
 def test_compute_covariance():
     def loss_fn(params):
         return (
-            params["a"] ** 2 + 2 * params["b"] ** 2 + (params["a"] + params["c"]) ** 2
+            params["a"].value ** 2
+            + 2 * params["b"].value ** 2
+            + (params["a"].value + params["c"].value) ** 2
         )
 
-    params = {"a": jnp.array(2.0), "b": jnp.array(3.0), "c": jnp.array(4.0)}
+    params = {"a": evm.Parameter(2.0), "b": evm.Parameter(3.0), "c": evm.Parameter(4.0)}
 
     cov = evm.loss.compute_covariance(loss_fn, params)
 

@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 __all__ = [
     "NormalParameter",
     "Parameter",
+    "_replace_parameter_value",
     "correlate",
     "is_parameter",
     "partition",
@@ -56,10 +57,10 @@ class Parameter(eqx.Module, SupportsTreescope):
         frozen_parameter = evm.Parameter(value=1.0, frozen=True)
     """
 
-    value: Float[Array, ...] = eqx.field(converter=float_array, default=0.0)
+    value: Float[Array, "..."] = eqx.field(converter=float_array, default=0.0)  # noqa: UP037
     name: str | None = eqx.field(default=None)
-    lower: Float[Array, ...] | None = eqx.field(default=None)
-    upper: Float[Array, ...] | None = eqx.field(default=None)
+    lower: Float[Array, "..."] | None = eqx.field(default=None)  # noqa: UP037
+    upper: Float[Array, "..."] | None = eqx.field(default=None)  # noqa: UP037
     prior: PDF | None = eqx.field(default=None)
     frozen: bool = eqx.field(default=False)
     transform: ParameterTransformation | None = eqx.field(default=None)
@@ -103,7 +104,7 @@ class NormalParameter(Parameter):
 
     prior: PDF | None = eqx.field(default_factory=lambda: Normal(mean=0.0, width=1.0))  # type: ignore[arg-type]
 
-    def scale_log(self, up: Float[Array, ...], down: Float[Array, ...]) -> Modifier:
+    def scale_log(self, up: Float[Array, "..."], down: Float[Array, "..."]) -> Modifier:  # noqa: UP037
         """
         Applies an asymmetric exponential scaling to the parameter.
 
@@ -120,7 +121,9 @@ class NormalParameter(Parameter):
         return Modifier(parameter=self, effect=AsymmetricExponential(up=up, down=down))  # type: ignore[arg-type]
 
     def morphing(
-        self, up_template: Float[Array, ...], down_template: Float[Array, ...]
+        self,
+        up_template: Float[Array, "..."],  # noqa: UP037
+        down_template: Float[Array, "..."],  # noqa: UP037
     ) -> Modifier:
         """
         Applies vertical template morphing to the parameter.
@@ -160,6 +163,18 @@ _params_map = partial(filter_tree_map, filter=is_parameter)
 
 
 _ParamsTree = TypeVar("_ParamsTree", bound=PyTree[Parameter])
+
+
+def _replace_parameter_value(
+    param: Parameter,
+    value: Float[Array, "..."],  # noqa: UP037
+) -> Parameter:
+    return eqx.tree_at(
+        lambda p: p.value,
+        param,
+        value,
+        is_leaf=lambda leaf: leaf is _missing,
+    )
 
 
 def value_filter_spec(tree: _ParamsTree) -> _ParamsTree:
@@ -359,10 +374,10 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
     def _correlate(parameter: Parameter) -> tuple[Parameter, Parameter]:
         ps = (first, parameter)
 
-        def where(ps: tuple[Parameter, Parameter]) -> Float[Array, ...]:
+        def where(ps: tuple[Parameter, Parameter]) -> Float[Array, "..."]:  # noqa: UP037
             return ps[1].value
 
-        def get(ps: tuple[Parameter, Parameter]) -> Float[Array, ...]:
+        def get(ps: tuple[Parameter, Parameter]) -> Float[Array, "..."]:  # noqa: UP037
             return ps[0].value
 
         shared = eqx.nn.Shared(ps, where, get)

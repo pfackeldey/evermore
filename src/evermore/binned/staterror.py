@@ -58,15 +58,15 @@ class StatErrors(ModifierBase):
     """
 
     eps: Float[Scalar, ""]
-    n_entries: Float[Array, ...]
+    n_entries: Float[Array, "..."]  # noqa: UP037
     non_empty_mask: Bool[Array, " nbins"]
-    relative_error: Float[Array, ...]
+    relative_error: Float[Array, "..."]  # noqa: UP037
     parameter: NormalParameter
 
     def __init__(
         self,
-        hist: Float[Array, ...],
-        variance: Float[Array, ...],
+        hist: Float[Array, "..."],  # noqa: UP037
+        variance: Float[Array, "..."],  # noqa: UP037
     ):
         # make sure they are of dtype float
         hist, variance = jax.tree.map(float_array, (hist, variance))
@@ -87,7 +87,7 @@ class StatErrors(ModifierBase):
         )
         self.parameter = NormalParameter(value=jnp.zeros_like(self.n_entries))
 
-    def offset_and_scale(self, hist: Float[Array, ...]) -> OffsetAndScale:
+    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
         modifier = Where(
             self.non_empty_mask,
             self.parameter.scale(slope=self.relative_error, offset=1.0),
