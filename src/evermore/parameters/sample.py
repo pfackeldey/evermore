@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PRNGKeyArray
@@ -144,7 +143,7 @@ def sample_from_priors(params: _ParamsTree, key: PRNGKeyArray) -> _ParamsTree:
                 sampled_value = (sampled_value / pdf.lamb) - 1
 
             # replace in param:
-            return eqx.tree_at(lambda p: p.value, param, sampled_value)
+            return _replace_parameter_value(param, sampled_value)
         # can't sample if there's no pdf to sample from,
         # or when the value is `_missing`
         return param
