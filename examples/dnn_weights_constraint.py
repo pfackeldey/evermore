@@ -40,9 +40,10 @@ def loss_fn(model, x, y):
     return mse + evm.util.sum_over_leaves(constraints)
 
 
-batch_size, in_size, out_size = 32, 2, 3
-model = LinearConstrained(in_size, out_size, key=jax.random.PRNGKey(0))
-x = jax.numpy.zeros((batch_size, in_size))
-y = jax.numpy.zeros((batch_size, out_size))
-loss_val = loss_fn(model, x, y)
-grads = eqx.filter_grad(loss_fn)(model, x, y)
+if __name__ == "__main__":
+    batch_size, in_size, out_size = 32, 2, 3
+    model = LinearConstrained(in_size, out_size, key=jax.random.PRNGKey(0))
+    x = jax.numpy.zeros((batch_size, in_size))
+    y = jax.numpy.zeros((batch_size, out_size))
+    loss_val = loss_fn(model, x, y)
+    grads = eqx.filter_grad(loss_fn)(model, x, y)

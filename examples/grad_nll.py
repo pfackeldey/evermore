@@ -6,6 +6,8 @@ from model import hists, model, observation, params
 
 import evermore as evm
 
+jax.config.update("jax_enable_x64", True)
+
 
 @eqx.filter_jit
 def loss(

@@ -2,13 +2,14 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optax
+import wadler_lindig as wl
 from jaxtyping import Array, Float, PyTree
 from model import hists, model, observation, params
 
 import evermore as evm
 
+jax.config.update("jax_enable_x64", True)
 optim = optax.sgd(learning_rate=1e-2)
-opt_state = optim.init(eqx.filter(model, eqx.is_inexact_array))
 
 
 @eqx.filter_jit
@@ -33,36 +34,38 @@ def loss(
 
 @eqx.filter_jit
 def make_step(
-    params: PyTree[evm.Parameter],
+    diffable: PyTree[evm.Parameter],
+    static: PyTree[evm.Parameter],
     opt_state: PyTree,
     hists: PyTree[Float[Array, " nbins"]],
     observation: Float[Array, " nbins"],
 ) -> tuple[PyTree[evm.Parameter], PyTree]:
-    diffable, static = evm.parameter.partition(params)
     grads = eqx.filter_grad(loss)(diffable, static, hists, observation)
     updates, opt_state = optim.update(grads, opt_state)
     # apply parameter updates
     diffable = eqx.apply_updates(diffable, updates)
-    params = evm.parameter.combine(diffable, static)
-    return params, opt_state
+    return diffable, opt_state
 
 
-# minimize params with 1000 steps
-for step in range(1000):
-    if step % 100 == 0:
-        diffable, static = evm.parameter.partition(params)
-        loss_val = loss(diffable, static, hists, observation)
-        print(f"{step=} - {loss_val=:.6f}")
-    params, opt_state = make_step(params, opt_state, hists, observation)
+def fit(params, hists, observation):
+    diffable, static = evm.parameter.partition(params)
+
+    # initialize optimizer state
+    opt_state = optim.init(eqx.filter(diffable, eqx.is_inexact_array))
+
+    # minimize params with 5000 steps
+    for step in range(5000):
+        if step % 500 == 0:
+            loss_val = loss(diffable, static, hists, observation)
+            print(f"{step=} - {loss_val=:.6f}")
+        diffable, opt_state = make_step(diffable, static, opt_state, hists, observation)
+
+    # combine optimized diffable part with the static pytree
+    return evm.parameter.combine(diffable, static)
 
 
-# For low overhead it is recommended to use jax.lax.fori_loop.
-# In case you want to jit the for loop, you can use the following function,
-# this will prevent jax from unrolling the loop and creating a huge graph
-@jax.jit
-def fit(steps: int = 1000) -> tuple[PyTree[evm.Parameter], PyTree]:
-    def fun(step, params_optstate):
-        params, opt_state = params_optstate
-        return make_step(params, opt_state, hists, observation)
+if __name__ == "__main__":
+    bestfit_params = fit(params, hists, observation)
 
-    return jax.lax.fori_loop(0, steps, fun, (params, opt_state))
+    print("Bestfit parameter:")
+    wl.pprint(bestfit_params, short_arrays=False)

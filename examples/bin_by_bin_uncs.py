@@ -6,6 +6,8 @@ from jaxtyping import Array, Float, PyTree
 
 import evermore as evm
 
+jax.config.update("jax_enable_x64", True)
+
 
 def model(
     staterrors: evm.staterror.StatErrors, hists: PyTree[Float[Array, " nbins"]]
@@ -44,5 +46,6 @@ staterrors = jax.tree.map(
     histsw2,
 )
 
-# test the model
-expectations = model(staterrors, hists)
+if __name__ == "__main__":
+    # test the model
+    expectations = model(staterrors, hists)

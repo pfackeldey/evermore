@@ -38,33 +38,33 @@ def fixed_mu_fit(mu: Float[Array, ""]) -> Float[Array, ""]:
 
     @eqx.filter_jit
     def make_step(
-        params: PyTree[evm.Parameter],
+        diffable: PyTree[evm.Parameter],
+        static: PyTree[evm.Parameter],
         opt_state: PyTree,
         hists: PyTree[Float[Array, " nbins"]],
         observation: Float[Array, " nbins"],
     ) -> tuple[PyTree[evm.Parameter], PyTree]:
-        diffable, static = evm.parameter.partition(params)
         grads = eqx.filter_grad(loss)(diffable, static, hists, observation)
         updates, opt_state = optim.update(grads, opt_state)
         # apply parameter updates
         diffable = eqx.apply_updates(diffable, updates)
-        params = evm.parameter.combine(diffable, static)
-        return params, opt_state
+        return diffable, opt_state
+
+    diffable, static = evm.parameter.partition(params)
 
     # minimize params with 1000 steps
     for _ in range(1000):
-        params, opt_state = make_step(params, opt_state, hists, observation)
-    diffable, static = evm.parameter.partition(params)
+        diffable, opt_state = make_step(diffable, static, opt_state, hists, observation)
     return loss(diffable, static, hists, observation)
 
 
-mus = jnp.linspace(0, 5, 11)
-# for loop over mu values
-for mu in mus:
-    print(f"[for-loop] mu={mu:.2f} - NLL={fixed_mu_fit(jnp.array(mu)):.6f}")
+if __name__ == "__main__":
+    mus = jnp.linspace(0, 5, 11)
+    # for loop over mu values
+    for mu in mus:
+        print(f"[for-loop] mu={mu:.2f} - NLL={fixed_mu_fit(jnp.array(mu)):.6f}")
 
-
-# or vectorized!!!
-likelihood_scan = jax.vmap(fixed_mu_fit)(mus)
-for mu, nll in zip(mus, likelihood_scan, strict=False):
-    print(f"[jax.vmap] mu={mu:.2f} - NLL={nll:.6f}")
+    # or vectorized!!!
+    likelihood_scan = jax.vmap(fixed_mu_fit)(mus)
+    for mu, nll in zip(mus, likelihood_scan, strict=False):
+        print(f"[jax.vmap] mu={mu:.2f} - NLL={nll:.6f}")

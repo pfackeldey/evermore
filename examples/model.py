@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PyTree
 
 import evermore as evm
+
+jax.config.update("jax_enable_x64", True)
 
 
 # dataclass like container for parameters
