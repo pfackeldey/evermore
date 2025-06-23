@@ -3,9 +3,15 @@ import typing as tp
 import jax
 import jax.flatten_util
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Scalar
+from jaxtyping import Array, Float
 
-from evermore.parameters.parameter import Parameter, _params_map, _ParamsTree
+from evermore.parameters.parameter import (
+    Parameter,
+    _params_map,
+    _ParamsTree,
+    _replace_parameter_value,
+    is_parameter,
+)
 from evermore.pdf import PDF, ImplementsFromUnitNormalConversion, Normal
 
 __all__ = [
@@ -76,54 +82,62 @@ def get_log_probs(params: _ParamsTree) -> _ParamsTree:
 def compute_covariance(
     loss_fn: tp.Callable,
     params: _ParamsTree,
-    args: tuple[tp.Any, ...] = (),
-    kwargs: dict[str, tp.Any] | None = None,
-) -> Array:
-    """
-    Computes the covariance (correlation) matrix between parameters in a PyTree, evaluated with its
-    parameter values at a given loss function. The covariance is computed using the inverted Hessian
-    under the Laplace assumption of normality, followed by a normalization step.
+) -> Float[Array, "nparams nparams"]:
+    r"""
+    Computes the covariance matrix of the parameters under the Laplace approximation,
+    by inverting the Hessian of the loss function at the current parameter values.
+
+    See ``examples/toy_generation.py`` for an example usage.
+
+    Args:
+        loss_fn (Callable): The loss function. Should accept (params) as arguments.
+            All other arguments have to be "partial'd" into the loss function.
+        params (_ParamsTree): A PyTree of parameters.
+
+    Returns:
+        Float[Array, "nparams nparams"]: The covariance matrix of the parameters.
+
+    Example:
 
     .. code-block:: python
 
-        import jax.numpy as jnp
         import evermore as evm
-
-        params = {"a": jnp.array(2.0), "b": jnp.array(3.0), "c": jnp.array(4.0)}
+        import jax
+        import jax.numpy as jnp
 
 
         def loss_fn(params):
-            # some loss function depending on params["a"], params["b"] and params["c"]
-            return ...
+            x = params["a"].value
+            y = params["b"].value
+            return jnp.sum((x - 1.0) ** 2 + (y - 2.0) ** 2)
 
 
-        # compute the covariance matrix
+        params = {
+            "a": evm.Parameter(value=jnp.array([1.0]), prior=None, lower=0.0, upper=2.0),
+            "b": evm.Parameter(value=jnp.array([2.0]), prior=None, lower=1.0, upper=3.0),
+        }
+
         cov = evm.loss.compute_covariance(loss_fn, params)
-
-    Args:
-        loss_fn (Callable): A callable whose gradients are evaluated for the computation.
-        params (PyTree): A PyTree containing parameters to compute the covariance for.
-        args (tuple): Additional positional arguments to pass to the loss function.
-        kwargs (dict): Additional keyword arguments to pass to the loss function.
-
-    Returns:
-        Array: A square matrix representing the correlation between parameters.
+        cov.shape
+        # (2, 2)
     """
-    # default kwargs
-    if kwargs is None:
-        kwargs = {}
+    # first, compute the hessian at the current point
+    values = _params_map(lambda p: p.value, params)
+    flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
 
-    # create a flattened version of the parameters and the loss
-    flat_params, unravel_fn = jax.flatten_util.ravel_pytree(params)
+    def _flat_loss(flat_values: Float[Array, "..."]) -> Float[Array, ""]:
+        param_values = unravel_fn(flat_values)
 
-    def flat_loss_fn(flat_params: Float[Array, "..."]) -> Float[Scalar, ""]:
-        return loss_fn(unravel_fn(flat_params), *args, **kwargs)
+        _params = jax.tree.map(
+            _replace_parameter_value, params, param_values, is_leaf=is_parameter
+        )
+        return loss_fn(_params)
 
-    # compute the hessian at the current parameters
-    h = jax.hessian(flat_loss_fn)(flat_params)
+    # calculate hessian
+    hessian = jax.hessian(_flat_loss)(flat_values)
 
-    # get the unnormalized covariance matrix
-    cov = jnp.linalg.inv(h)
+    # invert to get the correlation matrix under the Laplace assumption of normality
+    cov = jnp.linalg.inv(hessian)
 
     # normalize via D^-1 @ cov @ D^-1 with D being the diagnonal standard deviation matrix
     d = jnp.sqrt(jnp.diag(cov))
