@@ -4,42 +4,9 @@ import jax
 import jax.numpy as jnp
 import wadler_lindig as wl
 from jaxtyping import Array, Float, PyTree
-from model import hists, model, observation, params
+from model import hists, loss, observation, params
 
 import evermore as evm
-
-jax.config.update("jax_enable_x64", True)
-
-
-def update_params(
-    params: PyTree[evm.Parameter], values: [PyTree[Array]]
-) -> PyTree[evm.Parameter]:
-    return jax.tree.map(
-        evm.parameter.replace_value,
-        params,
-        values,
-        is_leaf=evm.parameter.is_parameter,
-    )
-
-
-@eqx.filter_jit
-def loss(
-    dynamic: PyTree[evm.Parameter],
-    static: PyTree[evm.Parameter],
-    hists: PyTree[Float[Array, " nbins"]],
-    observation: Float[Array, " nbins"],
-) -> Float[Array, ""]:
-    params = evm.parameter.combine(dynamic, static)
-    expectations = model(params, hists)
-    constraints = evm.loss.get_log_probs(params)
-    loss_val = (
-        evm.pdf.PoissonContinuous(evm.util.sum_over_leaves(expectations))
-        .log_prob(observation)
-        .sum()
-    )
-    # add constraint
-    loss_val += evm.util.sum_over_leaves(constraints)
-    return -jnp.sum(loss_val)
 
 
 def fit(params, hists, observation):
@@ -52,11 +19,21 @@ def fit(params, hists, observation):
     )
     flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
 
+    def update(
+        params: PyTree[evm.Parameter],
+        values: Float[Array, " nparams"],
+    ) -> PyTree[evm.Parameter]:
+        return jax.tree.map(
+            evm.parameter.replace_value,
+            params,
+            unravel_fn(values),
+            is_leaf=evm.parameter.is_parameter,
+        )
+
     # wrap loss that works on flat array
     @eqx.filter_jit
-    def flat_loss(flat_values: Float[Array, "..."]) -> Float[Array, ""]:
-        param_values = unravel_fn(flat_values)
-        _dynamic = update_params(dynamic, param_values)
+    def flat_loss(flat_values: Float[Array, " nparams"]) -> Float[Array, ""]:
+        _dynamic = update(dynamic, flat_values)
         return loss(_dynamic, static, hists, observation)
 
     minuit = iminuit.Minuit(flat_loss, flat_values, grad=eqx.filter_grad(flat_loss))
@@ -66,13 +43,10 @@ def fit(params, hists, observation):
 
     print(f"Is function minimum valid? -> {minuit.valid}")
 
-    bestfit = jnp.array(minuit.values)
-
-    # wrap into pytree
-    bestfit_wrapped = unravel_fn(bestfit)
+    bestfit_values = jnp.array(minuit.values)
 
     # wrap into pytree of parameters
-    bestfit_dynamic = update_params(dynamic, bestfit_wrapped)
+    bestfit_dynamic = update(dynamic, bestfit_values)
 
     # combine with static pytree
     return evm.parameter.combine(bestfit_dynamic, static)

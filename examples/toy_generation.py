@@ -5,11 +5,10 @@ import jax
 import jax.numpy as jnp
 import optimistix as optx
 from jaxtyping import Array, Float, PRNGKeyArray, PyTree
-from model import hists, model, observation, params
+from model import hists, loss, model, observation, params
 
 import evermore as evm
 
-jax.config.update("jax_enable_x64", True)
 key = jax.random.PRNGKey(42)
 
 
@@ -19,24 +18,6 @@ key = jax.random.PRNGKey(42)
 
 
 # first we have to run a fit to get the cov matrix
-@eqx.filter_jit
-def loss(
-    dynamic: PyTree[evm.Parameter],
-    static: PyTree[evm.Parameter],
-    hists: PyTree[Float[Array, " nbins"]],
-    observation: Float[Array, " nbins"],
-) -> Float[Array, ""]:
-    params = evm.parameter.combine(dynamic, static)
-    expectations = model(params, hists)
-    constraints = evm.loss.get_log_probs(params)
-    loss_val = (
-        evm.pdf.PoissonContinuous(evm.util.sum_over_leaves(expectations))
-        .log_prob(observation)
-        .sum()
-    )
-    # add constraint
-    loss_val += evm.util.sum_over_leaves(constraints)
-    return -jnp.sum(loss_val)
 
 
 @eqx.filter_jit

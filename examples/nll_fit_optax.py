@@ -1,35 +1,12 @@
 import equinox as eqx
-import jax
-import jax.numpy as jnp
 import optax
 import wadler_lindig as wl
 from jaxtyping import Array, Float, PyTree
-from model import hists, model, observation, params
+from model import hists, loss, observation, params
 
 import evermore as evm
 
-jax.config.update("jax_enable_x64", True)
 optim = optax.sgd(learning_rate=1e-2)
-
-
-@eqx.filter_jit
-def loss(
-    dynamic: PyTree[evm.Parameter],
-    static: PyTree[evm.Parameter],
-    hists: PyTree[Float[Array, " nbins"]],
-    observation: Float[Array, " nbins"],
-) -> Float[Array, ""]:
-    params = evm.parameter.combine(dynamic, static)
-    expectations = model(params, hists)
-    constraints = evm.loss.get_log_probs(params)
-    loss_val = (
-        evm.pdf.PoissonContinuous(evm.util.sum_over_leaves(expectations))
-        .log_prob(observation)
-        .sum()
-    )
-    # add constraint
-    loss_val += evm.util.sum_over_leaves(constraints)
-    return -jnp.sum(loss_val)
 
 
 @eqx.filter_jit
