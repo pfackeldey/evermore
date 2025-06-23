@@ -18,10 +18,10 @@ if TYPE_CHECKING:
 __all__ = [
     "NormalParameter",
     "Parameter",
-    "_replace_parameter_value",
     "correlate",
     "is_parameter",
     "partition",
+    "replace_value",
     "value_filter_spec",
 ]
 
@@ -165,7 +165,7 @@ _params_map = partial(filter_tree_map, filter=is_parameter)
 _ParamsTree = TypeVar("_ParamsTree", bound=PyTree[Parameter])
 
 
-def _replace_parameter_value(
+def replace_value(
     param: Parameter,
     value: Float[Array, "..."],  # noqa: UP037
 ) -> Parameter:

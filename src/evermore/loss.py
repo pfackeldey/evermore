@@ -9,8 +9,8 @@ from evermore.parameters.parameter import (
     Parameter,
     _params_map,
     _ParamsTree,
-    _replace_parameter_value,
     is_parameter,
+    replace_value,
 )
 from evermore.pdf import PDF, ImplementsFromUnitNormalConversion, Normal
 
@@ -129,7 +129,7 @@ def compute_covariance(
         param_values = unravel_fn(flat_values)
 
         _params = jax.tree.map(
-            _replace_parameter_value, params, param_values, is_leaf=is_parameter
+            replace_value, params, param_values, is_leaf=is_parameter
         )
         return loss_fn(_params)
 

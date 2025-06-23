@@ -8,8 +8,8 @@ from evermore.parameters.parameter import (
     Parameter,
     _params_map,
     _ParamsTree,
-    _replace_parameter_value,
     is_parameter,
+    replace_value,
 )
 from evermore.pdf import PDF, PoissonBase
 from evermore.util import _missing
@@ -87,7 +87,7 @@ def sample_from_covariance_matrix(
 
     # put them into the original structure again
     return jax.tree.map(
-        _replace_parameter_value, params, sampled_param_values, is_leaf=is_parameter
+        replace_value, params, sampled_param_values, is_leaf=is_parameter
     )
 
 
@@ -143,7 +143,7 @@ def sample_from_priors(params: _ParamsTree, key: PRNGKeyArray) -> _ParamsTree:
                 sampled_value = (sampled_value / pdf.lamb) - 1
 
             # replace in param:
-            return _replace_parameter_value(param, sampled_value)
+            return replace_value(param, sampled_value)
         # can't sample if there's no pdf to sample from,
         # or when the value is `_missing`
         return param

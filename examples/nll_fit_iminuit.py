@@ -15,7 +15,7 @@ def update_params(
     params: PyTree[evm.Parameter], values: [PyTree[Array]]
 ) -> PyTree[evm.Parameter]:
     return jax.tree.map(
-        evm.parameter._replace_parameter_value,
+        evm.parameter.replace_value,
         params,
         values,
         is_leaf=evm.parameter.is_parameter,
