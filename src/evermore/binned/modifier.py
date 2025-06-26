@@ -412,22 +412,27 @@ class Compose(ModifierBase):
             if not group_mods:
                 continue
             # Essentially we are turning an array of modifiers into a single modifier of stacked leaves.
-            # Then we can use XLA's loop constructs (e.g.: `jax.lax.scan`) to calculate the scale factors
+            # Then we can use XLA's loop constructs (e.g.: `jax.lax.scan` or `jax.vmap`) to calculate the scale factors
             # without having to compile the fully unrolled loop.
-            stack = tree_stack(group_mods, broadcast_leaves=True)  # type: ignore[arg-type]
+            stack = tree_stack(group_mods, broadcast_leaves=True)
             # scan over first axis of stack
             dynamic_stack, static_stack = eqx.partition(stack, eqx.is_array)
 
             def calc_sf(_hist, _dynamic_stack, _static_stack):
                 stack = eqx.combine(_dynamic_stack, _static_stack)
-                os = stack.offset_and_scale(_hist)
-                return _hist, os
+                return stack.offset_and_scale(_hist)
 
-            _, os = jax.lax.scan(
+            # Vectorize over the first axis of the stack.
+            # Using `jax.vmap` is the most efficient way to do this,
+            # however it needs `hist` and `dynamic_stack` to fit into memory.
+            # If this is not the case, we should consider using `jax.lax.scan` instead.
+            # See: https://github.com/jax-ml/jax/discussions/19114#discussioncomment-7996283
+            vec_calc_sf = jax.vmap(
                 jax.tree_util.Partial(calc_sf, _static_stack=static_stack),
-                hist,
-                dynamic_stack,
+                in_axes=(None, 0),  # vectorize over the batch axis of the dynamic_stack
+                out_axes=0,  # return a tree of scale factors
             )
+            os = vec_calc_sf(hist, dynamic_stack)
             scale *= jnp.prod(os.scale, axis=0)
             offset += jnp.sum(os.offset, axis=0)
 
