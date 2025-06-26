@@ -411,11 +411,10 @@ class Compose(ModifierBase):
             # skip empty groups
             if not group_mods:
                 continue
-            # Essentially we are turning an array of modifiers into a single modifier of stacked leaves.
+            # Essentially we are turning an array of modifiers (AOS) into a single modifier of stacked leaves (SOA).
             # Then we can use XLA's loop constructs (e.g.: `jax.lax.scan` or `jax.vmap`) to calculate the scale factors
             # without having to compile the fully unrolled loop.
             stack = tree_stack(group_mods, broadcast_leaves=True)
-            # scan over first axis of stack
             dynamic_stack, static_stack = eqx.partition(stack, eqx.is_array)
 
             def calc_sf(_hist, _dynamic_stack, _static_stack):
