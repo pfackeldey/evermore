@@ -406,14 +406,14 @@ class Compose(ModifierBase):
         # first group modifiers into same tree structures
         for mod in self.unroll_modifiers():
             groups[hash(jax.tree.structure(mod))].append(mod)
-        # then do the `jax.lax.scan` loops
+        # then do the `jax.vmap` trick to calculate the scale factors in parallel per group.
         for _, group_mods in groups.items():
             # skip empty groups
             if not group_mods:
                 continue
             # Essentially we are turning an array of modifiers (AOS) into a single modifier of stacked leaves (SOA).
-            # Then we can use XLA's loop constructs (e.g.: `jax.lax.scan` or `jax.vmap`) to calculate the scale factors
-            # without having to compile the fully unrolled loop.
+            # Then we can use XLA's vectorization/loop constructs (e.g.: `jax.vmap` or `jax.lax.scan`) to calculate
+            # the scale factors without having to compile the fully unrolled loop.
             stack = tree_stack(group_mods, broadcast_leaves=True)
             dynamic_stack, static_stack = eqx.partition(stack, eqx.is_array)
 
