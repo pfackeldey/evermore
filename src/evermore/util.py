@@ -59,7 +59,7 @@ def sum_over_leaves(tree: PyTree) -> Array:
 
 
 def tree_stack(
-    trees: list[PyTree[Shaped[Array, " ..."]]],
+    trees: list[PyTree[Shaped[Array, "..."]]],  # noqa: UP037
     *,
     broadcast_leaves: bool = False,
 ) -> PyTree[Shaped[Array, "batch_dim ..."]]:
@@ -79,48 +79,46 @@ def tree_stack(
         import evermore as evm
         import jax
         import jax.numpy as jnp
+        import wadler_lindig as wl
 
         modifiers = [
             evm.NormalParameter().scale_log(up=jnp.array([1.1]), down=jnp.array([0.9])),
             evm.NormalParameter().scale_log(up=jnp.array([1.2]), down=jnp.array([0.8])),
         ]
-        print(evm.util.tree_stack(modifiers))
-        # -> Modifier(
-        #      parameter=NormalParameter(
-        #        name=None,
-        #        value=f32[2,1], # <- stacked dimension (2, 1)
-        #        lower=f32[2,1], # <- stacked dimension (2, 1)
-        #        upper=f32[2,1], # <- stacked dimension (2, 1)
-        #        prior=Normal(mean=f32[2,1], width=f32[2,1]), # <- stacked dimension (2,1)
-        #        frozen=False
-        #      ),
-        #      effect=AsymmetricExponential(up=f32[2,1], down=f32[2,1]) # <- stacked dimension (2, 1)
-        #    )
+        wl.pprint(evm.util.tree_stack(modifiers), hide_defaults=False)
+        # Modifier(
+        #   parameter=NormalParameter(
+        #     value=f32[2,1](jax),
+        #     name=None,
+        #     lower=None,
+        #     upper=None,
+        #     prior=Normal(mean=f32[2,1](jax), width=f32[2,1](jax)),
+        #     frozen=False,
+        #     transform=None
+        #   ),
+        #   effect=AsymmetricExponential(up=f32[2,1](jax), down=f32[2,1](jax))
+        # )
     """
-    # If there is only one modifier, we can return it directly
-    if len(trees) == 1:
-        return trees[0]
-    leaves_list = []
-    treedef_list = []
-    for tree in trees:
-        leaves, treedef = jax.tree.flatten(tree)
-        leaves_list.append(leaves)
-        treedef_list.append(treedef)
+    dynamic_trees, static_trees = eqx.partition(trees, eqx.is_array)
+    for tree in static_trees[1:]:
+        if jax.tree.structure(tree) != jax.tree.structure(static_trees[0]):
+            msg = (
+                "All static trees must have the same structure. "
+                f"Got {jax.tree.structure(tree)} and {jax.tree.structure(static_trees[0])}"
+            )
+            raise ValueError(msg)
 
-    grouped_leaves = jax.util.safe_zip(*leaves_list)
-    stacked_leaves = []
-    # make sure we can build a batch dimension ("batch_dim" in type annotation of the result type),
-    # so we do `atleast_1d` once on each leaf
-    for leaves in jax.tree.map(jnp.atleast_1d, grouped_leaves):  # type: ignore[assignment]
-        # make sure we can build a batch dimension
+    def batch_axis_stack(*leaves: Array) -> Array:
+        leaves = jax.tree.map(jnp.atleast_1d, leaves)  # ensure at least 1D
         if broadcast_leaves:
             shape = jnp.broadcast_shapes(*[leaf.shape for leaf in leaves])
-            stacked_leaves.append(
-                jnp.stack(jax.tree.map(partial(jnp.broadcast_to, shape=shape), leaves))
+            return jnp.stack(
+                jax.tree.map(partial(jnp.broadcast_to, shape=shape), leaves)
             )
-        else:
-            stacked_leaves.append(jnp.stack(leaves))
-    return jax.tree.unflatten(treedef_list[0], stacked_leaves)
+        return jnp.stack(leaves, axis=0)
+
+    dynamic_trees = jax.tree.map(batch_axis_stack, *dynamic_trees)
+    return eqx.combine(static_trees[0], dynamic_trees)
 
 
 def dump_jaxpr(fun: Callable, *args: Any, **kwargs: Any) -> str:

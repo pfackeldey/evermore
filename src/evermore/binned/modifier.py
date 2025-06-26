@@ -424,18 +424,12 @@ class Compose(ModifierBase):
                 os = stack.offset_and_scale(_hist)
                 return _hist, os
 
-            # if there is only one modifier in the group, we can skip the scan
-            if len(group_mods) == 1:
-                _, os = calc_sf(hist, dynamic_stack, static_stack)
-                scale *= os.scale
-                offset += os.offset
-            else:
-                _, os = jax.lax.scan(
-                    partial(calc_sf, _static_stack=static_stack),
-                    hist,
-                    dynamic_stack,
-                )
-                scale *= jnp.prod(os.scale, axis=0)
-                offset += jnp.sum(os.offset, axis=0)
+            _, os = jax.lax.scan(
+                partial(calc_sf, _static_stack=static_stack),
+                hist,
+                dynamic_stack,
+            )
+            scale *= jnp.prod(os.scale, axis=0)
+            offset += jnp.sum(os.offset, axis=0)
 
         return OffsetAndScale(offset=offset, scale=scale)
