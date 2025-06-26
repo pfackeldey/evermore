@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import abc
 from collections.abc import Callable
-from functools import partial
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import equinox as eqx
@@ -425,7 +424,7 @@ class Compose(ModifierBase):
                 return _hist, os
 
             _, os = jax.lax.scan(
-                partial(calc_sf, _static_stack=static_stack),
+                jax.tree_util.Partial(calc_sf, _static_stack=static_stack),
                 hist,
                 dynamic_stack,
             )
