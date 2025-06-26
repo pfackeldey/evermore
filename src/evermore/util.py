@@ -65,11 +65,7 @@ def tree_stack(
 ) -> PyTree[Shaped[Array, "batch_dim ..."]]:
     """
     Turns e.g. an array of evm.Modifier(s) into a evm.Modifier of arrays. (AOS -> SOA)
-
-    It is important that the jax.Array(s) of the underlying Arrays have the same shape.
-    Same applies for the effect leaves (e.g. width). However, the effect leaves can be
-    broadcasted to the same shape if broadcast_effect_leaves is set to True.
-
+    The leaves can be broadcasted to the same shape if broadcast_effect is set to True.
     The stacked PyTree will have the static nodes of the first PyTree in the list.
 
     Example:
