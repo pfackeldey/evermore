@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import abc
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Iterator
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import equinox as eqx
@@ -379,21 +379,17 @@ class Compose(ModifierBase):
     modifiers: list[ModifierLike]
 
     def __init__(self, *modifiers: ModifierLike) -> None:
-        self.modifiers = list(modifiers)
-
-    def unroll_modifiers(self) -> list[ModifierLike]:
-        _modifiers = []
-        for mod in self.modifiers:
-            if isinstance(mod, Compose):
-                _modifiers.extend(mod.modifiers)
-            else:
-                assert isinstance(mod, ModifierLike)
-                _modifiers.append(mod)
-        # by now all are modifiers
-        return _modifiers
+        if not modifiers:
+            msg = "At least one modifier must be provided to Compose."
+            raise ValueError(msg)
+        # unpack the modifiers, if they are already a Compose instance
+        # this allows for nested compositions, e.g.:
+        # `Compose(Modifier1, Compose(Modifier2, Modifier3))`
+        # will flatten to `Compose(Modifier1, Modifier2, Modifier3)`
+        self.modifiers = list(unroll(modifiers))
 
     def __len__(self) -> int:
-        return len(self.unroll_modifiers())
+        return len(self.modifiers)
 
     def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
         from collections import defaultdict
@@ -404,7 +400,7 @@ class Compose(ModifierBase):
 
         groups = defaultdict(list)
         # first group modifiers into same tree structures
-        for mod in self.unroll_modifiers():
+        for mod in self.modifiers:
             groups[hash(jax.tree.structure(mod))].append(mod)
         # then do the `jax.vmap` trick to calculate the scale factors in parallel per group.
         for _, group_mods in groups.items():
@@ -436,3 +432,18 @@ class Compose(ModifierBase):
             offset += jnp.sum(os.offset, axis=0)
 
         return OffsetAndScale(offset=offset, scale=scale)
+
+
+def unroll(modifiers: Iterable) -> Iterator[ModifierLike]:
+    # Helper to recursively flatten nested Compose instances into a single list
+    for mod in modifiers:
+        if isinstance(mod, Compose):
+            # recursively yield from the modifiers of the Compose instance
+            yield from unroll(mod.modifiers)
+        elif isinstance(mod, ModifierLike):
+            # yield the modifier if it is a ModifierLike instance
+            yield mod
+        else:
+            # raise an error if the modifier is not a ModifierLike instance
+            msg = f"Modifier {mod} is not a ModifierLike instance."
+            raise TypeError(msg)
