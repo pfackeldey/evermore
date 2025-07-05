@@ -13,7 +13,7 @@ __credits__ = ["Peter Fackeldey"]
 __contact__ = "https://github.com/pfackeldey/evermore"
 __license__ = "BSD-3-Clause"
 __status__ = "Development"
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 
 
 # expose public API
