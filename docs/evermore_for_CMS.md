@@ -184,10 +184,6 @@ bin1 autoMCStats 10 [include-signal = 0] [hist-mode = 1]
 
 Please note that evermore is treating statistical uncertainties through Gaussian
 rather than Poisson modifiers, comparable to the behavior of [pyhf](https://pyhf.readthedocs.io/en/latest/likelihood.html#mc-statistical-uncertainty-staterror).
-However, unlike pyhf, evermore allows to define a threshold on the number of true,
-simulated events per bin below which the statistical uncertainty is modelled per
-process. The threshold value is negative by default, meaning that the per-process
-treatment is always applied.
 
 ```{code-block} python
 import jax
