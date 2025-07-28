@@ -89,9 +89,6 @@ class Linear(AbstractEffect[H]):
         return OffsetAndScale(offset=jnp.zeros_like(hist), scale=sf).broadcast()
 
 
-DEFAULT_EFFECT: Linear = Linear(offset=0.0, slope=1.0)
-
-
 class VerticalTemplateMorphing(AbstractEffect[H]):
     # + 1 sigma
     up_template: H = eqx.field(converter=maybe_float_array)
