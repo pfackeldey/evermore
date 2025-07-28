@@ -256,7 +256,7 @@ class BooleanMask(ModifierBase[PT]):
         return OffsetAndScale[H](
             offset=_mask(os.offset, 0.0),
             scale=_mask(os.scale, 1.0),
-        )
+        ).broadcast()
 
 
 class Transform(ModifierBase[PT]):
@@ -302,7 +302,9 @@ class TransformOffset(ModifierBase[PT]):
 
     def offset_and_scale(self, hist: H) -> OffsetAndScale[H]:
         os = self.modifier.offset_and_scale(hist)
-        return OffsetAndScale(offset=self.transform_fn(os.offset), scale=os.scale)
+        return OffsetAndScale(
+            offset=self.transform_fn(os.offset), scale=os.scale
+        ).broadcast()
 
 
 class TransformScale(ModifierBase[PT]):
@@ -311,7 +313,9 @@ class TransformScale(ModifierBase[PT]):
 
     def offset_and_scale(self, hist: H) -> OffsetAndScale[H]:
         os = self.modifier.offset_and_scale(hist)
-        return OffsetAndScale(offset=os.offset, scale=self.transform_fn(os.scale))
+        return OffsetAndScale(
+            offset=os.offset, scale=self.transform_fn(os.scale)
+        ).broadcast()
 
 
 class Compose(ModifierBase[PT]):
@@ -418,10 +422,10 @@ class Compose(ModifierBase[PT]):
             scale *= jnp.prod(os.scale, axis=0)
             offset += jnp.sum(os.offset, axis=0)
 
-        return OffsetAndScale(offset=offset, scale=scale)
+        return OffsetAndScale(offset=offset, scale=scale).broadcast()
 
 
-def unroll(modifiers: Iterable) -> Iterator[ModifierBase[PT]]:
+def unroll(modifiers: Iterable[ModifierBase[PT]]) -> Iterator[ModifierBase[PT]]:
     # Helper to recursively flatten nested Compose instances into a single list
     for mod in modifiers:
         if isinstance(mod, Compose):
@@ -432,5 +436,5 @@ def unroll(modifiers: Iterable) -> Iterator[ModifierBase[PT]]:
             yield mod
         else:
             # raise an error if the modifier is not a ModifierBase instance
-            msg = f"Modifier {mod} is not a ModifierBase instance."
+            msg = f"Modifier {mod} is not a ModifierBase instance."  # type: ignore[unreachable]
             raise TypeError(msg)
