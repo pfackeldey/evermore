@@ -63,8 +63,7 @@ PDFs
 
     :::{tip}
 
-    You can use _any_ JAX-compatible PDF that satisfies the `evm.custom_types.PDFLike` protocol that requires a `.log_prob` and a `.sample` method to be present.
-    Examples would be PDFs from `distrax` or from the JAX-substrate of TensorFlow Probability.
+    You can use _any_ JAX-compatible PDF that satisfies the `evm.pdf.AbstractPDF` interface.
 
 
 Parameter Boundaries
@@ -93,7 +92,7 @@ Correlate a Parameter
     p3 = evm.Parameter(value=0.5)
 
     # correlate them
-    p1, p2, p3 = evm.parameter.correlate(*parameters)
+    p1, p2, p3 = evm.parameter.correlate(p1, p2, p3)
 
     # now p1, p2, p3 are correlated, i.e., they share the same value
     assert p1.value == p2.value == p3.value
@@ -102,6 +101,7 @@ Correlate a Parameter
     A more general case of correlating any PyTree of parameters is implemented as follows:
     ```{code-block} python
     from typing import NamedTuple
+    import jax
 
 
     class Params(NamedTuple):
@@ -129,6 +129,7 @@ Inspect a (PyTree of) `evm.Parameters` with [treescope](https://treescope.readth
 You can even add custom visualizers, such as:
 
 ```{code-block} python
+import treescope
 import evermore as evm
 
 
@@ -170,7 +171,7 @@ Asymmetric Exponential Scaling
     The mathematical description can be found [here](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/latest/what_combine_does/model_and_likelihood/#normalization-effects).
 
 
-Custom effects can be either implemented by inheriting from `evm.effect.Effect` or - more conveniently - be defined with `evm.effect.Lambda`.
+Custom effects can be either implemented by inheriting from `evm.effect.AbstractEffect` or - more conveniently - be defined with `evm.effect.Lambda`.
 Exemplary, a custom effect that varies a 3-bin histogram by a constant absolute {math}`1\sigma` uncertainty of `[1.0, 1.5, 2.0]` and returns an additive (`normalize_by="offset"`) variation:
 
 ```{code-block} python
@@ -228,7 +229,7 @@ modify = evm.Modifier(parameter=param, effect=evm.effect.Linear(offset=0, slope=
 
 # apply the modifier
 modify(jnp.array([10, 20, 30]))
-# -> Array([11., 22., 33.], dtype=float32, weak_type=True),
+# -> Array([11., 22., 33.], dtype=float32)
 ```
 
 For the most common types of modifiers evermore provides shorthands that construct a modifier directly from parameters, two examples:
@@ -245,7 +246,7 @@ Modifier that scales a histogram with its value (no constraint):
 
     # apply the modifier
     modify(jnp.array([10, 20, 30]))
-    # -> Array([11., 22., 33.], dtype=float32, weak_type=True),
+    # -> Array([11., 22., 33.], dtype=float32)
     ```
 
 
@@ -255,12 +256,12 @@ Modifier that scales a histogram based on vertical template morphing (Normal con
     import evermore as evm
 
 
-    param = evm.NormalParameter(value=1.2)
+    param = evm.NormalParameter(value=0.2)
 
     # create the modifier
     modify = param.morphing(
-        up_template=[12, 23, 35],
-        down_template=[9, 17, 26],
+        up_template=jnp.array([12., 23., 35.]),
+        down_template=jnp.array([9., 17., 26.]),
     )
 
     # apply the modifier
@@ -282,14 +283,14 @@ jax.config.update("jax_enable_x64", True)
 param = evm.NormalParameter(value=0.1)
 
 modifier1 = param.morphing(
-    up_template=[12, 23, 35],
-    down_template=[9, 17, 26],
+    up_template=jnp.array([12., 23., 35.]),
+    down_template=jnp.array([9., 17., 26.]),
 )
 
 modifier2 = param.scale_log(up=1.1, down=0.9)
 
 # apply the composed modifier
-(modifier1 @ modifier2)(jnp.array([10, 20, 30]))
+(modifier1 @ modifier2)(jnp.array([10., 20., 30.]))
 # -> Array([10.259877, 20.500944, 30.760822], dtype=float32)
 
 with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):

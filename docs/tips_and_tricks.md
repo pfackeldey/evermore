@@ -71,7 +71,7 @@ This can be useful for example to ensure that the parameter values are within a 
 evermore provides two predefined transformations: [`evm.transform.MinuitTransform`](#evermore.parameters.transform.MinuitTransform) (for bounded parameters) and [`evm.transform.SoftPlusTransform`](#evermore.parameters.transform.SoftPlusTransform) (for positive parameters).
 
 
-```{code-cell} ipython3
+```{code-cell} python
 import evermore as evm
 import wadler_lindig as wl
 
@@ -96,7 +96,7 @@ Transformations always transform into the unconstrained real space (using [`evm.
 Typically, you would transform your parameters as a first step inside your loss (or model) function.
 Then, a minimizer can optimize the transformed parameters in the unconstrained space. Finally, you can transform them back to the constrained space for further processing.
 
-Custom transformations can be defined by subclassing [`evm.transform.ParameterTransformation`](#evermore.parameters.transform.ParameterTransformation) and implementing the [`wrap`](#evermore.parameters.transform.ParameterTransformation.wrap) and [`unwrap`](#evermore.parameters.transform.ParameterTransformation.unwrap) methods.
+Custom transformations can be defined by subclassing [`evm.transform.ParameterTransformation`](#evermore.parameters.transform.AbstractParameterTransformation) and implementing the [`wrap`](#evermore.parameters.transform.AbstractParameterTransformation.wrap) and [`unwrap`](#evermore.parameters.transform.AbstractParameterTransformation.unwrap) methods.
 
 
 ## Parameter Partitioning
@@ -109,6 +109,7 @@ w.r.t. both parts. Gradient calculation is performed only w.r.t. the differentia
 
 ```{code-block} python
 from jaxtyping import Array, PyTree
+import equinox as eqx
 import evermore as evm
 
 # define a PyTree of parameters

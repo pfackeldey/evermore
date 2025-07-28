@@ -2,20 +2,20 @@ from __future__ import annotations
 
 import abc
 from collections.abc import Callable, Iterable, Iterator
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Generic
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float, PyTree
+from jaxtyping import Array, Bool
 
-from evermore.binned.effect import DEFAULT_EFFECT, OffsetAndScale
-from evermore.parameters.parameter import Parameter
+from evermore.binned.effect import H, OffsetAndScale
+from evermore.parameters.parameter import PT
 from evermore.util import tree_stack
 from evermore.visualization import SupportsTreescope
 
 if TYPE_CHECKING:
-    from evermore.binned.effect import Effect
+    from evermore.binned.effect import AbstractEffect
 
 __all__ = [
     "BooleanMask",
@@ -33,43 +33,30 @@ def __dir__():
     return __all__
 
 
-@runtime_checkable
-class ModifierLike(Protocol):
-    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale: ...  # noqa: UP037
-    def __call__(self, hist: Float[Array, "..."]) -> Float[Array, "..."]: ...  # noqa: UP037
-    def __matmul__(self, other: ModifierLike) -> Compose: ...
-
-
-class AbstractModifier(eqx.Module):
+class AbstractModifier(eqx.Module, Generic[PT], SupportsTreescope):
     @abc.abstractmethod
-    def offset_and_scale(
-        self: ModifierLike,
-        hist: Float[Array, "..."],  # noqa: UP037
-    ) -> OffsetAndScale: ...
+    def offset_and_scale(self: ModifierBase, hist: H) -> OffsetAndScale[H]: ...
 
     @abc.abstractmethod
-    def __call__(
-        self: ModifierLike,
-        hist: Float[Array, "..."],  # noqa: UP037
-    ) -> Float[Array, "..."]: ...  # noqa: UP037
+    def __call__(self: ModifierBase, hist: H) -> H: ...
 
     @abc.abstractmethod
-    def __matmul__(self: ModifierLike, other: ModifierLike) -> Compose: ...
+    def __matmul__(self: ModifierBase, other: ModifierBase) -> Compose: ...
 
 
-class ApplyFn(AbstractModifier):
+class ApplyFn(AbstractModifier[PT]):
     @jax.named_scope("evm.modifier.ApplyFn")
-    def __call__(self: ModifierLike, hist: Float[Array, "..."]) -> Float[Array, "..."]:  # noqa: UP037
+    def __call__(self: ModifierBase, hist: H) -> H:
         os = self.offset_and_scale(hist=hist)
         return os.scale * (hist + os.offset)
 
 
-class MatMulCompose(AbstractModifier):
-    def __matmul__(self: ModifierLike, other: ModifierLike) -> Compose:
+class MatMulCompose(AbstractModifier[PT]):
+    def __matmul__(self: ModifierBase, other: ModifierBase) -> Compose:
         return Compose(self, other)
 
 
-class ModifierBase(ApplyFn, MatMulCompose, SupportsTreescope):
+class ModifierBase(ApplyFn[PT], MatMulCompose[PT]):
     """
     This serves as a base class for all modifiers.
     It automatically implements the __call__ method to apply the scale factors to the hist array
@@ -83,17 +70,19 @@ class ModifierBase(ApplyFn, MatMulCompose, SupportsTreescope):
 
         import equinox as eqx
         import jax.numpy as jnp
-        from jaxtyping import Array
+        from jaxtyping import Array, Float
 
         import evermore as evm
 
 
-        class Clip(evm.modifier.ModifierBase):
-            modifier: evm.custom_types.ModifierLike
+        class Clip(evm.modifier.ModifierBase[evm.PT]):
+            modifier: evm.modifier.ModifierBase[evm.PT]
             min_sf: float = eqx.field(static=True)
             max_sf: float = eqx.field(static=True)
 
-            def offset_and_scale(self, hist: Array) -> evm.custom_types.OffsetAndScale:
+            def offset_and_scale(
+                self, hist: Float[Array, "..."]
+            ) -> evm.effect.OffsetAndScale[H]:
                 os = self.modifier.offset_and_scale(hist)
                 return jax.tree.map(lambda x: jnp.clip(x, self.min_sf, self.max_sf), os)
 
@@ -112,7 +101,7 @@ class ModifierBase(ApplyFn, MatMulCompose, SupportsTreescope):
     """
 
 
-class Modifier(ModifierBase):
+class Modifier(ModifierBase[PT]):
     """
     Create a new modifier for a given parameter and penalty.
 
@@ -162,20 +151,18 @@ class Modifier(ModifierBase):
         modify = norm.morphing(up_template=up_template, down_template=down_template)
     """
 
-    parameter: PyTree[Parameter]
-    effect: Effect
+    parameter: PT
+    effect: AbstractEffect
 
-    def __init__(
-        self, parameter: PyTree[Parameter], effect: Effect = DEFAULT_EFFECT
-    ) -> None:
+    def __init__(self, parameter: PT, effect: AbstractEffect[H]) -> None:
         self.parameter = parameter
         self.effect = effect
 
-    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
+    def offset_and_scale(self, hist: H) -> OffsetAndScale[H]:
         return self.effect(parameter=self.parameter, hist=hist)
 
 
-class Where(ModifierBase):
+class Where(ModifierBase[PT]):
     """
     Combine two modifiers based on a condition.
 
@@ -211,10 +198,10 @@ class Where(ModifierBase):
     """
 
     condition: Bool[Array, ...]
-    modifier_true: ModifierLike
-    modifier_false: ModifierLike
+    modifier_true: ModifierBase[PT]
+    modifier_false: ModifierBase[PT]
 
-    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
+    def offset_and_scale(self, hist: H) -> OffsetAndScale[H]:
         true_os = self.modifier_true.offset_and_scale(hist)
         false_os = self.modifier_false.offset_and_scale(hist)
 
@@ -227,7 +214,7 @@ class Where(ModifierBase):
         return jax.tree.map(_where, true_os, false_os)
 
 
-class BooleanMask(ModifierBase):
+class BooleanMask(ModifierBase[PT]):
     """
     Mask a modifier for specific bins.
 
@@ -255,9 +242,9 @@ class BooleanMask(ModifierBase):
     """
 
     mask: Bool[Array, ...]
-    modifier: ModifierLike
+    modifier: ModifierBase[PT]
 
-    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
+    def offset_and_scale(self, hist: H) -> OffsetAndScale[H]:
         os = self.modifier.offset_and_scale(hist)
 
         def _mask(
@@ -266,13 +253,13 @@ class BooleanMask(ModifierBase):
         ) -> Bool[Array, ...]:
             return jnp.where(self.mask, true, false)
 
-        return OffsetAndScale(
+        return OffsetAndScale[H](
             offset=_mask(os.offset, 0.0),
             scale=_mask(os.scale, 1.0),
         )
 
 
-class Transform(ModifierBase):
+class Transform(ModifierBase[PT]):
     """
     Transform the scale factors of a modifier.
 
@@ -302,32 +289,32 @@ class Transform(ModifierBase):
     """
 
     transform_fn: Callable = eqx.field(static=True)
-    modifier: ModifierLike
+    modifier: ModifierBase[PT]
 
-    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
+    def offset_and_scale(self, hist: H) -> OffsetAndScale[H]:
         os = self.modifier.offset_and_scale(hist)
         return jax.tree.map(self.transform_fn, os)
 
 
-class TransformOffset(ModifierBase):
+class TransformOffset(ModifierBase[PT]):
     transform_fn: Callable = eqx.field(static=True)
-    modifier: ModifierLike
+    modifier: ModifierBase[PT]
 
-    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
+    def offset_and_scale(self, hist: H) -> OffsetAndScale[H]:
         os = self.modifier.offset_and_scale(hist)
         return OffsetAndScale(offset=self.transform_fn(os.offset), scale=os.scale)
 
 
-class TransformScale(ModifierBase):
+class TransformScale(ModifierBase[PT]):
     transform_fn: Callable = eqx.field(static=True)
-    modifier: ModifierLike
+    modifier: ModifierBase[PT]
 
-    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
+    def offset_and_scale(self, hist: H) -> OffsetAndScale[H]:
         os = self.modifier.offset_and_scale(hist)
         return OffsetAndScale(offset=os.offset, scale=self.transform_fn(os.scale))
 
 
-class Compose(ModifierBase):
+class Compose(ModifierBase[PT]):
     """
     Composition of multiple modifiers, in order to correctly apply them *together*.
     It behaves like a single modifier, but it is composed of multiple modifiers; it can be arbitrarily nested.
@@ -376,9 +363,9 @@ class Compose(ModifierBase):
         eqx.filter_jit(composition)(hist)
     """
 
-    modifiers: list[ModifierLike]
+    modifiers: list[ModifierBase[PT]]
 
-    def __init__(self, *modifiers: ModifierLike) -> None:
+    def __init__(self, *modifiers: ModifierBase[PT]) -> None:
         if not modifiers:
             msg = "At least one modifier must be provided to Compose."
             raise ValueError(msg)
@@ -391,7 +378,7 @@ class Compose(ModifierBase):
     def __len__(self) -> int:
         return len(self.modifiers)
 
-    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
+    def offset_and_scale(self, hist: H) -> OffsetAndScale[H]:
         from collections import defaultdict
 
         # initial scale and offset
@@ -434,16 +421,16 @@ class Compose(ModifierBase):
         return OffsetAndScale(offset=offset, scale=scale)
 
 
-def unroll(modifiers: Iterable) -> Iterator[ModifierLike]:
+def unroll(modifiers: Iterable) -> Iterator[ModifierBase[PT]]:
     # Helper to recursively flatten nested Compose instances into a single list
     for mod in modifiers:
         if isinstance(mod, Compose):
             # recursively yield from the modifiers of the Compose instance
             yield from unroll(mod.modifiers)
-        elif isinstance(mod, ModifierLike):
-            # yield the modifier if it is a ModifierLike instance
+        elif isinstance(mod, ModifierBase):
+            # yield the modifier if it is a ModifierBase instance
             yield mod
         else:
-            # raise an error if the modifier is not a ModifierLike instance
-            msg = f"Modifier {mod} is not a ModifierLike instance."
+            # raise an error if the modifier is not a ModifierBase instance
+            msg = f"Modifier {mod} is not a ModifierBase instance."
             raise TypeError(msg)

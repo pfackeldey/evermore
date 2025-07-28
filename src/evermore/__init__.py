@@ -19,14 +19,17 @@ __version__ = "0.3.2"
 # expose public API
 
 __all__ = [
+    "PT",
     "Modifier",
     "NormalParameter",
     # explicitly expose some classes
     "Parameter",
+    "V",
     "__version__",
     "effect",
     "loss",
     "modifier",
+    "mutable",
     "parameter",
     "pdf",
     "sample",
@@ -54,11 +57,14 @@ from evermore.binned import (  # noqa: E402
 )
 from evermore.binned.modifier import Modifier  # noqa: E402
 from evermore.parameters import (  # noqa: E402
+    mutable,
     parameter,
     sample,
     transform,
 )
 from evermore.parameters.parameter import (  # noqa: E402
+    PT,
     NormalParameter,
     Parameter,
+    V,
 )

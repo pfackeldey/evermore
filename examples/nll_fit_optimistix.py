@@ -30,4 +30,4 @@ if __name__ == "__main__":
     bestfit_params = fit(params, hists, observation)
 
     print("Bestfit parameter:")
-    wl.pprint(bestfit_params, short_arrays=False)
+    wl.pprint(evm.parameter.pure(bestfit_params), short_arrays=False)

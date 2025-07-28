@@ -1,4 +1,5 @@
 import typing as tp
+from functools import partial
 
 import jax
 import jax.flatten_util
@@ -6,13 +7,15 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from evermore.parameters.parameter import (
-    Parameter,
-    _params_map,
-    _ParamsTree,
+    PT,
+    AbstractParameter,
+    V,
     is_parameter,
+    pure,
     replace_value,
 )
-from evermore.pdf import PDF, ImplementsFromUnitNormalConversion, Normal
+from evermore.pdf import AbstractPDF, ImplementsFromUnitNormalConversion, Normal
+from evermore.util import filter_tree_map
 
 __all__ = [
     "compute_covariance",
@@ -24,7 +27,10 @@ def __dir__():
     return __all__
 
 
-def get_log_probs(params: _ParamsTree) -> _ParamsTree:
+_params_map = partial(filter_tree_map, filter=is_parameter)
+
+
+def get_log_probs(params: PT) -> PT:
     """
     Compute the log probabilities for all parameters.
 
@@ -41,12 +47,12 @@ def get_log_probs(params: _ParamsTree) -> _ParamsTree:
         is replaced by its corresponding log probability.
     """
 
-    def _constraint(param: Parameter) -> Float[Array, "..."]:
-        prior: PDF | None = param.prior
+    def _constraint(param: AbstractParameter[V]) -> V:
+        prior: AbstractPDF | None = param.prior
 
         # unconstrained case is easy:
         if prior is None:
-            return jnp.array([0.0])
+            return jnp.zeros_like(param.value)
 
         # all constrained parameters are 'moving' on a 'unit_normal' distribution (mean=0, width=1), i.e.:
         # - param.value=0: no shift, no constrain
@@ -66,9 +72,9 @@ def get_log_probs(params: _ParamsTree) -> _ParamsTree:
             # this is the fast-path
             x = prior.__evermore_from_unit_normal__(param.value)
         else:
-            # this is a general implementation to translate from a unit normal to any target PDF
+            # this is a general implementation to translate from a unit normal to any target AbstractPDF
             # the only requirement is that the target pdf implements `.inv_cdf`.
-            unit_normal = Normal(
+            unit_normal: Normal[V] = Normal(
                 mean=jnp.zeros_like(param.value), width=jnp.ones_like(param.value)
             )
             cdf = unit_normal.cdf(param.value)
@@ -81,7 +87,7 @@ def get_log_probs(params: _ParamsTree) -> _ParamsTree:
 
 def compute_covariance(
     loss_fn: tp.Callable,
-    params: _ParamsTree,
+    params: PT,
 ) -> Float[Array, "nparams nparams"]:
     r"""
     Computes the covariance matrix of the parameters under the Laplace approximation,
@@ -92,7 +98,7 @@ def compute_covariance(
     Args:
         loss_fn (Callable): The loss function. Should accept (params) as arguments.
             All other arguments have to be "partial'd" into the loss function.
-        params (_ParamsTree): A PyTree of parameters.
+        params (PT): A PyTree of parameters.
 
     Returns:
         Float[Array, "nparams nparams"]: The covariance matrix of the parameters.
@@ -122,7 +128,7 @@ def compute_covariance(
         # (2, 2)
     """
     # first, compute the hessian at the current point
-    values = _params_map(lambda p: p.value, params)
+    values = pure(params)
     flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
 
     def _flat_loss(flat_values: Float[Array, "..."]) -> Float[Array, ""]:

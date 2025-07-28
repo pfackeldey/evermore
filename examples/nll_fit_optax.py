@@ -1,8 +1,8 @@
 import equinox as eqx
 import optax
 import wadler_lindig as wl
-from jaxtyping import Array, Float, PyTree
-from model import hists, loss, observation, params
+from jaxtyping import PyTree
+from model import Hist1D, hists, loss, observation, params
 
 import evermore as evm
 
@@ -14,8 +14,8 @@ def make_step(
     dynamic: PyTree[evm.Parameter],
     static: PyTree[evm.Parameter],
     opt_state: PyTree,
-    hists: PyTree[Float[Array, " nbins"]],
-    observation: Float[Array, " nbins"],
+    hists: PyTree[Hist1D],
+    observation: Hist1D,
 ) -> tuple[PyTree[evm.Parameter], PyTree]:
     grads = eqx.filter_grad(loss)(dynamic, static, hists, observation)
     updates, opt_state = optim.update(grads, opt_state)
@@ -45,4 +45,4 @@ if __name__ == "__main__":
     bestfit_params = fit(params, hists, observation)
 
     print("Bestfit parameter:")
-    wl.pprint(bestfit_params, short_arrays=False)
+    wl.pprint(evm.parameter.pure(bestfit_params), short_arrays=False)

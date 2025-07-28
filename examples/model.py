@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import typing as tp
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -8,6 +10,9 @@ from jaxtyping import Array, Float, PyTree
 import evermore as evm
 
 jax.config.update("jax_enable_x64", True)
+
+
+Hist1D: tp.TypeAlias = Float[Array, " nbins"]  # type: ignore[name-defined]
 
 
 # dataclass like container for parameters
@@ -20,8 +25,8 @@ class Params(eqx.Module):
 
 def model(
     params: PyTree[evm.Parameter],
-    hists: PyTree[Float[Array, " nbins"]],
-) -> PyTree[Float[Array, " nbins"]]:
+    hists: PyTree[Hist1D],
+) -> PyTree[Hist1D]:
     expectations = {}
 
     # signal process
@@ -69,7 +74,7 @@ hists = {
 }
 
 params = Params(
-    mu=evm.Parameter(),  # type: ignore[arg-type]
+    mu=evm.Parameter(),
     norm1=evm.NormalParameter(),
     norm2=evm.NormalParameter(),
     shape1=evm.NormalParameter(),
@@ -83,8 +88,8 @@ expectations = model(params, hists)
 def loss(
     dynamic: PyTree[evm.Parameter],
     static: PyTree[evm.Parameter],
-    hists: PyTree[Float[Array, " nbins"]],
-    observation: Float[Array, " nbins"],
+    hists: PyTree[Hist1D],
+    observation: Hist1D,
 ) -> Float[Array, ""]:
     params = evm.parameter.combine(dynamic, static)
     expectations = model(params, hists)
