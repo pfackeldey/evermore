@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import optimistix as optx
 from jaxtyping import Array, Float, PRNGKeyArray, PyTree
-from model import hists, loss, model, observation, params
+from model import Hist1D, hists, loss, model, observation, params
 
 import evermore as evm
 
@@ -52,7 +52,7 @@ def postfit_toy_expectation(
     static: PyTree[evm.Parameter],
     covariance_matrix: Float[Array, "x x"],
     n_samples: int = 1,
-) -> Float[Array, " nbins"]:
+) -> Hist1D:
     toy_dynamic = evm.sample.sample_from_covariance_matrix(
         key=key,
         params=dynamic,

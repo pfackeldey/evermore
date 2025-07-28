@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import typing as tp
+
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PyTree
@@ -8,10 +10,12 @@ import evermore as evm
 
 jax.config.update("jax_enable_x64", True)
 
+Hist1D = tp.TypeVar("Hist1D", bound=Float[Array, " nbins"])
+
 
 def model(
-    staterrors: evm.staterror.StatErrors, hists: PyTree[Float[Array, " nbins"]]
-) -> PyTree[Float[Array, " nbins"]]:
+    staterrors: evm.staterror.StatErrors, hists: PyTree[Hist1D]
+) -> PyTree[Hist1D]:
     expectations = {}
 
     # signal process

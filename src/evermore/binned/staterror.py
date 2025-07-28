@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from typing import TypeVar
+
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float, Scalar
+from jaxtyping import Array, Bool, Float, Scalar, Shaped
 
 from evermore.binned.effect import Identity, OffsetAndScale
 from evermore.binned.modifier import Modifier, ModifierBase, Where
-from evermore.parameters.parameter import NormalParameter
-from evermore.util import float_array
+from evermore.parameters.parameter import PT, NormalParameter
+from evermore.util import maybe_float_array
 
 __all__ = [
     "StatErrors",
@@ -18,7 +20,10 @@ def __dir__():
     return __all__
 
 
-class StatErrors(ModifierBase):
+N = TypeVar("N", bound=Shaped[Array, "..."])
+
+
+class StatErrors(ModifierBase[PT]):
     """
     Create staterror (barlow-beeston) parameters.
 
@@ -58,18 +63,18 @@ class StatErrors(ModifierBase):
     """
 
     eps: Float[Scalar, ""]
-    n_entries: Float[Array, "..."]  # noqa: UP037
-    non_empty_mask: Bool[Array, " nbins"]
-    relative_error: Float[Array, "..."]  # noqa: UP037
-    parameter: NormalParameter
+    n_entries: Float[N]
+    non_empty_mask: Bool[N]
+    relative_error: Float[N]
+    parameter: NormalParameter[Float[N]]
 
     def __init__(
         self,
-        hist: Float[Array, "..."],  # noqa: UP037
-        variance: Float[Array, "..."],  # noqa: UP037
+        hist: Float[N],
+        variance: Float[N],
     ):
         # make sure they are of dtype float
-        hist, variance = jax.tree.map(float_array, (hist, variance))
+        hist, variance = jax.tree.map(maybe_float_array, (hist, variance))
 
         self.eps = jnp.finfo(variance.dtype).eps
 
@@ -87,8 +92,8 @@ class StatErrors(ModifierBase):
         )
         self.parameter = NormalParameter(value=jnp.zeros_like(self.n_entries))
 
-    def offset_and_scale(self, hist: Float[Array, "..."]) -> OffsetAndScale:  # noqa: UP037
-        modifier = Where(
+    def offset_and_scale(self, hist: Float[N]) -> OffsetAndScale[Float[N]]:
+        modifier: Where[PT] = Where(
             self.non_empty_mask,
             self.parameter.scale(slope=self.relative_error, offset=1.0),
             Modifier(parameter=self.parameter, effect=Identity()),

@@ -1,37 +1,42 @@
+import typing as tp
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+from jaxtyping import Array, Float
 
 import evermore as evm
 
+In: tp.TypeAlias = Float[Array, "in_size"]
+W: tp.TypeAlias = Float[Array, "out_size in_size"]
+B: tp.TypeAlias = Float[Array, "out_size"]
+Out: tp.TypeAlias = B
+
 
 class LinearConstrained(eqx.Module):
-    weights: evm.Parameter
-    biases: jax.Array
+    weights: evm.Parameter[W]
+    biases: B
 
     def __init__(self, in_size, out_size, key):
         wkey, bkey = jax.random.split(key)
         # weights
-        normal = evm.pdf.Normal(
-            mean=jnp.zeros((out_size, in_size)),
-            width=jnp.full((out_size, in_size), 0.5),
-        )
         self.weights = evm.Parameter(
             value=jax.random.normal(wkey, (out_size, in_size)),
-            lower=-jnp.inf,  # type: ignore[arg-type]
-            upper=jnp.inf,  # type: ignore[arg-type]
-            prior=normal,
+            prior=evm.pdf.Normal(
+                mean=jnp.zeros((out_size, in_size)),
+                width=jnp.full((out_size, in_size), 0.5),
+            ),
         )
 
         # biases
         self.biases = jax.random.normal(bkey, (out_size,))
 
-    def __call__(self, x: jax.Array):
+    def __call__(self, x: In) -> Out:
         return self.weights.value @ x + self.biases
 
 
 @eqx.filter_jit
-def loss_fn(model, x, y):
+def loss_fn(model, x: In, y: Out) -> Float[Array, ""]:
     pred_y = jax.vmap(model)(x)
     mse = jax.numpy.mean((y - pred_y) ** 2)
     constraints = evm.loss.get_log_probs(model)

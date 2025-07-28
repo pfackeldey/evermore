@@ -1,3 +1,5 @@
+import typing as tp
+
 import equinox as eqx
 import iminuit
 import jax
@@ -7,6 +9,8 @@ from jaxtyping import Array, Float, PyTree
 from model import hists, loss, observation, params
 
 import evermore as evm
+
+FlatV: tp.TypeAlias = Float[Array, " nparams"]  # type: ignore[name-defined]
 
 
 def fit(params, hists, observation):
@@ -21,7 +25,7 @@ def fit(params, hists, observation):
 
     def update(
         params: PyTree[evm.Parameter],
-        values: Float[Array, " nparams"],
+        values: FlatV,
     ) -> PyTree[evm.Parameter]:
         return jax.tree.map(
             evm.parameter.replace_value,
@@ -32,7 +36,7 @@ def fit(params, hists, observation):
 
     # wrap loss that works on flat array
     @eqx.filter_jit
-    def flat_loss(flat_values: Float[Array, " nparams"]) -> Float[Array, ""]:
+    def flat_loss(flat_values: FlatV) -> Float[Array, ""]:
         _dynamic = update(dynamic, flat_values)
         return loss(_dynamic, static, hists, observation)
 
@@ -56,4 +60,4 @@ if __name__ == "__main__":
     bestfit_params = fit(params, hists, observation)
 
     print("Bestfit parameter:")
-    wl.pprint(bestfit_params, short_arrays=False)
+    wl.pprint(evm.parameter.pure(bestfit_params), short_arrays=False)

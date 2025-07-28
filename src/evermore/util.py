@@ -15,7 +15,7 @@ __all__ = [
     "dump_hlo_graph",
     "dump_jaxpr",
     "filter_tree_map",
-    "float_array",
+    "maybe_float_array",
     "sum_over_leaves",
     "tree_stack",
 ]
@@ -25,8 +25,10 @@ def __dir__():
     return __all__
 
 
-def float_array(x: Any) -> Float[Array, "..."]:  # noqa: UP037
-    return jnp.asarray(x, jnp.result_type(float))
+def maybe_float_array(x: Any) -> Float[Array, "..."]:  # noqa: UP037
+    if eqx.is_array_like(x):
+        return jnp.asarray(x, jnp.result_type(float))
+    return x
 
 
 @jax.tree_util.register_static
@@ -171,4 +173,4 @@ def dump_hlo_graph(fun: Callable, *args: Any, **kwargs: Any) -> str:
         filepath = pathlib.Path("graph.gv")
         filepath.write_text(dump_hlo_graph(f, x), encoding="ascii")
     """
-    return jax.jit(fun).lower(*args, **kwargs).compiler_ir("hlo").as_hlo_dot_graph()  # type: ignore[union-attr]
+    return jax.jit(fun).lower(*args, **kwargs).compiler_ir("hlo").as_hlo_dot_graph()
