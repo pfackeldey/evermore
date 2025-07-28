@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "evermore"
 authors = [
-    { name = "Peter Fackeldey", email = "peter.fackeldey@rwth-aachen.de" },
+    { name = "Peter Fackeldey", email = "fackeldey.peter@gmail.com" },
 ]
 description = "Differentiable (binned) likelihoods in JAX."
 license = "BSD-3-Clause"
