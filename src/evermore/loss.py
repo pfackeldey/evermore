@@ -1,5 +1,4 @@
 import typing as tp
-from functools import partial
 
 import jax
 import jax.flatten_util
@@ -10,12 +9,12 @@ from evermore.parameters.parameter import (
     PT,
     AbstractParameter,
     V,
+    _params_map,
     is_parameter,
     pure,
     replace_value,
 )
 from evermore.pdf import AbstractPDF, ImplementsFromUnitNormalConversion, Normal
-from evermore.util import filter_tree_map
 
 __all__ = [
     "compute_covariance",
@@ -25,9 +24,6 @@ __all__ = [
 
 def __dir__():
     return __all__
-
-
-_params_map = partial(filter_tree_map, filter=is_parameter)
 
 
 def get_log_probs(params: PT) -> PT:

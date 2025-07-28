@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from functools import partial
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 import equinox as eqx
 import jax
 from jaxtyping import Array, ArrayLike, Float, PyTree
 
-from evermore.util import _missing, maybe_float_array
+from evermore.util import _missing, filter_tree_map, maybe_float_array
 from evermore.visualization import SupportsTreescope
 
 if TYPE_CHECKING:
@@ -315,6 +316,8 @@ def is_parameter(leaf: Any) -> bool:
 
 PT = TypeVar("PT", bound=PyTree[AbstractParameter[V]])
 
+_params_map = partial(filter_tree_map, filter=is_parameter)
+
 
 def pure(params: PT) -> PT:
     """
@@ -326,7 +329,7 @@ def pure(params: PT) -> PT:
     Returns:
         PT: A tree structure with the same shape as `params`, but with each parameter replaced by its underlying value.
     """
-    return jax.tree.map(lambda p: p.value, params, is_leaf=is_parameter)
+    return _params_map(lambda p: p.value, params)
 
 
 def replace_value(
@@ -400,12 +403,7 @@ def value_filter_spec(tree: PT) -> PT:
     # and _only_ the .value, because we don't want do optimize against anything else!
     def _replace_value(filter_leaf: Any, tree_leaf: Any) -> Any:
         if isinstance(filter_leaf, AbstractParameter):
-            filter_leaf = eqx.tree_at(
-                lambda fl: fl.value,
-                filter_leaf,
-                not tree_leaf.frozen,
-                is_leaf=lambda leaf: leaf is _missing,
-            )
+            filter_leaf = replace_value(filter_leaf, not tree_leaf.frozen)
         return filter_leaf
 
     return jax.tree.map(_replace_value, filter_spec, tree, is_leaf=is_parameter)

@@ -10,7 +10,7 @@ from evermore.parameters.parameter import (
     PT,
     AbstractParameter,
     V,
-    is_parameter,
+    _params_map,
     replace_value,
 )
 
@@ -46,7 +46,7 @@ def unwrap(params: PT) -> PT:
             return param
         return param.transform.unwrap(param)
 
-    return jax.tree.map(_unwrap, params, is_leaf=is_parameter)
+    return _params_map(_unwrap, params)
 
 
 def wrap(params: PT) -> PT:
@@ -69,7 +69,7 @@ def wrap(params: PT) -> PT:
             return param
         return param.transform.wrap(param)
 
-    return jax.tree.map(_wrap, params, is_leaf=is_parameter)
+    return _params_map(_wrap, params)
 
 
 class AbstractParameterTransformation(eqx.Module):

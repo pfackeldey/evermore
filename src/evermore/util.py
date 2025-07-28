@@ -48,10 +48,10 @@ def filter_tree_map(
     tree: PyTree,
     filter: Callable,
 ) -> PyTree:
-    params = eqx.filter(tree, filter, is_leaf=filter)
+    filtered = eqx.filter(tree, filter, is_leaf=filter)
     return jax.tree.map(
         fun,
-        params,
+        filtered,
         is_leaf=filter,
     )
 

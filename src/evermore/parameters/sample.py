@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from functools import partial
-
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PRNGKeyArray
@@ -10,11 +8,12 @@ from evermore.parameters.parameter import (
     PT,
     AbstractParameter,
     V,
+    _params_map,
     is_parameter,
     replace_value,
 )
 from evermore.pdf import AbstractPDF, PoissonBase
-from evermore.util import _missing, filter_tree_map
+from evermore.util import _missing
 
 __all__ = [
     "sample_from_covariance_matrix",
@@ -24,9 +23,6 @@ __all__ = [
 
 def __dir__():
     return __all__
-
-
-_params_map = partial(filter_tree_map, filter=is_parameter)
 
 
 def sample_from_covariance_matrix(
