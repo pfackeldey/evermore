@@ -6,14 +6,15 @@ from model import hists, loss, observation, params
 import evermore as evm
 
 evmm = evm.mutable
-evmp = evm.parameter
+evmt = evm.tree
+evmf = evm.filter
 
 
 def fit(params, hists, observation):
-    dynamic, static = evmp.partition(params)
+    dynamic, static = evmt.partition(params)
 
     # make dynamic part mutable
-    dynamic_ref = evmm.mutable(dynamic)
+    dynamic_ref = evmm.to_refs(dynamic)
 
     @jax.jit
     def minimize_step(dynamic_ref, static, hists, observation) -> None:
@@ -30,7 +31,7 @@ def fit(params, hists, observation):
             p.value[...] -= lr * g.value
 
         # apply the gradient descent step to each parameter in the dynamic part
-        jax.tree.map(gd, dynamic_ref, grads, is_leaf=evmp.is_parameter)
+        jax.tree.map(gd, dynamic_ref, grads, is_leaf=evmf.is_parameter)
         return loss_val
 
     # minimize with 5000 steps
@@ -40,7 +41,7 @@ def fit(params, hists, observation):
             print(f"{step=} - {loss_val=:.6f}")
 
     # return best fit values (immutable)
-    return evmp.pure(evmm.freeze(dynamic_ref))
+    return evmt.pure(evmt.combine(evmm.to_arrays(dynamic_ref), static))
 
 
 if __name__ == "__main__":

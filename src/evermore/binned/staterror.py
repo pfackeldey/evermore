@@ -8,7 +8,8 @@ from jaxtyping import Array, Bool, Float, Scalar, Shaped
 
 from evermore.binned.effect import Identity, OffsetAndScale
 from evermore.binned.modifier import Modifier, ModifierBase, Where
-from evermore.parameters.parameter import PT, NormalParameter
+from evermore.parameters.parameter import NormalParameter
+from evermore.parameters.tree import PT
 from evermore.util import maybe_float_array
 
 __all__ = [
@@ -90,7 +91,7 @@ class StatErrors(ModifierBase[PT]):
             / jnp.sqrt(self.n_entries + jnp.where(self.non_empty_mask, 0.0, self.eps)),
             1.0,
         )
-        self.parameter = NormalParameter(value=jnp.zeros_like(self.n_entries))
+        self.parameter = NormalParameter(jnp.zeros_like(self.n_entries))
 
     def offset_and_scale(self, hist: Float[N]) -> OffsetAndScale[Float[N]]:
         modifier: Where[PT] = Where(

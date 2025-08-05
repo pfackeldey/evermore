@@ -29,7 +29,7 @@ def optx_loss(dynamic, args):
 def fit(params, hists, observation):
     solver = optx.BFGS(rtol=1e-5, atol=1e-7)
 
-    dynamic, static = evm.parameter.partition(params)
+    dynamic, static = evm.tree.partition(params)
 
     fitresult = optx.minimise(
         optx_loss,
@@ -41,7 +41,7 @@ def fit(params, hists, observation):
         max_steps=10_000,
         throw=True,
     )
-    return evm.parameter.combine(fitresult.value, static)
+    return evm.tree.combine(fitresult.value, static)
 
 
 # generate new expectation based on the postfit toy parameters
@@ -59,7 +59,7 @@ def postfit_toy_expectation(
         covariance_matrix=covariance_matrix,
         n_samples=n_samples,
     )
-    toy_params = evm.parameter.combine(toy_dynamic, static)
+    toy_params = evm.tree.combine(toy_dynamic, static)
     expectations = model(toy_params, hists)
     return evm.util.sum_over_leaves(expectations)
 
@@ -77,7 +77,7 @@ if __name__ == "__main__":
 
     # --- Postfit sampling ---
     bestfit_params = fit(params, hists, observation)
-    dynamic, static = evm.parameter.partition(bestfit_params)
+    dynamic, static = evm.tree.partition(bestfit_params)
 
     # partial it to only depend on `params`
     loss_fn = partial(optx_loss, args=(static, hists, observation))
@@ -107,10 +107,18 @@ if __name__ == "__main__":
     print("Mean of 10.000 toys (prefit):", jnp.mean(expectations, axis=0))
     print("Std of 10.000 toys (prefit):", jnp.std(expectations, axis=0))
 
-    # # just sample observations with poisson
-    # poisson_obs = evm.pdf.PoissonDiscrete(observation)
-    # sampled_observation = poisson_obs.sample(key)
+    # just sample observations with poisson
+    poisson_obs = evm.pdf.PoissonDiscrete(observation)
+    sampled_observation = poisson_obs.sample(key, shape=(1,))
 
-    # # vectorized sampling (generically with `vmap`)
-    # keys = jax.random.split(key, 10_000)
-    # sampled_observations = jax.vmap(poisson_obs.sample)(keys)
+    N = 10_000
+    # vectorized sampling (standard way)
+    sampled_observations = poisson_obs.sample(key, shape=(N, 1))
+
+    # vectorized sampling (generically with `vmap`)
+    keys = jax.random.split(key, N)
+
+    def sample_obs(k):
+        return poisson_obs.sample(k, shape=(1,))
+
+    sampled_observations = jax.vmap(sample_obs)(keys)

@@ -15,12 +15,10 @@ FlatV: tp.TypeAlias = Float[Array, " nparams"]  # type: ignore[name-defined]
 
 def fit(params, hists, observation):
     # partition into dynamic and static parts
-    dynamic, static = evm.parameter.partition(params)
+    dynamic, static = evm.tree.partition(params)
 
     # flatten parameter.value for iminuit
-    values = jax.tree.map(
-        lambda p: p.value, dynamic, is_leaf=evm.parameter.is_parameter
-    )
+    values = evm.tree.pure(dynamic)
     flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
 
     def update(
@@ -31,7 +29,7 @@ def fit(params, hists, observation):
             evm.parameter.replace_value,
             params,
             unravel_fn(values),
-            is_leaf=evm.parameter.is_parameter,
+            is_leaf=evm.filter.is_parameter,
         )
 
     # wrap loss that works on flat array
@@ -53,11 +51,11 @@ def fit(params, hists, observation):
     bestfit_dynamic = update(dynamic, bestfit_values)
 
     # combine with static pytree
-    return evm.parameter.combine(bestfit_dynamic, static)
+    return evm.tree.combine(bestfit_dynamic, static)
 
 
 if __name__ == "__main__":
     bestfit_params = fit(params, hists, observation)
 
     print("Bestfit parameter:")
-    wl.pprint(evm.parameter.pure(bestfit_params), short_arrays=False)
+    wl.pprint(evm.tree.pure(bestfit_params), short_arrays=False)

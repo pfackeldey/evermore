@@ -8,7 +8,7 @@ import evermore as evm
 def fit(params, hists, observation):
     solver = optx.BFGS(rtol=1e-5, atol=1e-7)
 
-    dynamic, static = evm.parameter.partition(params)
+    dynamic, static = evm.tree.partition(params)
 
     def optx_loss(dynamic, args):
         return loss(dynamic, *args)
@@ -23,11 +23,11 @@ def fit(params, hists, observation):
         max_steps=10_000,
         throw=True,
     )
-    return evm.parameter.combine(fitresult.value, static)
+    return evm.tree.combine(fitresult.value, static)
 
 
 if __name__ == "__main__":
     bestfit_params = fit(params, hists, observation)
 
     print("Bestfit parameter:")
-    wl.pprint(evm.parameter.pure(bestfit_params), short_arrays=False)
+    wl.pprint(evm.tree.pure(bestfit_params), short_arrays=False)

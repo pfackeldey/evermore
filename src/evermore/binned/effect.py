@@ -9,7 +9,8 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from evermore.parameters.parameter import PT, AbstractParameter
+from evermore.parameters.parameter import AbstractParameter
+from evermore.parameters.tree import PT
 from evermore.util import maybe_float_array
 from evermore.visualization import SupportsTreescope
 

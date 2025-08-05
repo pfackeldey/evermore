@@ -10,7 +10,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Bool
 
 from evermore.binned.effect import H, OffsetAndScale
-from evermore.parameters.parameter import PT
+from evermore.parameters.tree import PT
 from evermore.util import tree_stack
 from evermore.visualization import SupportsTreescope
 

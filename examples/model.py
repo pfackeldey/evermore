@@ -91,7 +91,7 @@ def loss(
     hists: PyTree[Hist1D],
     observation: Hist1D,
 ) -> Float[Array, ""]:
-    params = evm.parameter.combine(dynamic, static)
+    params = evm.tree.combine(dynamic, static)
     expectations = model(params, hists)
     constraints = evm.loss.get_log_probs(params)
     loss_val = (
