@@ -207,7 +207,7 @@ Example:
             "c": evm.Parameter(value=2.0),
         }
 
-        filtered_params = evm.tree.only(params, predicate=evm.filter.is_parameter)
+        filtered_params = evm.tree.only(params, filter=evm.filter.is_parameter)
 """
 
 is_value = OfType(type=ValueAttr)
@@ -226,7 +226,7 @@ Example:
             "c": evm.Parameter(value=2.0),
         }
 
-        filtered_params = evm.tree.only(params, predicate=evm.filter.is_value)
+        filtered_params = evm.tree.only(params, filter=evm.filter.is_value)
 """
 
 is_frozen = IsFrozen()
@@ -245,7 +245,7 @@ Example:
             "c": evm.Parameter(value=2.0),
         }
 
-        filtered_params = evm.tree.only(params, predicate=evm.filter.is_frozen)
+        filtered_params = evm.tree.only(params, filter=evm.filter.is_frozen)
 """
 
 is_not_frozen = Not(is_frozen)
@@ -264,5 +264,5 @@ Example:
             "c": evm.Parameter(value=2.0),
         }
 
-        filtered_params = evm.tree.only(params, predicate=evm.filter.is_not_frozen)
+        filtered_params = evm.tree.only(params, filter=evm.filter.is_not_frozen)
 """
