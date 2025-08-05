@@ -2,6 +2,8 @@
 
 ```{toctree}
 parameter.md
+tree.md
+filter.md
 transform.md
 sample.md
 effect.md

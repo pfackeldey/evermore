@@ -118,14 +118,14 @@ params = {
     "b": evm.Parameter(),
 }
 
-dynamic, static = evm.parameter.partition(params)
+dynamic, static = evm.tree.partition(params)
 print(f"{dynamic=}")
 print(f"{static=}")
 
 # loss's first argument is only the dynamic part of the parameter Pytree!
 def loss(dynamic: PyTree[evm.Parameter], static: PyTree[evm.Parameter], hists: PyTree[Array]) -> Array:
     # combine the dynamic and static parts of the parameter PyTree
-    parameters = evm.parameter.combine(dynamic, static)
+    parameters = evm.tree.combine(dynamic, static)
     assert parameters == params
     # use the parameters to calculate the loss as usual
     ...
@@ -134,7 +134,50 @@ grad_loss = eqx.filter_grad(loss)(dynamic, static, ...)
 ```
 
 If you need to further exclude parameter from being optimized you can either set `frozen=True`.
-For a more precise handling of the partitioning and combining step, have a look at `eqx.partition`, `eqx.combine`, and `evm.parameter.value_filter_spec`.
+For a more precise handling of the partitioning and combining step, have a look at `eqx.partition`, `eqx.combine`, and `evm.tree.value_filter_spec`.
+
+
+(tree-manipulations)=
+## PyTree Manipulations
+
+`evermore` provides (similarly to `nnx`) a little filter DSL to allow more powerful manipulations of PyTrees of `evm.Parameters`.
+The following example highlights the `evm.tree.only` function using various filters:
+
+```{code-cell} ipython3
+import evermore as evm
+import wadler_lindig as wl
+
+tags = frozenset({"theory"})
+
+# some pytree of parameters and something else
+tree = {
+    "mu": evm.Parameter(name="mu"),
+    "xsecs": {
+        "dy": evm.Parameter(tags=tags),
+        "tt": evm.Parameter(frozen=True, tags=tags),
+    },
+    "not_a_parameter": 0.0,
+}
+
+# parameter-only pytree
+params = evm.tree.only(tree, evm.filter.is_parameter)
+print("evm.filter.is_parameter:")
+wl.pprint(params, width=200)
+
+print("\nevm.filter.is_frozen:")
+wl.pprint(evm.tree.only(params, evm.filter.is_frozen), width=200)
+
+print("\nevm.filter.is_not_frozen:")
+wl.pprint(evm.tree.only(params, evm.filter.is_not_frozen), width=200)
+
+print("\nevm.filter.HasName('mu'):")
+wl.pprint(evm.tree.only(params, evm.filter.HasName("mu")), width=200)
+
+print("\nevm.filter.HasTags({'theory'}):")
+wl.pprint(evm.tree.only(params, evm.filter.HasTags(tags)), width=200)
+```
+
+`evm.tree.partition` also accepts a `filter` argument, and let's you partition any pytree as you want.
 
 
 ## JAX Transformations

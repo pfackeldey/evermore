@@ -5,12 +5,12 @@ from model import hists, loss, observation, params
 import evermore as evm
 
 if __name__ == "__main__":
-    dynamic, static = evm.parameter.partition(params)
+    dynamic, static = evm.tree.partition(params)
     loss_val = loss(dynamic, static, hists, observation)
     print(f"{loss_val=}")
     grads = eqx.filter_grad(loss)(dynamic, static, hists, observation)
     print("Gradients:")
     wl.pprint(
-        evm.parameter.pure(grads),
+        evm.tree.pure(grads),
         short_arrays=False,
     )

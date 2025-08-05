@@ -76,7 +76,7 @@ More information can be found in <project:#parameter-transformations>.
 Freeze a Parameter
 
 :   For the minimization of a likelihood it is necessary to differentiate with respect to the _differentiable_ part, i.e., the `.value` attributes, of a PyTree of `evm.Parameters`.
-    Splitting this tree into the differentiable and non-differentiable part is done with `evm.parameter.partition`. You can freeze a `evm.Parameter` by setting `frozen=True`, this will
+    Splitting this tree into the differentiable and non-differentiable part is done with `evm.tree.partition`. You can freeze a `evm.Parameter` by setting `frozen=True`, this will
     put the frozen parameter in the non-differentiable part.
 
 Correlate a Parameter

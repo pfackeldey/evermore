@@ -37,7 +37,7 @@ import evermore as evm
 
 # -- parameter definition --
 # params: PyTree[evm.Parameter] = ...
-# dynamic_params, static_params = evm.parameter.partition(params)
+# dynamic_params, static_params = evm.tree.partition(params)
 
 
 # -- model definition --

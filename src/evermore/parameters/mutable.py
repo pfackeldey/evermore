@@ -4,8 +4,8 @@ import typing as tp
 
 import equinox as eqx
 import jax
-from jax._src.core import MutableArray, mutable_array  # noqa: PLC2701
 from jax._src.state.types import AbstractRef  # noqa: PLC2701
+from jax.experimental import MutableArray, mutable_array
 from jaxtyping import PyTree
 
 
@@ -15,7 +15,7 @@ def _is_mutable_array(x) -> tp.TypeGuard[MutableArray]:
     )
 
 
-def mutable(vals: PyTree) -> PyTree:
+def to_refs(vals: PyTree) -> PyTree:
     """
     Recursively converts all mutable array-like elements within a parameter tree to their mutable counterparts.
 
@@ -28,7 +28,7 @@ def mutable(vals: PyTree) -> PyTree:
     return jax.tree.map(lambda x: mutable_array(x) if eqx.is_array(x) else x, vals)
 
 
-def freeze(vals: PyTree) -> PyTree:
+def to_arrays(vals: PyTree) -> PyTree:
     """
     Converts all mutable arrays within the given parameter tree to their immutable counterparts.
 

@@ -13,10 +13,16 @@ def fixed_mu_fit(mu: Float[Array, ""]) -> Float[Array, ""]:
     from model import hists, loss, observation, params
 
     # Fix `mu` and freeze the parameter
-    params = eqx.tree_at(lambda t: t.mu.value, params, mu)
     params = eqx.tree_at(lambda t: t.mu.frozen, params, True)
+    dynamic, static = evm.tree.partition(params)
 
-    dynamic, static = evm.parameter.partition(params)
+    # Update the `mu` value in the static part, either:
+    # 1) using `evm.parameter.to_value`  and `eqx.tree_at`
+    static = eqx.tree_at(lambda t: t.mu.raw_value, static, evm.parameter.to_value(mu))
+    # or 2) using mutable arrays
+    # static_ref = evm.mutable.to_refs(static)
+    # static_ref.mu.raw_value[...] = evm.parameter.to_value(mu)
+    # static = evm.mutable.to_arrays(static_ref)
 
     def twice_nll(dynamic, args):
         return 2.0 * loss(dynamic, *args)

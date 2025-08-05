@@ -5,15 +5,13 @@ import jax.flatten_util
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
+from evermore.parameters.filter import is_parameter
 from evermore.parameters.parameter import (
-    PT,
     AbstractParameter,
     V,
-    _params_map,
-    is_parameter,
-    pure,
     replace_value,
 )
+from evermore.parameters.tree import PT, combine, only, partition, pure
 from evermore.pdf import AbstractPDF, ImplementsFromUnitNormalConversion, Normal
 
 __all__ = [
@@ -26,17 +24,17 @@ def __dir__():
     return __all__
 
 
-def get_log_probs(params: PT) -> PT:
+def get_log_probs(tree: PT) -> PT:
     """
     Compute the log probabilities for all parameters.
 
-    This function iterates over all parameters in the provided PyTree params,
+    This function iterates over all parameters in the provided PyTree tree,
     applies their associated prior distributions (if any), and computes the
     log probability for each parameter. If a parameter does not have a prior
     distribution, a default log probability of 0.0 is returned.
 
     Args:
-        params (PyTree): A PyTree containing parameters to compute log probabilities for.
+        tree (PyTree): A PyTree containing parameters to compute log probabilities for.
 
     Returns:
         PyTree: A PyTree with the same structure as the input, where each parameter
@@ -78,12 +76,12 @@ def get_log_probs(params: PT) -> PT:
         return prior.log_prob(x)
 
     # constraints from pdfs
-    return _params_map(_constraint, params)
+    return jax.tree.map(_constraint, only(tree, is_parameter), is_leaf=is_parameter)
 
 
 def compute_covariance(
     loss_fn: tp.Callable,
-    params: PT,
+    tree: PT,
 ) -> Float[Array, "nparams nparams"]:
     r"""
     Computes the covariance matrix of the parameters under the Laplace approximation,
@@ -92,9 +90,9 @@ def compute_covariance(
     See ``examples/toy_generation.py`` for an example usage.
 
     Args:
-        loss_fn (Callable): The loss function. Should accept (params) as arguments.
+        loss_fn (Callable): The loss function. Should accept (tree) as arguments.
             All other arguments have to be "partial'd" into the loss function.
-        params (PT): A PyTree of parameters.
+        tree (PT): A PyTree of parameters.
 
     Returns:
         Float[Array, "nparams nparams"]: The covariance matrix of the parameters.
@@ -124,16 +122,26 @@ def compute_covariance(
         # (2, 2)
     """
     # first, compute the hessian at the current point
-    values = pure(params)
+    values = pure(tree)
     flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
 
     def _flat_loss(flat_values: Float[Array, "..."]) -> Float[Array, ""]:
         param_values = unravel_fn(flat_values)
 
-        _params = jax.tree.map(
+        # update the parameters with the new values
+        # and call the loss function
+        # 1. partition the tree of parameters and other things
+        # 2. update the parameters with the new values
+        # 3. combine the updated parameters with the rest of the tree
+        # 4. call the loss function with the updated tree
+        params, rest = partition(tree, filter=is_parameter)
+
+        updated_params = jax.tree.map(
             replace_value, params, param_values, is_leaf=is_parameter
         )
-        return loss_fn(_params)
+
+        updated_tree = combine(updated_params, rest)
+        return loss_fn(updated_tree)
 
     # calculate hessian
     hessian = jax.hessian(_flat_loss)(flat_values)

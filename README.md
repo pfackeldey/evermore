@@ -63,7 +63,7 @@ def loss(
     hists: Hists1D,
     observation: Hist1D,
 ) -> Float[Scalar, ""]:
-    params = evm.parameter.combine(dynamic, static)
+    params = evm.tree.combine(dynamic, static)
     expectation = model(params, hists)
     # Poisson NLL of the expectation and observation
     log_likelihood = (
@@ -89,13 +89,13 @@ class Params(NamedTuple):
 params = Params(mu=evm.Parameter(1.0), syst=evm.NormalParameter(0.0))
 
 # split tree of parameters in a differentiable part and a static part
-dynamic, static = evm.parameter.partition(params)
+dynamic, static = evm.tree.partition(params)
 
 # Calculate negative log-likelihood/loss
 loss_val = loss(dynamic, static, hists, observation)
 # gradients of negative log-likelihood w.r.t. dynamic parameters
 grads = eqx.filter_grad(loss)(dynamic, static, hists, observation)
-wl.pprint(evm.parameter.pure(grads), short_arrays=False)
+wl.pprint(evm.tree.pure(grads), short_arrays=False)
 # -> Params(mu=Array(-0.46153846, dtype=float64), syst=Array(-0.15436207, dtype=float64))
 ```
 

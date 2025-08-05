@@ -43,9 +43,7 @@ class AbstractPDF(eqx.Module, Generic[V], SupportsTreescope):
     def inv_cdf(self, x: V) -> V: ...
 
     @abc.abstractmethod
-    def sample(
-        self, key: PRNGKeyArray, shape: Shape | None = None
-    ) -> Float[Array, ...]: ...
+    def sample(self, key: PRNGKeyArray, shape: Shape) -> Float[Array, ...]: ...
 
     def prob(self, x: V, **kwargs) -> V:
         return jnp.exp(self.log_prob(x, **kwargs))
@@ -71,12 +69,7 @@ class Normal(AbstractPDF[V]):
     def __evermore_from_unit_normal__(self, x: V) -> V:
         return self.mean + self.width * x
 
-    def sample(
-        self, key: PRNGKeyArray, shape: Shape | None = None
-    ) -> Float[Array, ...]:
-        # jax.random.normal does not accept None shape
-        if shape is None:
-            shape = ()
+    def sample(self, key: PRNGKeyArray, shape: Shape) -> Float[Array, ...]:
         # sample parameter from pdf
         return self.__evermore_from_unit_normal__(jax.random.normal(key, shape=shape))
 
@@ -127,12 +120,7 @@ class PoissonDiscrete(PoissonBase[V]):
         # since we check for cdf < value, n will always refer to the next value
         return jnp.clip(n - 1, min=0)
 
-    def sample(
-        self, key: PRNGKeyArray, shape: Shape | None = None
-    ) -> Float[Array, ...]:
-        # jax.random.poisson does not accept empty tuple shape
-        if shape == ():
-            shape = None
+    def sample(self, key: PRNGKeyArray, shape: Shape) -> Float[Array, ...]:
         return jax.random.poisson(key, self.lamb, shape=shape)
 
 

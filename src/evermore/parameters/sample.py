@@ -4,14 +4,13 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PRNGKeyArray
 
+from evermore.parameters.filter import is_parameter
 from evermore.parameters.parameter import (
-    PT,
     AbstractParameter,
     V,
-    _params_map,
-    is_parameter,
     replace_value,
 )
+from evermore.parameters.tree import PT, only, pure
 from evermore.pdf import AbstractPDF, PoissonBase
 from evermore.util import _missing
 
@@ -70,9 +69,8 @@ def sample_from_covariance_matrix(
         # (3, 1)
     """
     # get the value & make sure it has at least 1d so we insert a batch dim later
-    values = _params_map(
-        lambda p: _missing if p.value is _missing else jnp.atleast_1d(p.value), params
-    )
+    params_ = only(params, is_parameter)
+    values = jax.tree.map(jnp.atleast_1d, pure(params_))
     flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
 
     # sample parameter sets from the correlation matrix (centered around `flat_values`)
@@ -121,9 +119,9 @@ def sample_from_priors(params: PT, key: PRNGKeyArray) -> PT:
         key = jax.random.PRNGKey(0)
         sampled = evm.sample.sample_from_priors(params, key)
         sampled["a"].value.shape
-        # (1,)
+        # ()
         sampled["b"].value.shape
-        # (1,)
+        # ()
     """
     flat_params, treedef = jax.tree.flatten(params, is_leaf=is_parameter)
     n_params = len(flat_params)
@@ -137,7 +135,7 @@ def sample_from_priors(params: PT, key: PRNGKeyArray) -> PT:
             pdf = param.prior
 
             # Sample new value from the prior pdf
-            sampled_value = pdf.sample(key)
+            sampled_value = pdf.sample(key, shape=(1,))
 
             # TODO: this is not correct I assume
             if isinstance(pdf, PoissonBase):

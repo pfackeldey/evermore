@@ -25,7 +25,7 @@ def make_step(
 
 
 def fit(params, hists, observation):
-    dynamic, static = evm.parameter.partition(params)
+    dynamic, static = evm.tree.partition(params)
 
     # initialize optimizer state
     opt_state = optim.init(eqx.filter(dynamic, eqx.is_inexact_array))
@@ -38,11 +38,11 @@ def fit(params, hists, observation):
         dynamic, opt_state = make_step(dynamic, static, opt_state, hists, observation)
 
     # combine optimized dynamic part with the static pytree
-    return evm.parameter.combine(dynamic, static)
+    return evm.tree.combine(dynamic, static)
 
 
 if __name__ == "__main__":
     bestfit_params = fit(params, hists, observation)
 
     print("Bestfit parameter:")
-    wl.pprint(evm.parameter.pure(bestfit_params), short_arrays=False)
+    wl.pprint(evm.tree.pure(bestfit_params), short_arrays=False)

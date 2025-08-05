@@ -25,10 +25,13 @@ def __dir__():
     return __all__
 
 
-def maybe_float_array(x: Any) -> Float[Array, "..."]:  # noqa: UP037
+def maybe_float_array(x: Any, passthrough: bool = True) -> Float[Array, "..."]:  # noqa: UP037
     if eqx.is_array_like(x):
         return jnp.asarray(x, jnp.result_type(float))
-    return x
+    if passthrough:
+        return x
+    msg = f"Expected an array-like object, got {type(x).__name__} instead."
+    raise ValueError(msg)
 
 
 @jax.tree_util.register_static

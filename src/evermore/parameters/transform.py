@@ -6,13 +6,13 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
+from evermore.parameters.filter import is_parameter
 from evermore.parameters.parameter import (
-    PT,
     AbstractParameter,
     V,
-    _params_map,
     replace_value,
 )
+from evermore.parameters.tree import PT, only
 
 __all__ = [
     "AbstractParameterTransformation",
@@ -46,7 +46,7 @@ def unwrap(params: PT) -> PT:
             return param
         return param.transform.unwrap(param)
 
-    return _params_map(_unwrap, params)
+    return jax.tree.map(_unwrap, only(params, is_parameter), is_leaf=is_parameter)
 
 
 def wrap(params: PT) -> PT:
@@ -69,7 +69,7 @@ def wrap(params: PT) -> PT:
             return param
         return param.transform.wrap(param)
 
-    return _params_map(_wrap, params)
+    return jax.tree.map(_wrap, only(params, is_parameter), is_leaf=is_parameter)
 
 
 class AbstractParameterTransformation(eqx.Module):
@@ -137,22 +137,22 @@ class MinuitTransform(AbstractParameterTransformation):
             # wrap back (or "inverse transform")
             pytree_tt = wrap(pytree_t)
 
-            wl.pprint(pytree, width=150, short_arrays=False)
+            wl.pprint(pytree, width=250, short_arrays=False)
             # {
-            #   'a': Parameter(value=Array([2.], dtype=float32), lower=-0.1, upper=2.2, transform=MinuitTransform()),
-            #   'b': Parameter(value=Array([0.1], dtype=float32), lower=0.0, upper=1.1, transform=MinuitTransform())
+            #   'a': Parameter(raw_value=ValueAttr(value=Array(2., dtype=float32)), name=None, lower=Array(-0.1, dtype=float32), upper=Array(2.2, dtype=float32), prior=None, frozen=False, transform=MinuitTransform(), tags=frozenset()),
+            #   'b': Parameter(raw_value=ValueAttr(value=Array(0.1, dtype=float32)), name=None, lower=Array(0., dtype=float32), upper=Array(1.1, dtype=float32), prior=None, frozen=False, transform=MinuitTransform(), tags=frozenset())
             # }
 
-            wl.pprint(pytree_t, width=150, short_arrays=False)
+            wl.pprint(pytree_t, width=250, short_arrays=False)
             # {
-            #   'a': Parameter(value=Array([0.9721281], dtype=float32), lower=-0.1, upper=2.2, transform=MinuitTransform()),
-            #   'b': Parameter(value=Array([-0.95824164], dtype=float32), lower=0.0, upper=1.1, transform=MinuitTransform())
+            #   'a': Parameter(raw_value=ValueAttr(value=Array(0.9721281, dtype=float32)), name=None, lower=Array(-0.1, dtype=float32), upper=Array(2.2, dtype=float32), prior=None, frozen=False, transform=MinuitTransform(), tags=frozenset()),
+            #   'b': Parameter(raw_value=ValueAttr(value=Array(-0.95824164, dtype=float32)), name=None, lower=Array(0., dtype=float32), upper=Array(1.1, dtype=float32), prior=None, frozen=False, transform=MinuitTransform(), tags=frozenset())
             # }
 
-            wl.pprint(pytree_tt, width=150, short_arrays=False)
+            wl.pprint(pytree_tt, width=250, short_arrays=False)
             # {
-            #   'a': Parameter(value=Array([1.9999999], dtype=float32), lower=-0.1, upper=2.2, transform=MinuitTransform()),
-            #   'b': Parameter(value=Array([0.09999997], dtype=float32), lower=0.0, upper=1.1, transform=MinuitTransform())
+            #   'a': Parameter(raw_value=ValueAttr(value=Array(1.9999999, dtype=float32)), name=None, lower=Array(-0.1, dtype=float32), upper=Array(2.2, dtype=float32), prior=None, frozen=False, transform=MinuitTransform(), tags=frozenset()),
+            #   'b': Parameter(raw_value=ValueAttr(value=Array(0.09999997, dtype=float32)), name=None, lower=Array(0., dtype=float32), upper=Array(1.1, dtype=float32), prior=None, frozen=False, transform=MinuitTransform(), tags=frozenset())
             # }
     """
 
@@ -245,22 +245,22 @@ class SoftPlusTransform(AbstractParameterTransformation):
         # wrap back (or "inverse transform")
         pytree_tt = wrap(pytree_t)
 
-        wl.pprint(pytree, width=150, short_arrays=False)
+        wl.pprint(pytree, width=250, short_arrays=False)
         # {
-        #   'a': Parameter(value=Array([2.], dtype=float32), transform=SoftPlusTransform()),
-        #   'b': Parameter(value=Array([0.1], dtype=float32), transform=SoftPlusTransform())
+        #   'a': Parameter(raw_value=ValueAttr(value=Array(2., dtype=float32)), name=None, lower=None, upper=None, prior=None, frozen=False, transform=SoftPlusTransform(), tags=frozenset()),
+        #   'b': Parameter(raw_value=ValueAttr(value=Array(0.1, dtype=float32)), name=None, lower=None, upper=None, prior=None, frozen=False, transform=SoftPlusTransform(), tags=frozenset())
         # }
 
-        wl.pprint(pytree_t, width=150, short_arrays=False)
+        wl.pprint(pytree_t, width=250, short_arrays=False)
         # {
-        #   'a': Parameter(value=Array([1.8545866], dtype=float32), transform=SoftPlusTransform()),
-        #   'b': Parameter(value=Array([-2.2521687], dtype=float32), transform=SoftPlusTransform())
+        #   'a': Parameter(raw_value=ValueAttr(value=Array(1.8545866, dtype=float32)), name=None, lower=None, upper=None, prior=None, frozen=False, transform=SoftPlusTransform(), tags=frozenset()),
+        #   'b': Parameter(raw_value=ValueAttr(value=Array(-2.2521687, dtype=float32)), name=None, lower=None, upper=None, prior=None, frozen=False, transform=SoftPlusTransform(), tags=frozenset())
         # }
 
-        wl.pprint(pytree_tt, width=150, short_arrays=False)
+        wl.pprint(pytree_tt, width=250, short_arrays=False)
         # {
-        #   'a': Parameter(value=Array([2.], dtype=float32), transform=SoftPlusTransform()),
-        #   'b': Parameter(value=Array([0.09999998], dtype=float32), transform=SoftPlusTransform())
+        #   'a': Parameter(raw_value=ValueAttr(value=Array(2., dtype=float32)), name=None, lower=None, upper=None, prior=None, frozen=False, transform=SoftPlusTransform(), tags=frozenset()),
+        #   'b': Parameter(raw_value=ValueAttr(value=Array(0.09999998, dtype=float32)), name=None, lower=None, upper=None, prior=None, frozen=False, transform=SoftPlusTransform(), tags=frozenset())
         # }
     """
 
