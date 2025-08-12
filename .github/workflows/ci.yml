@@ -16,7 +16,7 @@ jobs:
     name: Format + lint code
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v5
@@ -37,7 +37,7 @@ jobs:
         runs-on: [ubuntu-latest] # can be extended to other OSes, e.g. macOS/Windows if needed
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
