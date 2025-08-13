@@ -20,7 +20,7 @@ def fit(params, hists, observation):
     def minimize_step(dynamic_ref, static, hists, observation) -> None:
         loss_grad = eqx.filter_value_and_grad(loss)
         loss_val, grads = loss_grad(
-            evmm.freeze(dynamic_ref),
+            evmm.to_arrays(dynamic_ref),
             static,
             hists,
             observation,

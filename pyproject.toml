@@ -29,7 +29,7 @@ classifiers = [
 ]
 dynamic = ["version"] # version is set in src/evermore/__init__.py
 dependencies = [
-    "jax>=0.4.25",     # jax.tree
+    "jax>=0.7.0",     # jax.experimental.MutableArray
     "jaxlib",
     "jaxtyping",
     "equinox>=0.10.6", # eqx.field
@@ -38,6 +38,13 @@ dependencies = [
 
 [dependency-groups]
 test = ["pytest >=7", "pytest-cov >=3"]
+examples = [
+    "iminuit",
+    "jaxtyping",
+    "optax",
+    "optimistix",
+    "wadler_lindig",
+]
 docs = [
     "sphinx",
     "myst-parser",
@@ -50,14 +57,12 @@ docs = [
 ]
 dev = [
     { include-group = "test" },
+    { include-group = "examples" },
     { include-group = "docs" },
     "ipython",
     "ruff",
     "pre_commit",
     "mypy",
-    "optax",
-    "optimistix",
-    "jaxopt >=0.6",
 ]
 
 [project.urls]
