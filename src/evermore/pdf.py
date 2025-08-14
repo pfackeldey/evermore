@@ -24,10 +24,6 @@ __all__ = [
 ]
 
 
-# alias for rounding literals
-DiscreteRounding = Literal["floor", "ceil", "closest"]
-
-
 def __dir__():
     return __all__
 
@@ -171,6 +167,11 @@ class PoissonContinuous(PoissonBase[V]):
         raise Exception(msg)
 
 
+# alias for rounding literals
+DiscreteRounding = Literal["floor", "ceil", "closest"]
+known_roundings = frozenset(DiscreteRounding.__args__)  # type: ignore[attr-defined]
+
+
 def discrete_inv_cdf_search(
     x: V,
     cdf_fn: Callable[[V], V],
@@ -207,7 +208,7 @@ def discrete_inv_cdf_search(
         # -> 7.0
 
     Args:
-        x (Array): Integral values to compute the inverse CDF for.
+        x (V): Integral values to compute the inverse CDF for.
         cdf_fn (Callable): A callable representing the discrete CDF function. It is called with a
             single argument and supposed to return the CDF value for that argument.
         start_fn (Callable): A callable that provides a starting point for the search. It is called
@@ -215,18 +216,8 @@ def discrete_inv_cdf_search(
         rounding (DiscreteRounding): One of "floor", "ceil" or "closest".
 
     Returns:
-        Array: The computed inverse CDF values in the same shape as *x*.
+        V: The computed inverse CDF values in the same shape as *x*.
     """
-    # check rounding
-    known_roundings = {"floor", "ceil", "closest"}
-    if rounding not in known_roundings:
-        msg = f"unknown rounding '{rounding}', expected one of {', '.join(known_roundings)}"
-        raise ValueError(msg)
-
-    # flatten input
-    x_shape = x.shape
-    x = jnp.reshape(x, (-1, 1))
-
     # store masks for injecting exact values for known edge cases later on
     # inject 0 for x == 0
     zero_mask = x == 0.0
@@ -238,7 +229,7 @@ def discrete_inv_cdf_search(
     # setup stopping condition and iteration body for the iterative search
     # note: functions are defined for scalar values and then vmap'd, with results being reshaped
     def cond_fn(val):
-        stop = val[-1]
+        *_, stop = val
         return ~jnp.any(stop)
 
     def body_fn(val):
@@ -259,16 +250,23 @@ def discrete_inv_cdf_search(
         # if target_itg is between the computed integrals we can now find the correct k
         # note: k might be subject to a shift by +1 or -1, depending on the stride and rounding
         k_found = ~stop & ~make_step
-        if rounding == "floor":
-            k_shift = jnp.where(k_found & (itg > target_itg), -1, 0)
-        elif rounding == "ceil":
-            k_shift = jnp.where(k_found & (prev_itg > target_itg), 1, 0)
-        else:  # "closest"
-            k_shift = jnp.where(
-                k_found & (abs(itg - target_itg) > abs(prev_itg - target_itg)),
-                jnp.sign(prev_itg - itg),
-                0,
-            )
+
+        # we're using python >=3.11 :)
+        match rounding:
+            case "floor":
+                k_shift = jnp.where(k_found & (itg > target_itg), -1, 0)
+            case "ceil":
+                k_shift = jnp.where(k_found & (prev_itg > target_itg), 1, 0)
+            case "closest":
+                k_shift = jnp.where(
+                    k_found & (abs(itg - target_itg) > abs(prev_itg - target_itg)),
+                    jnp.sign(prev_itg - itg),
+                    0,
+                )
+            case _:
+                msg = f"unknown rounding '{rounding}' mode, expected one of {', '.join(known_roundings)}"  # type: ignore[unreachable]
+                raise ValueError(msg)
+
         k += k_shift
         # update the stop flag and end
         stop |= k_found
@@ -279,8 +277,9 @@ def discrete_inv_cdf_search(
         val = (start_k, target_itg, prev_itg, stop)
         return jax.lax.while_loop(cond_fn, body_fn, val)[0]
 
-    # vmap
-    vsearch = jax.vmap(search, in_axes=(0, 0, 0))
+    # jnp.vectorize is auto-vmapping over all axes of its arguments,
+    # see: https://docs.jax.dev/en/latest/_autosummary/jax.numpy.vectorize.html#jax.numpy.vectorize
+    vsearch = jnp.vectorize(search)
 
     # define starting point and stop flag (eagerly skipping edge cases), then search
     start_k = start_fn(x)
@@ -292,5 +291,4 @@ def discrete_inv_cdf_search(
     k = jnp.where(inf_mask, jnp.inf, k)
     k = jnp.where(nan_mask, jnp.nan, k)
 
-    # reshape to input shape
-    return jnp.reshape(k, x_shape)
+    return k  # noqa: RET504
