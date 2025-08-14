@@ -1,43 +1,34 @@
 from __future__ import annotations
 
-from operator import itemgetter
+import typing as tp
 
-import equinox as eqx
+import jax
 import jax.numpy as jnp
-from jaxtyping import Array
+from jaxtyping import Array, Float, PyTree
 
 import evermore as evm
 
+jax.config.update("jax_enable_x64", True)
 
-class SPlusBModel(eqx.Module):
-    staterrors: evm.staterror.StatErrors
+Hist1D = tp.TypeVar("Hist1D", bound=Float[Array, " nbins"])
 
-    def __init__(self, hists: dict[str, Array], histsw2: dict[str, Array]) -> None:
-        # create the staterrors (barlow-beeston-lite with threshold=10.0)
-        self.staterrors = evm.staterror.StatErrors.from_hists_and_variances(
-            hists=hists, variances=histsw2
-        )
 
-    def __call__(self, hists: dict) -> dict[str, Array]:
-        expectations = {}
+def model(
+    staterrors: evm.staterror.StatErrors, hists: PyTree[Hist1D]
+) -> PyTree[Hist1D]:
+    expectations = {}
 
-        # signal process
-        getter = itemgetter("signal")
-        signal_mcstat_mod = self.staterrors.modifier(getter=getter)
-        expectations["signal"] = signal_mcstat_mod(getter(hists))
+    # signal process
+    expectations["signal"] = staterrors["signal"](hists["signal"])
 
-        # bkg1 process
-        getter = itemgetter("bkg1")
-        bkg1_mcstat_mod = self.staterrors.modifier(getter=getter)
-        expectations["bkg1"] = bkg1_mcstat_mod(getter(hists))
+    # bkg1 process
+    expectations["bkg1"] = staterrors["bkg1"](hists["bkg1"])
 
-        # bkg2 process
-        getter = itemgetter("bkg2")
-        bkg2_mcstat_mod = self.staterrors.modifier(getter=getter)
-        expectations["bkg2"] = bkg2_mcstat_mod(getter(hists))
+    # bkg2 process
+    expectations["bkg2"] = staterrors["bkg2"](hists["bkg2"])
 
-        # return the modified expectations
-        return expectations
+    # return the modified expectations
+    return expectations
 
 
 hists = {
@@ -52,7 +43,13 @@ histsw2 = {
 }
 observation = jnp.array([34.0])
 
-model = SPlusBModel(hists, histsw2)
+# `staterrors` is just a pytree of `evm.Parameter`(s)
+staterrors = jax.tree.map(
+    evm.staterror.StatErrors,
+    hists,
+    histsw2,
+)
 
-# test the model
-expectations = model(hists)
+if __name__ == "__main__":
+    # test the model
+    expectations = model(staterrors, hists)

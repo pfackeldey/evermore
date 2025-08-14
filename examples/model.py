@@ -1,71 +1,104 @@
 from __future__ import annotations
 
+import typing as tp
+
 import equinox as eqx
+import jax
 import jax.numpy as jnp
-from jaxtyping import Array
+from jaxtyping import Array, Float, PyTree
 
 import evermore as evm
 
+jax.config.update("jax_enable_x64", True)
 
-class SPlusBModel(eqx.Module):
+
+Hist1D: tp.TypeAlias = Float[Array, " nbins"]  # type: ignore[name-defined]
+
+
+# dataclass like container for parameters
+class Params(eqx.Module):
     mu: evm.Parameter
     norm1: evm.NormalParameter
     norm2: evm.NormalParameter
     shape1: evm.NormalParameter
 
-    def __call__(self, hists: dict) -> dict[str, Array]:
-        expectations = {}
 
-        # signal process
-        sig_mod = self.mu.scale()
-        expectations["signal"] = sig_mod(hists["nominal"]["signal"])
+def model(
+    params: PyTree[evm.Parameter],
+    hists: PyTree[Hist1D],
+) -> PyTree[Hist1D]:
+    expectations = {}
 
-        # bkg1 process
-        bkg1_lnN = self.norm1.scale_log(up=jnp.array([1.1]), down=jnp.array([0.9]))
-        bkg1_shape = self.shape1.morphing(
-            up_template=hists["shape_up"]["bkg1"],
-            down_template=hists["shape_down"]["bkg1"],
-        )
-        # combine modifiers
-        bkg1_mod = bkg1_lnN @ bkg1_shape
-        expectations["bkg1"] = bkg1_mod(hists["nominal"]["bkg1"])
+    # signal process
+    sig_mod = params.mu.scale()
+    expectations["signal"] = sig_mod(hists["nominal"]["signal"])
 
-        # bkg2 process
-        bkg2_lnN = self.norm2.scale_log(up=jnp.array([1.05]), down=jnp.array([0.95]))
-        bkg2_shape = self.shape1.morphing(
-            up_template=hists["shape_up"]["bkg2"],
-            down_template=hists["shape_down"]["bkg2"],
-        )
-        # combine modifiers
-        bkg2_mod = bkg2_lnN @ bkg2_shape
-        expectations["bkg2"] = bkg2_mod(hists["nominal"]["bkg2"])
+    # bkg1 process
+    bkg1_lnN = params.norm1.scale_log(up=jnp.array([1.1]), down=jnp.array([0.9]))
+    bkg1_shape = params.shape1.morphing(
+        up_template=hists["shape_up"]["bkg1"],
+        down_template=hists["shape_down"]["bkg1"],
+    )
+    # combine modifiers
+    bkg1_mod = bkg1_lnN @ bkg1_shape
+    expectations["bkg1"] = bkg1_mod(hists["nominal"]["bkg1"])
 
-        # return the modified expectations
-        return expectations
+    # bkg2 process
+    bkg2_lnN = params.norm2.scale_log(up=jnp.array([1.05]), down=jnp.array([0.95]))
+    bkg2_shape = params.shape1.morphing(
+        up_template=hists["shape_up"]["bkg2"],
+        down_template=hists["shape_down"]["bkg2"],
+    )
+    # combine modifiers
+    bkg2_mod = bkg2_lnN @ bkg2_shape
+    expectations["bkg2"] = bkg2_mod(hists["nominal"]["bkg2"])
+
+    # return the modified expectations
+    return expectations
 
 
 hists = {
     "nominal": {
-        "signal": jnp.array([3]),
-        "bkg1": jnp.array([10]),
-        "bkg2": jnp.array([20]),
+        "signal": jnp.array([3.0]),
+        "bkg1": jnp.array([10.0]),
+        "bkg2": jnp.array([20.0]),
     },
     "shape_up": {
-        "bkg1": jnp.array([12]),
-        "bkg2": jnp.array([23]),
+        "bkg1": jnp.array([12.0]),
+        "bkg2": jnp.array([23.0]),
     },
     "shape_down": {
-        "bkg1": jnp.array([8]),
-        "bkg2": jnp.array([19]),
+        "bkg1": jnp.array([8.0]),
+        "bkg2": jnp.array([19.0]),
     },
 }
 
-model = SPlusBModel(
-    mu=evm.Parameter(value=0.0, lower=0.0, upper=10.0),  # type: ignore[arg-type]
+params = Params(
+    mu=evm.Parameter(),
     norm1=evm.NormalParameter(),
     norm2=evm.NormalParameter(),
     shape1=evm.NormalParameter(),
 )
 
-observation = jnp.array([37])
-expectations = model(hists)
+observation = jnp.array([37.0])
+expectations = model(params, hists)
+
+
+@eqx.filter_jit
+def loss(
+    dynamic: PyTree[evm.Parameter],
+    static: PyTree[evm.Parameter],
+    hists: PyTree[Hist1D],
+    observation: Hist1D,
+) -> Float[Array, ""]:
+    params = evm.tree.combine(dynamic, static)
+    expectations = model(params, hists)
+    constraints = evm.loss.get_log_probs(params)
+    loss_val = (
+        evm.pdf.PoissonContinuous(evm.util.sum_over_leaves(expectations))
+        .log_prob(observation)
+        .sum()
+    )
+    # add constraint
+    loss_val += evm.util.sum_over_leaves(constraints)
+    return -jnp.sum(loss_val)

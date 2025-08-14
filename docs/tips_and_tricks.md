@@ -71,7 +71,7 @@ This can be useful for example to ensure that the parameter values are within a 
 evermore provides two predefined transformations: [`evm.transform.MinuitTransform`](#evermore.parameters.transform.MinuitTransform) (for bounded parameters) and [`evm.transform.SoftPlusTransform`](#evermore.parameters.transform.SoftPlusTransform) (for positive parameters).
 
 
-```{code-cell} ipython3
+```{code-cell} python
 import evermore as evm
 import wadler_lindig as wl
 
@@ -96,7 +96,7 @@ Transformations always transform into the unconstrained real space (using [`evm.
 Typically, you would transform your parameters as a first step inside your loss (or model) function.
 Then, a minimizer can optimize the transformed parameters in the unconstrained space. Finally, you can transform them back to the constrained space for further processing.
 
-Custom transformations can be defined by subclassing [`evm.transform.ParameterTransformation`](#evermore.parameters.transform.ParameterTransformation) and implementing the [`wrap`](#evermore.parameters.transform.ParameterTransformation.wrap) and [`unwrap`](#evermore.parameters.transform.ParameterTransformation.unwrap) methods.
+Custom transformations can be defined by subclassing [`evm.transform.ParameterTransformation`](#evermore.parameters.transform.AbstractParameterTransformation) and implementing the [`wrap`](#evermore.parameters.transform.AbstractParameterTransformation.wrap) and [`unwrap`](#evermore.parameters.transform.AbstractParameterTransformation.unwrap) methods.
 
 
 ## Parameter Partitioning
@@ -109,6 +109,7 @@ w.r.t. both parts. Gradient calculation is performed only w.r.t. the differentia
 
 ```{code-block} python
 from jaxtyping import Array, PyTree
+import equinox as eqx
 import evermore as evm
 
 # define a PyTree of parameters
@@ -117,25 +118,66 @@ params = {
     "b": evm.Parameter(),
 }
 
-# split the PyTree into diffable and the static parts
-filter_spec = evm.parameter.value_filter_spec(params)
-diffable, static = eqx.partition(params, filter_spec)
+dynamic, static = evm.tree.partition(params)
+print(f"{dynamic=}")
+print(f"{static=}")
 
-# or
-# diffable, static = evm.parameter.partition(params)
-
-# loss's first argument is only the diffable part of the parameter Pytree!
-def loss(diffable: PyTree[evm.Parameter], static: PyTree[evm.Parameter], hists: PyTree[Array]) -> Array:
-    # combine the diffable and static parts of the parameter PyTree
-    parameters = eqx.combine(diffable, static)
+# loss's first argument is only the dynamic part of the parameter Pytree!
+def loss(dynamic: PyTree[evm.Parameter], static: PyTree[evm.Parameter], hists: PyTree[Array]) -> Array:
+    # combine the dynamic and static parts of the parameter PyTree
+    parameters = evm.tree.combine(dynamic, static)
     assert parameters == params
     # use the parameters to calculate the loss as usual
     ...
 
-grad_loss = eqx.filter_grad(loss)(diffable, static, ...)
+grad_loss = eqx.filter_grad(loss)(dynamic, static, ...)
 ```
 
-If you need to further exclude parameter from being optimized you can either set `frozen=True` or set the corresponding leaf in `filter_spec` from `True` to `False`.
+If you need to further exclude parameter from being optimized you can either set `frozen=True`.
+For a more precise handling of the partitioning and combining step, have a look at `eqx.partition`, `eqx.combine`, and `evm.tree.value_filter_spec`.
+
+
+(tree-manipulations)=
+## PyTree Manipulations
+
+`evermore` provides (similarly to `nnx`) a little filter DSL to allow more powerful manipulations of PyTrees of `evm.Parameters`.
+The following example highlights the `evm.tree.only` function using various filters:
+
+```{code-cell} ipython3
+import evermore as evm
+import wadler_lindig as wl
+
+tags = frozenset({"theory"})
+
+# some pytree of parameters and something else
+tree = {
+    "mu": evm.Parameter(name="mu"),
+    "xsecs": {
+        "dy": evm.Parameter(tags=tags),
+        "tt": evm.Parameter(frozen=True, tags=tags),
+    },
+    "not_a_parameter": 0.0,
+}
+
+# parameter-only pytree
+params = evm.tree.only(tree, evm.filter.is_parameter)
+print("evm.filter.is_parameter:")
+wl.pprint(params, width=200)
+
+print("\nevm.filter.is_frozen:")
+wl.pprint(evm.tree.only(params, evm.filter.is_frozen), width=200)
+
+print("\nevm.filter.is_not_frozen:")
+wl.pprint(evm.tree.only(params, evm.filter.is_not_frozen), width=200)
+
+print("\nevm.filter.HasName('mu'):")
+wl.pprint(evm.tree.only(params, evm.filter.HasName("mu")), width=200)
+
+print("\nevm.filter.HasTags({'theory'}):")
+wl.pprint(evm.tree.only(params, evm.filter.HasTags(tags)), width=200)
+```
+
+`evm.tree.partition` also accepts a `filter` argument, and let's you partition any pytree as you want.
 
 
 ## JAX Transformations
@@ -152,9 +194,9 @@ import treescope
 params = {"a": evm.NormalParameter(), "b": evm.NormalParameter()}
 
 rng_key = jax.random.key(0)
-rng_keys = jax.random.split(rng_key, 100)
+rng_keys = jax.random.split(rng_key, 10_000)
 
-vec_sample = jax.vmap(evm.sample.sample_uncorrelated, in_axes=(None, 0))
+vec_sample = jax.vmap(evm.sample.sample_from_priors, in_axes=(None, 0))
 
 with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
     tree = vec_sample(params, rng_keys)

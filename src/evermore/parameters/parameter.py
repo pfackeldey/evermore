@@ -1,27 +1,30 @@
 from __future__ import annotations
 
-from functools import partial
-from typing import TYPE_CHECKING, Any, TypeVar
+from collections.abc import Hashable, Iterator
+from typing import (
+    TYPE_CHECKING,
+    Generic,
+    TypeVar,
+)
 
 import equinox as eqx
-import jax
-from jaxtyping import Array, ArrayLike, PyTree
+from jaxtyping import Array, ArrayLike, Float
 
-from evermore.pdf import PDF, Normal
-from evermore.util import atleast_1d_float_array, filter_tree_map
+from evermore.util import _missing, maybe_float_array
 from evermore.visualization import SupportsTreescope
 
 if TYPE_CHECKING:
-    from evermore.binned.modifier import Modifier
-    from evermore.parameters.transform import ParameterTransformation
+    from evermore.binned.modifier import H, Modifier
+    from evermore.parameters.transform import AbstractParameterTransformation
+    from evermore.pdf import AbstractPDF, Normal
+
 
 __all__ = [
+    "AbstractParameter",
     "NormalParameter",
     "Parameter",
     "correlate",
-    "is_parameter",
-    "partition",
-    "value_filter_spec",
+    "replace_value",
 ]
 
 
@@ -29,46 +32,119 @@ def __dir__():
     return __all__
 
 
-class Parameter(eqx.Module, SupportsTreescope):
-    """
-    A general Parameter class for defining the parameters of a statistical model.
+def _numeric_methods(name):
+    bname = f"__{name}__"
 
-    Attributes:
-        value (Array): The actual value of the parameter.
-        name (str | None): An optional name for the parameter.
-        lower (Array | None): The lower boundary of the parameter.
-        upper (Array | None): The upper boundary of the parameter.
-        prior (PDF | None): The prior distribution of the parameter.
-        frozen (bool): Indicates if the parameter is frozen during optimization.
-        transform (ParameterTransformation | None): An optional transformation applied to the parameter.
+    def _binary(self, other):
+        other_val = other.value if isinstance(other, AbstractParameter) else other
+        return getattr(self.value, bname)(other_val)
 
-    Usage:
+    rname = f"__r{name}__"
 
-    .. code-block:: python
+    def _reflected(self, other):
+        other_val = other.value if isinstance(other, AbstractParameter) else other
+        return getattr(self.value, rname)(other_val)
 
-        import evermore as evm
+    iname = f"__i{name}__"
 
-        simple_param = evm.Parameter(value=1.0)
-        bounded_param = evm.Parameter(value=1.0, lower=0.0, upper=2.0)
-        constrained_parameter = evm.Parameter(
-            value=1.0, prior=evm.pdf.Normal(mean=1.0, width=0.1)
-        )
-        frozen_parameter = evm.Parameter(value=1.0, frozen=True)
-    """
+    def _inplace(self, other):
+        other_val = other.value if isinstance(other, AbstractParameter) else other
+        return getattr(self.value, iname)(other_val)
 
-    value: Array = eqx.field(converter=atleast_1d_float_array, default=0.0)
-    name: str | None = eqx.field(static=True, default=None)
-    lower: Array | None = eqx.field(default=None)
-    upper: Array | None = eqx.field(default=None)
-    prior: PDF | None = eqx.field(default=None)
-    frozen: bool = eqx.field(static=True, default=False)
-    transform: ParameterTransformation | None = eqx.field(default=None)
+    _binary.__name__ = bname
+    _reflected.__name__ = rname
+    _inplace.__name__ = iname
+    return _binary, _reflected, _inplace
 
-    def __check_init__(self):
-        # runtime check to be sure
-        if self.prior is not None and not isinstance(self.prior, PDF):
-            msg = f"Prior must be a PDF object for a constrained Parameter (or 'None' for an unconstrained one), got {self.prior=} ({type(self.prior)=})"  # type: ignore[unreachable]
-            raise ValueError(msg)
+
+def _unary_method(name):
+    uname = f"__{name}__"
+
+    def _unary(self):
+        return getattr(self.value, uname)()
+
+    _unary.__name__ = uname
+    return _unary
+
+
+V = TypeVar("V", bound=Float[Array, "..."])
+
+
+class ValueAttr(eqx.Module, Generic[V], SupportsTreescope):
+    value: V
+
+
+def to_value(x: ArrayLike) -> ValueAttr:
+    if isinstance(x, ValueAttr):
+        return x
+    return ValueAttr(value=maybe_float_array(x, passthrough=False))
+
+
+class AbstractParameter(
+    eqx.Module,
+    Generic[V],
+    SupportsTreescope,
+):
+    raw_value: eqx.AbstractVar[V]
+    name: eqx.AbstractVar[str | None]
+    lower: eqx.AbstractVar[V | None]
+    upper: eqx.AbstractVar[V | None]
+    prior: eqx.AbstractVar[AbstractPDF | None]
+    frozen: eqx.AbstractVar[bool]
+    transform: eqx.AbstractVar[AbstractParameterTransformation | None]
+    tags: eqx.AbstractVar[frozenset[Hashable]]
+
+    @property
+    def value(self) -> V:
+        """
+        Returns the value of the parameter.
+
+        This property is used to access the actual value of the parameter, which can be a JAX array or any other type.
+        It is defined as a property to allow for lazy evaluation and potential transformations.
+        """
+        return self.raw_value.value
+
+    def __jax_array__(self):
+        return self.value
+
+    def __len__(self) -> int:
+        return len(self.value)
+
+    def __iter__(self) -> Iterator:
+        return iter(self.value)
+
+    def __contains__(self, item) -> bool:
+        return item in self.value
+
+    __add__, __radd__, __iadd__ = _numeric_methods("add")
+    __sub__, __rsub__, __isub__ = _numeric_methods("sub")
+    __mul__, __rmul__, __imul__ = _numeric_methods("mul")
+    __matmul__, __rmatmul__, __imatmul__ = _numeric_methods("matmul")
+    __truediv__, __rtruediv__, __itruediv__ = _numeric_methods("truediv")
+    __floordiv__, __rfloordiv__, __ifloordiv__ = _numeric_methods("floordiv")
+    __mod__, __rmod__, __imod__ = _numeric_methods("mod")
+    __divmod__, __rdivmod__, __idivmod__ = _numeric_methods("divmod")
+    __pow__, __rpow__, __ipow__ = _numeric_methods("pow")
+    __lshift__, __rlshift__, __ilshift__ = _numeric_methods("lshift")
+    __rshift__, __rrshift__, __irshift__ = _numeric_methods("rshift")
+    __and__, __rand__, __iand__ = _numeric_methods("and")
+    __xor__, __rxor__, __ixor__ = _numeric_methods("xor")
+    __or__, __ror__, __ior__ = _numeric_methods("or")
+
+    __neg__ = _unary_method("neg")
+    __pos__ = _unary_method("pos")
+    __abs__ = _unary_method("abs")
+    __invert__ = _unary_method("invert")
+    __complex__ = _unary_method("complex")
+    __int__ = _unary_method("int")
+    __float__ = _unary_method("float")
+    __index__ = _unary_method("index")
+    __trunc__ = _unary_method("trunc")
+    __floor__ = _unary_method("floor")
+    __ceil__ = _unary_method("ceil")
+
+    def __round__(self, ndigits: int) -> V:
+        return self.value.__round__(ndigits)
 
     def scale(self, slope: ArrayLike = 1.0, offset: ArrayLike = 0.0) -> Modifier:
         """
@@ -86,11 +162,84 @@ class Parameter(eqx.Module, SupportsTreescope):
 
         return Modifier(
             parameter=self,
-            effect=Linear(slope=slope, offset=offset),  # type: ignore[arg-type]
+            effect=Linear(slope=slope, offset=offset),
         )
 
 
-class NormalParameter(Parameter):
+class Parameter(AbstractParameter[V]):
+    """
+    A general Parameter class for defining the parameters of a statistical model.
+
+    Attributes:
+        value (V): The actual value of the parameter.
+        name (str | None): An optional name for the parameter.
+        lower (V | None): The lower boundary of the parameter.
+        upper (V | None): The upper boundary of the parameter.
+        prior (AbstractPDF | None): The prior distribution of the parameter.
+        frozen (bool): Indicates if the parameter is frozen during optimization.
+        transform (AbstractParameterTransformation | None): An optional transformation applied to the parameter.
+        tags (frozenset[Hashable]): A set of tags associated with the parameter for additional metadata.
+
+    Usage:
+
+    .. code-block:: python
+
+        import evermore as evm
+
+        simple_param = evm.Parameter(value=1.0)
+        bounded_param = evm.Parameter(value=1.0, lower=0.0, upper=2.0)
+        constrained_parameter = evm.Parameter(
+            value=1.0, prior=evm.pdf.Normal(mean=1.0, width=0.1)
+        )
+        frozen_parameter = evm.Parameter(value=1.0, frozen=True)
+    """
+
+    raw_value: V
+    name: str | None
+    lower: V | None
+    upper: V | None
+    prior: AbstractPDF | None
+    frozen: bool
+    transform: AbstractParameterTransformation | None
+    tags: frozenset[Hashable] = eqx.field(static=True)
+
+    def __init__(
+        self,
+        value: V | ArrayLike = 0.0,
+        name: str | None = None,
+        lower: V | ArrayLike | None = None,
+        upper: V | ArrayLike | None = None,
+        prior: AbstractPDF | None = None,
+        frozen: bool = False,
+        transform: AbstractParameterTransformation | None = None,
+        tags: frozenset[Hashable] = frozenset(),
+    ) -> None:
+        self.raw_value = to_value(value)
+        self.name = name
+
+        # boundaries
+        self.lower = maybe_float_array(lower)
+        self.upper = maybe_float_array(upper)
+
+        # prior
+        self.prior = prior
+
+        # frozen: if True, the parameter is not updated during optimization
+        self.frozen = frozen
+        self.transform = transform
+
+        self.tags = tags
+
+    def __check_init__(self):
+        from evermore.pdf import AbstractPDF
+
+        # runtime check to be sure
+        if self.prior is not None and not isinstance(self.prior, AbstractPDF):
+            msg = f"Prior must be a AbstractPDF object for a constrained AbstractParameter (or 'None' for an unconstrained one), got {self.prior=} ({type(self.prior)=})"  # type: ignore[unreachable]
+            raise ValueError(msg)
+
+
+class NormalParameter(AbstractParameter[V]):
     """
     A specialized Parameter class with a Normal prior distribution.
 
@@ -98,10 +247,53 @@ class NormalParameter(Parameter):
     It also provides additional methods for scaling and morphing the parameter.
 
     Attributes:
-        prior (PDF | None): The prior distribution of the parameter, defaulting to a Normal distribution with mean 0.0 and width 1.0.
+        value (V): The actual value of the parameter.
+        name (str | None): An optional name for the parameter.
+        lower (V | None): The lower boundary of the parameter.
+        upper (V | None): The upper boundary of the parameter.
+        prior (Normal): The prior distribution of the parameter, set to a Normal distribution by default.
+        frozen (bool): Indicates if the parameter is frozen during optimization.
+        transform (AbstractParameterTransformation | None): An optional transformation applied to the parameter.
+        tags (frozenset[Hashable]): A set of tags associated with the parameter for additional metadata.
+
     """
 
-    prior: PDF | None = eqx.field(default_factory=lambda: Normal(mean=0.0, width=1.0))  # type: ignore[arg-type]
+    raw_value: V
+    name: str | None
+    lower: V | None
+    upper: V | None
+    prior: Normal
+    frozen: bool
+    transform: AbstractParameterTransformation | None
+    tags: frozenset[Hashable] = eqx.field(static=True)
+
+    def __init__(
+        self,
+        value: V | ArrayLike = 0.0,
+        name: str | None = None,
+        lower: V | ArrayLike | None = None,
+        upper: V | ArrayLike | None = None,
+        frozen: bool = False,
+        transform: AbstractParameterTransformation | None = None,
+        tags: frozenset[Hashable] = frozenset(),
+    ) -> None:
+        from evermore.pdf import Normal
+
+        self.raw_value = to_value(value)
+        self.name = name
+
+        # boundaries
+        self.lower = maybe_float_array(lower)
+        self.upper = maybe_float_array(upper)
+
+        # prior
+        self.prior = Normal(mean=0.0, width=1.0)
+
+        # frozen: if True, the parameter is not updated during optimization
+        self.frozen = frozen
+        self.transform = transform
+
+        self.tags = tags
 
     def scale_log(self, up: ArrayLike, down: ArrayLike) -> Modifier:
         """
@@ -117,15 +309,19 @@ class NormalParameter(Parameter):
         from evermore.binned.effect import AsymmetricExponential
         from evermore.binned.modifier import Modifier
 
-        return Modifier(parameter=self, effect=AsymmetricExponential(up=up, down=down))  # type: ignore[arg-type]
+        return Modifier(parameter=self, effect=AsymmetricExponential(up=up, down=down))
 
-    def morphing(self, up_template: Array, down_template: Array) -> Modifier:
+    def morphing(
+        self,
+        up_template: H,
+        down_template: H,
+    ) -> Modifier:
         """
         Applies vertical template morphing to the parameter.
 
         Args:
-            up_template (Array): The template for the upward shift.
-            down_template (Array): The template for the downward shift.
+            up_template (H): The template for the upward shift.
+            down_template (H): The template for the downward shift.
 
         Returns:
             Modifier: A Modifier instance with the vertical template morphing effect applied.
@@ -141,122 +337,49 @@ class NormalParameter(Parameter):
         )
 
 
-def is_parameter(leaf: Any) -> bool:
+def replace_value(
+    param: AbstractParameter,
+    value: V,
+) -> AbstractParameter:
     """
-    Checks if the given leaf is an instance of the Parameter class.
+    Replaces the `value` attribute of a given `AbstractParameter` instance with a new value.
 
     Args:
-        leaf (Any): The object to check.
+        param (AbstractParameter): The parameter object whose value is to be replaced.
+        value (V): The new value to assign to the parameter.
 
     Returns:
-        bool: True if the leaf is an instance of Parameter, False otherwise.
+        AbstractParameter: A new `AbstractParameter` instance with the updated value.
+
+    Notes:
+        This function uses `eqx.tree_at` to perform a functional update, returning a new object
+        rather than modifying the original `param` in place.
     """
-    return isinstance(leaf, Parameter)
+    return eqx.tree_at(
+        lambda p: p.raw_value,
+        param,
+        to_value(value),
+        is_leaf=lambda leaf: leaf is _missing,
+    )
 
 
-_params_map = partial(filter_tree_map, filter=is_parameter)
-
-
-_ParamsTree = TypeVar("_ParamsTree", bound=PyTree[Parameter])
-
-
-def value_filter_spec(tree: _ParamsTree) -> _ParamsTree:
-    """
-    Splits a PyTree of `evm.Parameter` instances into two PyTrees: one containing the values of the parameters
-    and the other containing the rest of the PyTree. This is useful for defining which components are to be optimized
-    and which to keep fixed during optimization.
-
-    Args:
-        tree (_ParamsTree): A PyTree of `evm.Parameter` instances to be split.
-
-    Returns:
-        _ParamsTree: A PyTree with the same structure as the input, but with boolean values indicating
-        which parts of the tree are diffable (True) and which are static (False).
-
-    Usage:
-
-    .. code-block:: python
-
-        from jaxtyping import Array
-        import evermore as evm
-
-        # define a PyTree of parameters
-        params = {
-            "a": evm.Parameter(value=1.0),
-            "b": evm.Parameter(value=2.0),
-        }
-
-        # split the PyTree into diffable and the static parts
-        filter_spec = evm.parameter.value_filter_spec(params)
-        diffable, static = eqx.partition(params, filter_spec)
-
-        # model's first argument is only the diffable part of the parameter PyTree!!
-        def model(diffable, static, hists) -> Array:
-            # combine the diffable and static parts of the parameter PyTree
-            parameters = eqx.combine(diffable, static)
-            assert parameters == params
-            # use the parameters to calculate the model as usual
-            ...
-    """
-    # 1. set the filter_spec to False for all non-static leaves
-    filter_spec = jax.tree.map(lambda _: False, tree)
-
-    # 2. set the filter_spec to True for each parameter value
-    def _replace_value(leaf: Any) -> Any:
-        if isinstance(leaf, Parameter):
-            leaf = eqx.tree_at(lambda p: p.value, leaf, not leaf.frozen)
-        return leaf
-
-    return jax.tree.map(_replace_value, filter_spec, is_leaf=is_parameter)
-
-
-def partition(tree: _ParamsTree) -> tuple[_ParamsTree, _ParamsTree]:
-    """
-    Partitions a PyTree of parameters into two separate PyTrees: one containing the diffable (optimizable) parts
-    and the other containing the static parts.
-
-    This function serves as a shorthand for manually creating a filter specification and then using `eqx.partition`
-    to split the parameters.
-
-    Args:
-        tree (_ParamsTree): A PyTree of parameters to be partitioned.
-
-    Returns:
-        tuple[_ParamsTree, _ParamsTree]: A tuple containing two PyTrees. The first PyTree contains the diffable parts
-        of the parameters, and the second PyTree contains the static parts.
-
-    Example:
-
-    .. code-block:: python
-
-        import evermore as evm
-
-        # Verbose:
-        filter_spec = evm.parameter.value_filter_spec(params)
-        diffable, static = eqx.partition(params, filter_spec)
-
-        # Short hand:
-        diffable, static = evm.parameter.partition(params)
-    """
-    return eqx.partition(tree, filter_spec=value_filter_spec(tree))
-
-
-def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
+def correlate(*parameters: AbstractParameter) -> tuple[AbstractParameter, ...]:
     """
     Correlate parameters by sharing the value of the *first* given parameter.
 
     It is preferred to just use the same parameter if possible, this function should be used if that is not doable.
 
     Args:
-        *parameters (Parameter): A variable number of Parameter instances to be correlated.
+        *parameters (AbstractParameter): A variable number of AbstractParameter instances to be correlated.
 
     Returns:
-        tuple[Parameter, ...]: A tuple of correlated Parameter instances.
+        tuple[AbstractParameter, ...]: A tuple of correlated AbstractParameter instances.
 
     Example:
 
     .. code-block:: python
 
+        import jax
         from jaxtyping import PyTree
         import evermore as evm
 
@@ -289,7 +412,7 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
 
 
         def model(params: Params):
-            flat_params, tree_def = jax.tree.flatten(params, evm.parameter.is_parameter)
+            flat_params, tree_def = jax.tree.flatten(params, evm.filter.is_parameter)
 
             # correlate the parameters
             correlated_flat_params = evm.parameter.correlate(*flat_params)
@@ -305,13 +428,15 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
 
     first, *rest = parameters
 
-    def _correlate(parameter: Parameter) -> tuple[Parameter, Parameter]:
+    def _correlate(
+        parameter: AbstractParameter[V],
+    ) -> tuple[AbstractParameter[V], AbstractParameter[V]]:
         ps = (first, parameter)
 
-        def where(ps: tuple[Parameter, Parameter]) -> Array:
+        def where(ps: tuple[AbstractParameter[V], AbstractParameter[V]]) -> V:
             return ps[1].value
 
-        def get(ps: tuple[Parameter, Parameter]) -> Array:
+        def get(ps: tuple[AbstractParameter[V], AbstractParameter[V]]) -> V:
             return ps[0].value
 
         shared = eqx.nn.Shared(ps, where, get)
@@ -319,6 +444,7 @@ def correlate(*parameters: Parameter) -> tuple[Parameter, ...]:
 
     correlated = [first]
     for p in rest:
+        # is this error really needed? shouldn't it be safe to broadcast here?
         if p.value.shape != first.value.shape:
             msg = f"Can't correlate parameters {first} and {p}! Must have the same shape, got {first.value.shape} and {p.value.shape}."
             raise ValueError(msg)

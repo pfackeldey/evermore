@@ -5,13 +5,18 @@ import abc
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import ArrayLike
 
-from evermore.parameters.parameter import Parameter, _params_map, _ParamsTree
+from evermore.parameters.filter import is_parameter
+from evermore.parameters.parameter import (
+    AbstractParameter,
+    V,
+    replace_value,
+)
+from evermore.parameters.tree import PT, only
 
 __all__ = [
+    "AbstractParameterTransformation",
     "MinuitTransform",
-    "ParameterTransformation",
     "SoftPlusTransform",
     "unwrap",
     "wrap",
@@ -22,7 +27,7 @@ def __dir__():
     return __all__
 
 
-def unwrap(params: _ParamsTree) -> _ParamsTree:
+def unwrap(params: PT) -> PT:
     """
     Unwraps the parameters in the given PyTree by applying their respective transformations.
 
@@ -30,21 +35,21 @@ def unwrap(params: _ParamsTree) -> _ParamsTree:
     transformation, if it exists. If a parameter does not have a transformation, it remains unchanged.
 
     Args:
-        params (_ParamsTree): A PyTree of parameters to be unwrapped.
+        params (PT): A PyTree of parameters to be unwrapped.
 
     Returns:
-        _ParamsTree: A new PyTree with the parameters unwrapped.
+        PT: A new PyTree with the parameters unwrapped.
     """
 
-    def _unwrap(param: Parameter) -> Parameter:
+    def _unwrap(param: AbstractParameter[V]) -> AbstractParameter[V]:
         if param.transform is None:
             return param
         return param.transform.unwrap(param)
 
-    return _params_map(_unwrap, params)
+    return jax.tree.map(_unwrap, only(params, is_parameter), is_leaf=is_parameter)
 
 
-def wrap(params: _ParamsTree) -> _ParamsTree:
+def wrap(params: PT) -> PT:
     """
     Wraps the parameters in the given PyTree by applying their respective transformations.
     This is the inverse operation of `unwrap`.
@@ -53,21 +58,21 @@ def wrap(params: _ParamsTree) -> _ParamsTree:
     transformation, if it exists. If a parameter does not have a transformation, it remains unchanged.
 
     Args:
-        params (_ParamsTree): A PyTree of parameters to be wrapped.
+        params (PT): A PyTree of parameters to be wrapped.
 
     Returns:
-        _ParamsTree: A new PyTree with the parameters wrapped.
+        PT: A new PyTree with the parameters wrapped.
     """
 
-    def _wrap(param: Parameter) -> Parameter:
+    def _wrap(param: AbstractParameter[V]) -> AbstractParameter[V]:
         if param.transform is None:
             return param
         return param.transform.wrap(param)
 
-    return _params_map(_wrap, params)
+    return jax.tree.map(_wrap, only(params, is_parameter), is_leaf=is_parameter)
 
 
-class ParameterTransformation(eqx.Module):
+class AbstractParameterTransformation(eqx.Module):
     """
     Abstract base class for parameter transformations.
 
@@ -77,31 +82,31 @@ class ParameterTransformation(eqx.Module):
     """
 
     @abc.abstractmethod
-    def unwrap(self, parameter: Parameter) -> Parameter:
+    def unwrap(self, parameter: AbstractParameter[V]) -> AbstractParameter[V]:
         """
         Transform a parameter from its meaningful (e.g. bounded) space to the real unconstrained space.
 
         Args:
-            parameter (Parameter): The parameter to be transformed.
+            parameter (AbstractParameter): The parameter to be transformed.
 
         Returns:
-            Parameter: The transformed parameter.
+            AbstractParameter: The transformed parameter.
         """
 
     @abc.abstractmethod
-    def wrap(self, parameter: Parameter) -> Parameter:
+    def wrap(self, parameter: AbstractParameter[V]) -> AbstractParameter[V]:
         """
         Transform a parameter from the real unconstrained space back to its meaningful (e.g. bounded) space. (Inverse of `unwrap`)
 
         Args:
-            parameter (Parameter): The parameter to be transformed.
+            parameter (AbstractParameter): The parameter to be transformed.
 
         Returns:
-            Parameter: The parameter transformed back to its original space.
+            AbstractParameter: The parameter transformed back to its original space.
         """
 
 
-class MinuitTransform(ParameterTransformation):
+class MinuitTransform(AbstractParameterTransformation):
     """
     Transform parameters based on Minuit's conventions. This transformation is used to map parameters with finite
     lower and upper boundaries to an unconstrained space. Both lower and upper boundaries
@@ -119,45 +124,46 @@ class MinuitTransform(ParameterTransformation):
             import evermore as evm
             import wadler_lindig as wl
 
+            from evermore.parameters.transform import MinuitTransform, unwrap, wrap
 
-            minuit_transform = evm.parameter.MinuitTransform()
+            minuit_transform = MinuitTransform()
             pytree = {
                 "a": evm.Parameter(2.0, lower=-0.1, upper=2.2, transform=minuit_transform),
                 "b": evm.Parameter(0.1, lower=0.0, upper=1.1, transform=minuit_transform),
             }
 
             # unwrap (or "transform")
-            pytree_t = evm.parameter.unwrap(pytree)
+            pytree_t = unwrap(pytree)
             # wrap back (or "inverse transform")
-            pytree_tt = evm.parameter.wrap(pytree_t)
+            pytree_tt = wrap(pytree_t)
 
-            wl.pprint(pytree, width=150, short_arrays=False)
+            wl.pprint(pytree, width=250, short_arrays=False)
             # {
-            #   'a': Parameter(value=Array([2.], dtype=float32), lower=-0.1, upper=2.2, transform=MinuitTransform()),
-            #   'b': Parameter(value=Array([0.1], dtype=float32), lower=0.0, upper=1.1, transform=MinuitTransform())
+            #   'a': Parameter(raw_value=ValueAttr(value=Array(2., dtype=float32)), name=None, lower=Array(-0.1, dtype=float32), upper=Array(2.2, dtype=float32), prior=None, frozen=False, transform=MinuitTransform(), tags=frozenset()),
+            #   'b': Parameter(raw_value=ValueAttr(value=Array(0.1, dtype=float32)), name=None, lower=Array(0., dtype=float32), upper=Array(1.1, dtype=float32), prior=None, frozen=False, transform=MinuitTransform(), tags=frozenset())
             # }
 
-            wl.pprint(pytree_t, width=150, short_arrays=False)
+            wl.pprint(pytree_t, width=250, short_arrays=False)
             # {
-            #   'a': Parameter(value=Array([0.9721281], dtype=float32), lower=-0.1, upper=2.2, transform=MinuitTransform()),
-            #   'b': Parameter(value=Array([-0.95824164], dtype=float32), lower=0.0, upper=1.1, transform=MinuitTransform())
+            #   'a': Parameter(raw_value=ValueAttr(value=Array(0.9721281, dtype=float32)), name=None, lower=Array(-0.1, dtype=float32), upper=Array(2.2, dtype=float32), prior=None, frozen=False, transform=MinuitTransform(), tags=frozenset()),
+            #   'b': Parameter(raw_value=ValueAttr(value=Array(-0.95824164, dtype=float32)), name=None, lower=Array(0., dtype=float32), upper=Array(1.1, dtype=float32), prior=None, frozen=False, transform=MinuitTransform(), tags=frozenset())
             # }
 
-            wl.pprint(pytree_tt, width=150, short_arrays=False)
+            wl.pprint(pytree_tt, width=250, short_arrays=False)
             # {
-            #   'a': Parameter(value=Array([1.9999999], dtype=float32), lower=-0.1, upper=2.2, transform=MinuitTransform()),
-            #   'b': Parameter(value=Array([0.09999997], dtype=float32), lower=0.0, upper=1.1, transform=MinuitTransform())
+            #   'a': Parameter(raw_value=ValueAttr(value=Array(1.9999999, dtype=float32)), name=None, lower=Array(-0.1, dtype=float32), upper=Array(2.2, dtype=float32), prior=None, frozen=False, transform=MinuitTransform(), tags=frozenset()),
+            #   'b': Parameter(raw_value=ValueAttr(value=Array(0.09999997, dtype=float32)), name=None, lower=Array(0., dtype=float32), upper=Array(1.1, dtype=float32), prior=None, frozen=False, transform=MinuitTransform(), tags=frozenset())
             # }
     """
 
-    def _check(self, parameter: Parameter) -> Parameter:
+    def _check(self, parameter: AbstractParameter[V]) -> AbstractParameter[V]:
         if (parameter.lower is None and parameter.upper is not None) or (
             parameter.lower is not None and parameter.upper is None
         ):
             msg = f"{parameter} must have both lower and upper boundaries set, or none of them."
             raise ValueError(msg)
-        lower: ArrayLike = parameter.lower  # type: ignore[assignment]
-        upper: ArrayLike = parameter.upper  # type: ignore[assignment]
+        lower = parameter.lower
+        upper = parameter.upper
         # check for finite boundaries
         error_msg = f"Bounds of {parameter} must be finite, got {parameter.lower=}, {parameter.upper=}."
         parameter = eqx.error_if(
@@ -171,7 +177,7 @@ class MinuitTransform(ParameterTransformation):
             error_msg,
         )
 
-    def unwrap(self, parameter: Parameter) -> Parameter:
+    def unwrap(self, parameter: AbstractParameter[V]) -> AbstractParameter[V]:
         # short-cut
         if parameter.lower is None and parameter.upper is None:
             return parameter
@@ -193,26 +199,26 @@ class MinuitTransform(ParameterTransformation):
         # this formula turns user-provided "external" parameter values into "internal" values
         value_t = jnp.arcsin(
             2.0
-            * (parameter.value - parameter.lower)  # type: ignore[operator]
-            / (parameter.upper - parameter.lower)  # type: ignore[operator]
+            * (parameter.value - parameter.lower)
+            / (parameter.upper - parameter.lower)
             - 1.0
         )
-        return eqx.tree_at(lambda p: p.value, parameter, value_t)
+        return replace_value(parameter, value_t)
 
-    def wrap(self, parameter: Parameter) -> Parameter:
+    def wrap(self, parameter: AbstractParameter[V]) -> AbstractParameter[V]:
         # short-cut
         if parameter.lower is None and parameter.upper is None:
             return parameter
 
         parameter = self._check(parameter)
         # this formula turns "internal" parameter values into "external" values
-        value_t = parameter.lower + (parameter.upper - parameter.lower) / 2 * (  # type: ignore[operator]
+        value_t = parameter.lower + (parameter.upper - parameter.lower) / 2 * (
             jnp.sin(parameter.value) + 1
         )
-        return eqx.tree_at(lambda p: p.value, parameter, value_t)
+        return replace_value(parameter, value_t)
 
 
-class SoftPlusTransform(ParameterTransformation):
+class SoftPlusTransform(AbstractParameterTransformation):
     """
     Applies the softplus transformation to parameters, projecting them from real space (R) to positive space (R+).
     This transformation is useful for enforcing the positivity of parameters and does not require lower or upper boundaries.
@@ -226,38 +232,39 @@ class SoftPlusTransform(ParameterTransformation):
         import evermore as evm
         import wadler_lindig as wl
 
+        from evermore.parameters.transform import SoftPlusTransform, unwrap, wrap
 
-        enforce_positivity = evm.parameter.SoftPlusTransform()
+        enforce_positivity = SoftPlusTransform()
         pytree = {
             "a": evm.Parameter(2.0, transform=enforce_positivity),
             "b": evm.Parameter(0.1, transform=enforce_positivity),
         }
 
         # unwrap (or "transform")
-        pytree_t = evm.parameter.unwrap(pytree)
+        pytree_t = unwrap(pytree)
         # wrap back (or "inverse transform")
-        pytree_tt = evm.parameter.wrap(pytree_t)
+        pytree_tt = wrap(pytree_t)
 
-        wl.pprint(pytree, width=150, short_arrays=False)
+        wl.pprint(pytree, width=250, short_arrays=False)
         # {
-        #   'a': Parameter(value=Array([2.], dtype=float32), transform=SoftPlusTransform()),
-        #   'b': Parameter(value=Array([0.1], dtype=float32), transform=SoftPlusTransform())
+        #   'a': Parameter(raw_value=ValueAttr(value=Array(2., dtype=float32)), name=None, lower=None, upper=None, prior=None, frozen=False, transform=SoftPlusTransform(), tags=frozenset()),
+        #   'b': Parameter(raw_value=ValueAttr(value=Array(0.1, dtype=float32)), name=None, lower=None, upper=None, prior=None, frozen=False, transform=SoftPlusTransform(), tags=frozenset())
         # }
 
-        wl.pprint(pytree_t, width=150, short_arrays=False)
+        wl.pprint(pytree_t, width=250, short_arrays=False)
         # {
-        #   'a': Parameter(value=Array([1.8545866], dtype=float32), transform=SoftPlusTransform()),
-        #   'b': Parameter(value=Array([-2.2521687], dtype=float32), transform=SoftPlusTransform())
+        #   'a': Parameter(raw_value=ValueAttr(value=Array(1.8545866, dtype=float32)), name=None, lower=None, upper=None, prior=None, frozen=False, transform=SoftPlusTransform(), tags=frozenset()),
+        #   'b': Parameter(raw_value=ValueAttr(value=Array(-2.2521687, dtype=float32)), name=None, lower=None, upper=None, prior=None, frozen=False, transform=SoftPlusTransform(), tags=frozenset())
         # }
 
-        wl.pprint(pytree_tt, width=150, short_arrays=False)
+        wl.pprint(pytree_tt, width=250, short_arrays=False)
         # {
-        #   'a': Parameter(value=Array([2.], dtype=float32), transform=SoftPlusTransform()),
-        #   'b': Parameter(value=Array([0.09999998], dtype=float32), transform=SoftPlusTransform())
+        #   'a': Parameter(raw_value=ValueAttr(value=Array(2., dtype=float32)), name=None, lower=None, upper=None, prior=None, frozen=False, transform=SoftPlusTransform(), tags=frozenset()),
+        #   'b': Parameter(raw_value=ValueAttr(value=Array(0.09999998, dtype=float32)), name=None, lower=None, upper=None, prior=None, frozen=False, transform=SoftPlusTransform(), tags=frozenset())
         # }
     """
 
-    def unwrap(self, parameter: Parameter) -> Parameter:
+    def unwrap(self, parameter: AbstractParameter[V]) -> AbstractParameter[V]:
         # from: https://github.com/danielward27/paramax/blob/main/paramax/utils.py
         """The inverse of the softplus function, checking for positive inputs."""
         parameter = eqx.error_if(
@@ -266,8 +273,8 @@ class SoftPlusTransform(ParameterTransformation):
             "Expected positive inputs to inv_softplus.",
         )
         value_t = jnp.log(-jnp.expm1(-parameter.value)) + parameter.value
-        return eqx.tree_at(lambda p: p.value, parameter, value_t)
+        return replace_value(parameter, value_t)
 
-    def wrap(self, parameter: Parameter) -> Parameter:
+    def wrap(self, parameter: AbstractParameter[V]) -> AbstractParameter[V]:
         value_t = jax.nn.softplus(parameter.value)
-        return eqx.tree_at(lambda p: p.value, parameter, value_t)
+        return replace_value(parameter, value_t)

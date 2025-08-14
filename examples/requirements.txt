@@ -1,0 +1,6 @@
+evermore>=0.3.1
+iminuit
+jaxtyping
+optax
+optimistix
+wadler_lindig

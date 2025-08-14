@@ -25,5 +25,6 @@ def model(params, domain):
     return gauss1 + gauss2
 
 
-# eval model
-model(params, domain)
+if __name__ == "__main__":
+    # eval model
+    model(params, domain)

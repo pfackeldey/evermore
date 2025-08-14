@@ -1,67 +1,53 @@
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import optax
-from jaxtyping import Array
+import optimistix as optx
+from jaxtyping import Array, Float
 
 import evermore as evm
 
+solver = optx.BFGS(rtol=1e-5, atol=1e-7)
 
-def fixed_mu_fit(mu: Array) -> Array:
-    from model import hists, model, observation
 
-    optim = optax.sgd(learning_rate=1e-2)
-    opt_state = optim.init(eqx.filter(model, eqx.is_inexact_array))
+def fixed_mu_fit(mu: Float[Array, ""]) -> Float[Array, ""]:
+    from model import hists, loss, observation, params
 
-    model = eqx.tree_at(lambda t: t.mu.value, model, mu)
+    # Fix `mu` and freeze the parameter
+    params = eqx.tree_at(lambda t: t.mu.frozen, params, True)
+    dynamic, static = evm.tree.partition(params)
 
-    # filter out mu from the model (no gradients will be calculated for mu!)
-    # see: https://github.com/patrick-kidger/equinox/blob/main/examples/frozen_layer.ipynb
-    filter_spec = evm.parameter.value_filter_spec(model)
-    filter_spec = eqx.tree_at(
-        lambda tree: tree.mu.value,
-        filter_spec,
-        replace=False,
+    # Update the `mu` value in the static part, either:
+    # 1) using `evm.parameter.to_value`  and `eqx.tree_at`
+    static = eqx.tree_at(lambda t: t.mu.raw_value, static, evm.parameter.to_value(mu))
+    # or 2) using mutable arrays
+    # static_ref = evm.mutable.to_refs(static)
+    # static_ref.mu.raw_value[...] = evm.parameter.to_value(mu)
+    # static = evm.mutable.to_arrays(static_ref)
+
+    def twice_nll(dynamic, args):
+        return 2.0 * loss(dynamic, *args)
+
+    fitresult = optx.minimise(
+        twice_nll,
+        solver,
+        dynamic,
+        has_aux=False,
+        args=(static, hists, observation),
+        options={},
+        max_steps=10_000,
+        throw=True,
     )
 
-    @eqx.filter_jit
-    def loss(dynamic_model, static_model, hists, observation):
-        model = eqx.combine(dynamic_model, static_model)
-        expectations = model(hists)
-        constraints = evm.loss.get_log_probs(model)
-        loss_val = (
-            evm.pdf.PoissonContinuous(lamb=evm.util.sum_over_leaves(expectations))
-            .log_prob(observation)
-            .sum()
-        )
-        # add constraint
-        loss_val += evm.util.sum_over_leaves(constraints)
-        return -2 * jnp.sum(loss_val)
-
-    @eqx.filter_jit
-    def make_step(model, opt_state, hists, observation):
-        # differentiate
-        dynamic_model, static_model = eqx.partition(model, filter_spec)
-        grads = eqx.filter_grad(loss)(dynamic_model, static_model, hists, observation)
-        updates, opt_state = optim.update(grads, opt_state)
-        # apply nuisance parameter and DNN weight updates
-        model = eqx.apply_updates(model, updates)
-        return model, opt_state
-
-    # minimize model with 1000 steps
-    for _ in range(1000):
-        model, opt_state = make_step(model, opt_state, hists, observation)
-    dynamic_model, static_model = eqx.partition(model, filter_spec)
-    return loss(dynamic_model, static_model, hists, observation)
+    return twice_nll(fitresult.value, (static, hists, observation))
 
 
-mus = jnp.linspace(0, 5, 11)
-# for loop over mu values
-for mu in mus:
-    print(f"[for-loop] mu={mu:.2f} - NLL={fixed_mu_fit(jnp.array(mu)):.6f}")
+if __name__ == "__main__":
+    mus = jnp.linspace(0, 5, 11)
+    # for loop over mu values
+    for mu in mus:
+        print(f"[for-loop] mu={mu:.2f} - NLL={fixed_mu_fit(jnp.array(mu)):.6f}")
 
-
-# or vectorized!!!
-likelihood_scan = jax.vmap(fixed_mu_fit)(mus)
-for mu, nll in zip(mus, likelihood_scan, strict=False):
-    print(f"[jax.vmap] mu={mu:.2f} - NLL={nll:.6f}")
+    # or vectorized!!!
+    likelihood_scan = jax.vmap(fixed_mu_fit)(mus)
+    for mu, nll in zip(mus, likelihood_scan, strict=False):
+        print(f"[jax.vmap] mu={mu:.2f} - NLL={nll:.6f}")

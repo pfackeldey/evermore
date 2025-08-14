@@ -8,13 +8,14 @@ from typing import Any
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, PyTree
+from jaxtyping import Array, Float, PyTree, Shaped
 
 __all__ = [
-    "atleast_1d_float_array",
+    "_missing",
     "dump_hlo_graph",
     "dump_jaxpr",
     "filter_tree_map",
+    "maybe_float_array",
     "sum_over_leaves",
     "tree_stack",
 ]
@@ -24,20 +25,36 @@ def __dir__():
     return __all__
 
 
-def atleast_1d_float_array(x: Any) -> Array:
-    float_type = jnp.result_type(float)
-    return jnp.atleast_1d(jnp.asarray(x, dtype=float_type))
+def maybe_float_array(x: Any, passthrough: bool = True) -> Float[Array, "..."]:  # noqa: UP037
+    if eqx.is_array_like(x):
+        return jnp.asarray(x, jnp.result_type(float))
+    if passthrough:
+        return x
+    msg = f"Expected an array-like object, got {type(x).__name__} instead."
+    raise ValueError(msg)
+
+
+@jax.tree_util.register_static
+class _Missing:
+    __slots__ = ()
+
+    def __repr__(self):
+        return "--"
+
+
+_missing = _Missing()
+del _Missing
 
 
 def filter_tree_map(
     fun: Callable,
-    module: PyTree,
+    tree: PyTree,
     filter: Callable,
 ) -> PyTree:
-    params = eqx.filter(module, filter, is_leaf=filter)
+    filtered = eqx.filter(tree, filter, is_leaf=filter)
     return jax.tree.map(
         fun,
-        params,
+        filtered,
         is_leaf=filter,
     )
 
@@ -46,14 +63,14 @@ def sum_over_leaves(tree: PyTree) -> Array:
     return jax.tree.reduce(operator.add, tree)
 
 
-def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
+def tree_stack(
+    trees: list[PyTree[Shaped[Array, "..."]]],  # noqa: UP037
+    *,
+    broadcast_leaves: bool = False,
+) -> PyTree[Shaped[Array, "batch_dim ..."]]:
     """
-    Turns e.g. an array of evm.Modifier(s) into a evm.Modifier of arrays.
-
-    It is important that the jax.Array(s) of the underlying Arrays have the same shape.
-    Same applies for the effect leaves (e.g. width). However, the effect leaves can be
-    broadcasted to the same shape if broadcast_effect_leaves is set to True.
-
+    Turns e.g. an array of evm.Modifier(s) into a evm.Modifier of arrays. (AOS -> SOA)
+    The leaves can be broadcasted to the same shape if broadcast_effect is set to True.
     The stacked PyTree will have the static nodes of the first PyTree in the list.
 
     Example:
@@ -63,45 +80,46 @@ def tree_stack(trees: list[PyTree], broadcast_leaves: bool = False) -> PyTree:
         import evermore as evm
         import jax
         import jax.numpy as jnp
+        import wadler_lindig as wl
 
         modifiers = [
             evm.NormalParameter().scale_log(up=jnp.array([1.1]), down=jnp.array([0.9])),
             evm.NormalParameter().scale_log(up=jnp.array([1.2]), down=jnp.array([0.8])),
         ]
-        print(evm.util.tree_stack(modifiers))
-        # -> Modifier(
-        #      parameter=NormalParameter(
-        #        name=None,
-        #        value=f32[2,1], # <- stacked dimension (2, 1)
-        #        lower=f32[2,1], # <- stacked dimension (2, 1)
-        #        upper=f32[2,1], # <- stacked dimension (2, 1)
-        #        prior=Normal(mean=f32[2,1], width=f32[2,1]), # <- stacked dimension (2,1)
-        #        frozen=False
-        #      ),
-        #      effect=AsymmetricExponential(up=f32[2,1], down=f32[2,1]) # <- stacked dimension (2, 1)
-        #    )
+        wl.pprint(evm.util.tree_stack(modifiers), hide_defaults=False)
+        # Modifier(
+        #   parameter=NormalParameter(
+        #     value=f32[2,1](jax),
+        #     name=None,
+        #     lower=None,
+        #     upper=None,
+        #     prior=Normal(mean=f32[2,1](jax), width=f32[2,1](jax)),
+        #     frozen=False,
+        #     transform=None
+        #   ),
+        #   effect=AsymmetricExponential(up=f32[2,1](jax), down=f32[2,1](jax))
+        # )
     """
-    # If there is only one modifier, we can return it directly
-    if len(trees) == 1:
-        return trees[0]
-    leaves_list = []
-    treedef_list = []
-    for tree in trees:
-        leaves, treedef = jax.tree.flatten(tree)
-        leaves_list.append(leaves)
-        treedef_list.append(treedef)
+    dynamic_trees, static_trees = eqx.partition(trees, eqx.is_array)
+    for tree in static_trees[1:]:
+        if jax.tree.structure(tree) != jax.tree.structure(static_trees[0]):
+            msg = (
+                "All static trees must have the same structure. "
+                f"Got {jax.tree.structure(tree)} and {jax.tree.structure(static_trees[0])}"
+            )
+            raise ValueError(msg)
 
-    grouped_leaves = zip(*leaves_list, strict=False)
-    stacked_leaves = []
-    for leaves in grouped_leaves:  # type: ignore[assignment]
+    def batch_axis_stack(*leaves: Array) -> Array:
+        leaves = jax.tree.map(jnp.atleast_1d, leaves)  # ensure at least 1D
         if broadcast_leaves:
             shape = jnp.broadcast_shapes(*[leaf.shape for leaf in leaves])
-            stacked_leaves.append(
-                jnp.stack(jax.tree.map(partial(jnp.broadcast_to, shape=shape), leaves))
+            return jnp.stack(
+                jax.tree.map(partial(jnp.broadcast_to, shape=shape), leaves)
             )
-        else:
-            stacked_leaves.append(jnp.stack(leaves))
-    return jax.tree.unflatten(treedef_list[0], stacked_leaves)
+        return jnp.stack(leaves, axis=0)
+
+    dynamic_trees = jax.tree.map(batch_axis_stack, *dynamic_trees)
+    return eqx.combine(static_trees[0], dynamic_trees)
 
 
 def dump_jaxpr(fun: Callable, *args: Any, **kwargs: Any) -> str:
@@ -158,4 +176,4 @@ def dump_hlo_graph(fun: Callable, *args: Any, **kwargs: Any) -> str:
         filepath = pathlib.Path("graph.gv")
         filepath.write_text(dump_hlo_graph(f, x), encoding="ascii")
     """
-    return jax.jit(fun).lower(*args, **kwargs).compiler_ir("hlo").as_hlo_dot_graph()  # type: ignore[union-attr]
+    return jax.jit(fun).lower(*args, **kwargs).compiler_ir("hlo").as_hlo_dot_graph()

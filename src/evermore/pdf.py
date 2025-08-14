@@ -1,20 +1,22 @@
 from __future__ import annotations
 
 import abc
-import typing as tp
+from collections.abc import Callable
+from typing import Generic, Literal, Protocol, runtime_checkable
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jax._src.random import Shape
 from jax.scipy.special import digamma, gammaln, xlogy
-from jaxtyping import Array, ArrayLike, PRNGKeyArray
+from jaxtyping import Array, Float, PRNGKeyArray
 
-from evermore.util import atleast_1d_float_array
+from evermore.parameters.parameter import V
+from evermore.util import maybe_float_array
 from evermore.visualization import SupportsTreescope
 
 __all__ = [
-    "PDF",
+    "AbstractPDF",
     "Normal",
     "PoissonBase",
     "PoissonContinuous",
@@ -23,75 +25,75 @@ __all__ = [
 
 
 # alias for rounding literals
-DiscreteRounding = tp.Literal["floor", "ceil", "closest"]
+DiscreteRounding = Literal["floor", "ceil", "closest"]
 
 
 def __dir__():
     return __all__
 
 
-@tp.runtime_checkable
-class ImplementsFromUnitNormalConversion(tp.Protocol):
-    def __evermore_from_unit_normal__(self, x: Array) -> Array: ...
+@runtime_checkable
+class ImplementsFromUnitNormalConversion(Protocol[V]):
+    def __evermore_from_unit_normal__(self, x: V) -> V: ...
 
 
-class PDF(eqx.Module, SupportsTreescope):
+class AbstractPDF(eqx.Module, Generic[V], SupportsTreescope):
     @abc.abstractmethod
-    def log_prob(self, x: Array) -> Array: ...
-
-    @abc.abstractmethod
-    def cdf(self, x: Array) -> Array: ...
+    def log_prob(self, x: V) -> V: ...
 
     @abc.abstractmethod
-    def inv_cdf(self, x: Array) -> Array: ...
+    def cdf(self, x: V) -> V: ...
 
     @abc.abstractmethod
-    def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array: ...
+    def inv_cdf(self, x: V) -> V: ...
 
-    def prob(self, x: Array, **kwargs) -> Array:
+    @abc.abstractmethod
+    def sample(self, key: PRNGKeyArray, shape: Shape) -> Float[Array, ...]: ...
+
+    def prob(self, x: V, **kwargs) -> V:
         return jnp.exp(self.log_prob(x, **kwargs))
 
 
-class Normal(PDF):
-    mean: Array = eqx.field(converter=atleast_1d_float_array)
-    width: Array = eqx.field(converter=atleast_1d_float_array)
+class Normal(AbstractPDF[V]):
+    mean: V = eqx.field(converter=maybe_float_array)
+    width: V = eqx.field(converter=maybe_float_array)
 
-    def log_prob(self, x: Array) -> Array:
+    def log_prob(self, x: V) -> V:
         logpdf_max = jax.scipy.stats.norm.logpdf(
             self.mean, loc=self.mean, scale=self.width
         )
         unnormalized = jax.scipy.stats.norm.logpdf(x, loc=self.mean, scale=self.width)
         return unnormalized - logpdf_max
 
-    def cdf(self, x: Array) -> Array:
+    def cdf(self, x: V) -> V:
         return jax.scipy.stats.norm.cdf(x, loc=self.mean, scale=self.width)
 
-    def inv_cdf(self, x: Array) -> Array:
+    def inv_cdf(self, x: V) -> V:
         return jax.scipy.stats.norm.ppf(x, loc=self.mean, scale=self.width)
 
-    def __evermore_from_unit_normal__(self, x: Array) -> Array:
+    def __evermore_from_unit_normal__(self, x: V) -> V:
         return self.mean + self.width * x
 
-    def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array:
-        # jax.random.normal does not accept None shape
-        if shape is None:
-            shape = ()
+    def sample(self, key: PRNGKeyArray, shape: Shape) -> Float[Array, ...]:
         # sample parameter from pdf
         return self.__evermore_from_unit_normal__(jax.random.normal(key, shape=shape))
 
 
-class PoissonBase(PDF):
-    lamb: Array = eqx.field(converter=atleast_1d_float_array)
+class PoissonBase(AbstractPDF[V]):
+    lamb: V = eqx.field(converter=maybe_float_array)
 
 
-class PoissonDiscrete(PoissonBase):
+class PoissonDiscrete(PoissonBase[V]):
     """
     Poisson distribution with discrete support. Float inputs are floored to the nearest integer,
     similar to the behavior implemented in other libraries like SciPy or RooFit.
     """
 
-    def log_prob(self, x: Array, normalize: bool = True) -> Array:
-        # explicit rounding
+    def log_prob(
+        self,
+        x: V,
+        normalize: bool = True,
+    ) -> V:
         k = jnp.floor(x)
 
         # plain evaluation of the pmf
@@ -103,19 +105,19 @@ class PoissonDiscrete(PoissonBase):
         logpdf_max = jax.scipy.stats.poisson.logpmf(k, k)
         return unnormalized - logpdf_max
 
-    def cdf(self, x: Array) -> Array:
+    def cdf(self, x: V) -> V:
         # no need to round x to k, already done by cdf library function
         return jax.scipy.stats.poisson.cdf(x, self.lamb)
 
-    def inv_cdf(self, x: Array, rounding: DiscreteRounding = "floor") -> Array:
+    def inv_cdf(self, x: V, rounding: DiscreteRounding = "floor") -> V:
         # define starting point for search from normal approximation
-        def start_fn(x):
+        def start_fn(x: V) -> V:
             return jnp.floor(
                 self.lamb + jax.scipy.stats.norm.ppf(x) * jnp.sqrt(self.lamb)
             )
 
         # define the cdf function
-        def cdf_fn(k):
+        def cdf_fn(k: V) -> V:
             return jax.scipy.stats.poisson.cdf(k, self.lamb)
 
         return discrete_inv_cdf_search(
@@ -125,17 +127,17 @@ class PoissonDiscrete(PoissonBase):
             rounding=rounding,
         )
 
-    def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array:
-        # jax.random.poisson does not accept empty tuple shape
-        if shape == ():
-            shape = None
+    def sample(self, key: PRNGKeyArray, shape: Shape) -> Float[Array, ...]:
         return jax.random.poisson(key, self.lamb, shape=shape)
 
 
-class PoissonContinuous(PoissonBase):
+class PoissonContinuous(PoissonBase[V]):
     def log_prob(
-        self, x: Array, normalize: bool = True, shift_mode: bool = False
-    ) -> Array:
+        self,
+        x: V,
+        normalize: bool = True,
+        shift_mode: bool = False,
+    ) -> V:
         # optionally adjust lambda to a higher value such that the new mode is the current lambda
         lamb = jnp.exp(digamma(self.lamb + 1)) if shift_mode else self.lamb
 
@@ -154,25 +156,27 @@ class PoissonContinuous(PoissonBase):
         logpdf_max = _log_prob(*args)
         return unnormalized - logpdf_max
 
-    def cdf(self, x: Array) -> Array:
+    def cdf(self, x: V) -> V:
         err = f"{self.__class__.__name__} does not support cdf"
         raise Exception(err)
 
-    def inv_cdf(self, x: Array) -> Array:
+    def inv_cdf(self, x: V) -> V:
         err = f"{self.__class__.__name__} does not support inv_cdf"
         raise Exception(err)
 
-    def sample(self, key: PRNGKeyArray, shape: Shape | None = None) -> Array:
+    def sample(
+        self, key: PRNGKeyArray, shape: Shape | None = None
+    ) -> Float[Array, ...]:
         msg = f"{self.__class__.__name__} does not support sampling, use PoissonDiscrete instead"
         raise Exception(msg)
 
 
 def discrete_inv_cdf_search(
-    x: Array,
-    cdf_fn: tp.Callable[[ArrayLike], ArrayLike],
-    start_fn: tp.Callable[[ArrayLike], ArrayLike],
+    x: V,
+    cdf_fn: Callable[[V], V],
+    start_fn: Callable[[V], V],
     rounding: DiscreteRounding,
-) -> Array:
+) -> V:
     """
     Computes the inverse CDF (percent point function) at integral values *x* for a discrete CDF
     distribution *cdf* using an iterative search strategy. The search starts at values provided by

@@ -5,13 +5,13 @@ build-backend = "hatchling.build"
 [project]
 name = "evermore"
 authors = [
-    { name = "Peter Fackeldey", email = "peter.fackeldey@rwth-aachen.de" },
+    { name = "Peter Fackeldey", email = "fackeldey.peter@gmail.com" },
 ]
 description = "Differentiable (binned) likelihoods in JAX."
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 1 - Planning",
     "Intended Audience :: Science/Research",
@@ -20,7 +20,6 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -29,7 +28,7 @@ classifiers = [
 ]
 dynamic = ["version"] # version is set in src/evermore/__init__.py
 dependencies = [
-    "jax>=0.4.25",     # jax.tree
+    "jax>=0.7.0",     # jax.experimental.MutableArray
     "jaxlib",
     "jaxtyping",
     "equinox>=0.10.6", # eqx.field
@@ -38,6 +37,13 @@ dependencies = [
 
 [dependency-groups]
 test = ["pytest >=7", "pytest-cov >=3"]
+examples = [
+    "iminuit",
+    "jaxtyping",
+    "optax",
+    "optimistix",
+    "wadler_lindig",
+]
 docs = [
     "sphinx",
     "myst-parser",
@@ -50,14 +56,12 @@ docs = [
 ]
 dev = [
     { include-group = "test" },
+    { include-group = "examples" },
     { include-group = "docs" },
     "ipython",
     "ruff",
     "pre_commit",
     "mypy",
-    "optax",
-    "optimistix",
-    "jaxopt >=0.6",
 ]
 
 [project.urls]
@@ -90,7 +94,7 @@ port.exclude_lines = ['pragma: no cover', '\.\.\.', 'if typing.TYPE_CHECKING:']
 
 [tool.mypy]
 files = ["src", "tests"]
-python_version = "3.10"
+python_version = "3.11"
 warn_unreachable = true
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
@@ -106,34 +110,35 @@ ignore = [
     "PLR",  # Design related pylint codes
     "E501", # Line too long
     # "B006",   # converts default args to 'None'
-    "I002",   # isort: "from __future__ import annotations"
-    "ISC001", # flake8-implicit-str-concat: Implicit string concatenation"
-    "PLC0415",  # `import` should be at the top-level of a file
-    "PLW3201",  # Dunder method `...` has no special meaning in Python 3
+    "I002",    # isort: "from __future__ import annotations"
+    "ISC001",  # flake8-implicit-str-concat: Implicit string concatenation"
+    "PLC0415", # `import` should be at the top-level of a file
+    "PLW3201", # Dunder method `...` has no special meaning in Python 3
     "RUF052",  # Local dummy variable `...` is accessed
+    "F722",    # jaxtyping: `Float32[Array, "b c"]` (https://docs.kidger.site/jaxtyping/faq/#flake8-or-ruff-are-throwing-an-error)
 ]
 select = [
     "E",
     "F",
-    "W",   # flake8
-    "B",   # flake8-bugbear
-    "I",   # isort
-    "C4",  # flake8-comprehensions
-    "EM",  # flake8-errmsg
-    "ICN", # flake8-import-conventions
-    "ISC", # flake8-implicit-str-concat
-    "G",   # flake8-logging-format
-    "PGH", # pygrep-hooks
-    "PIE", # flake8-pie
-    "PL",  # pylint
-    "PT",  # flake8-pytest-style
-    "PTH", # flake8-use-pathlib
-    "RET", # flake8-return
-    "RUF", # Ruff-specific
-    "SIM", # flake8-simplify
-    "UP",  # pyupgrade
-    "YTT", # flake8-2020
-    "EXE", # flake8-executable
+    "W",    # flake8
+    "B",    # flake8-bugbear
+    "I",    # isort
+    "C4",   # flake8-comprehensions
+    "EM",   # flake8-errmsg
+    "ICN",  # flake8-import-conventions
+    "ISC",  # flake8-implicit-str-concat
+    "G",    # flake8-logging-format
+    "PGH",  # pygrep-hooks
+    "PIE",  # flake8-pie
+    "PL",   # pylint
+    "PT",   # flake8-pytest-style
+    "PTH",  # flake8-use-pathlib
+    "RET",  # flake8-return
+    "RUF",  # Ruff-specific
+    "SIM",  # flake8-simplify
+    "UP",   # pyupgrade
+    "YTT",  # flake8-2020
+    "EXE",  # flake8-executable
     "E303", # Too many blank lines
 ]
 unfixable = [
