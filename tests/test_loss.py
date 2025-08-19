@@ -13,7 +13,23 @@ ScalarParam: tp.TypeAlias = evm.Parameter[Float[Scalar, ""]]
 ScalarParamTree: tp.TypeAlias = PyTree[ScalarParam]
 
 
+def loss_fn(params: ScalarParamTree) -> Float[Scalar, ""]:
+    return (
+        params["a"].value ** 2
+        + 2 * params["b"].value ** 2
+        + (params["a"].value + params["c"].value) ** 2
+    )
+
+
+params: ScalarParamTree = {
+    "a": evm.Parameter(2.0),
+    "b": evm.Parameter(3.0),
+    "c": evm.Parameter(4.0),
+}
+
+
 def test_get_log_probs():
+    # use some with constraints
     params: ScalarParamTree = {
         "a": evm.NormalParameter(value=0.5),
         "b": evm.NormalParameter(),
@@ -26,24 +42,29 @@ def test_get_log_probs():
     assert log_probs["c"] == pytest.approx(0.0)
 
 
-def test_compute_covariance():
-    def loss_fn(params: ScalarParamTree) -> Float[Scalar, ""]:
-        return (
-            params["a"].value ** 2
-            + 2 * params["b"].value ** 2
-            + (params["a"].value + params["c"].value) ** 2
-        )
-
-    params: ScalarParamTree = {
-        "a": evm.Parameter(2.0),
-        "b": evm.Parameter(3.0),
-        "c": evm.Parameter(4.0),
-    }
-
-    cov = evm.loss.compute_covariance(loss_fn, params)
+def test_covariance_matrix():
+    cov = evm.loss.covariance_matrix(loss_fn, params)
 
     assert cov.shape == (3, 3)
     np.testing.assert_allclose(
         cov,
         jnp.array([[1.0, 0.0, -0.7071067], [0.0, 1.0, 0.0], [-0.7071067, 0.0, 1.0]]),
     )
+
+
+def test_hessian_matrix():
+    h = evm.loss.hessian_matrix(loss_fn, params)
+
+    assert h.shape == (3, 3)
+    np.testing.assert_allclose(
+        h,
+        jnp.array([[4.0, 0.0, 2.0], [0.0, 4.0, 0.0], [2.0, 0.0, 2.0]]),
+    )
+
+
+def test_cramer_rao_uncertainty():
+    uncertainty = evm.loss.cramer_rao_uncertainty(loss_fn, params)
+
+    assert uncertainty["a"] == pytest.approx(0.70710677)
+    assert uncertainty["b"] == pytest.approx(0.5)
+    assert uncertainty["c"] == pytest.approx(1.0)

@@ -22,6 +22,7 @@ class SupportsTreescope:
             subtree_renderer=subtree_renderer,
             # Pass `roundtrippable=True` only if you can rebuild your object by
             # calling `__init__` with these attributes!
-            roundtrippable=True,
+            # This is `False` because of `evm.Parameter.raw_value`
+            roundtrippable=False,
             color=treescope.formatting_util.color_from_string(object_type.__qualname__),
         )

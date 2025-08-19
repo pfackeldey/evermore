@@ -15,8 +15,11 @@ from evermore.parameters.tree import PT, combine, only, partition, pure
 from evermore.pdf import AbstractPDF, ImplementsFromUnitNormalConversion, Normal
 
 __all__ = [
-    "compute_covariance",
+    "covariance_matrix",
+    "cramer_rao_uncertainty",
+    "fisher_information_matrix",
     "get_log_probs",
+    "hessian_matrix",
 ]
 
 
@@ -79,11 +82,131 @@ def get_log_probs(tree: PT) -> PT:
     return jax.tree.map(_constraint, only(tree, is_parameter), is_leaf=is_parameter)
 
 
-def compute_covariance(
+def _ravel_pure_tree(tree: PT) -> tuple[Float[Array, " nparams"], tp.Callable]:
+    """Flattens a PyTree of parameters into a 1D array of parameter values.
+    Args:
+        tree (PT): A PyTree of parameters.
+
+    Returns:
+        tuple[Float[Array, "nparams"], Callable]: A tuple containing the flattened
+        array of parameter values and a function to unflatten the array back into
+        the original PyTree structure.
+    """
+    values = pure(tree)
+    flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
+    return flat_values, unravel_fn
+
+
+def hessian_matrix(
     loss_fn: tp.Callable,
     tree: PT,
 ) -> Float[Array, "nparams nparams"]:
-    r"""
+    """
+    Computes the Hessian matrix of the loss function at the current parameter values.
+
+    Args:
+        loss_fn (Callable): The loss function. Should accept (tree) as arguments.
+            All other arguments have to be "partial'd" into the loss function.
+        tree (PT): A PyTree of parameters.
+
+    Returns:
+        Float[Array, "nparams nparams"]: The Hessian matrix of the loss function.
+
+    Example:
+
+    .. code-block:: python
+
+        import jax.numpy as jnp
+
+
+        def loss_fn(params):
+            x = params["a"].value
+            y = params["b"].value
+            return jnp.sum((x - 1.0) ** 2 + (y - 2.0) ** 2)
+
+
+        params = {
+            "a": evm.Parameter(value=jnp.array([1.0])),
+            "b": evm.Parameter(value=jnp.array([2.0])),
+        }
+
+        hessian = evm.loss.hessian(loss_fn, params)
+        hessian.shape
+        # (2, 2)
+    """
+    flat_values, unravel_fn = _ravel_pure_tree(tree)
+
+    def _flat_loss(flat_values: Float[Array, "..."]) -> Float[Array, ""]:
+        param_values = unravel_fn(flat_values)
+
+        # update the parameters with the new values
+        # and call the loss function
+        # 1. partition the tree of parameters and other things
+        # 2. update the parameters with the new values
+        # 3. combine the updated parameters with the rest of the tree
+        # 4. call the loss function with the updated tree
+        params, rest = partition(tree, filter=is_parameter)
+
+        updated_params = jax.tree.map(
+            replace_value, params, param_values, is_leaf=is_parameter
+        )
+
+        updated_tree = combine(updated_params, rest)
+        return loss_fn(updated_tree)
+
+    # calculate hessian
+    return jax.hessian(_flat_loss)(flat_values)
+
+
+def fisher_information_matrix(
+    loss_fn: tp.Callable,
+    tree: PT,
+) -> Float[Array, "nparams nparams"]:
+    """
+    Computes the Fisher information matrix of the parameters under the Laplace approximation,
+    by computing the Hessian of the loss function at the current parameter values.
+
+    Args:
+        loss_fn (Callable): The loss function. Should accept (tree) as arguments.
+            All other arguments have to be "partial'd" into the loss function.
+        tree (PT): A PyTree of parameters.
+
+    Returns:
+        Float[Array, "nparams nparams"]: The Fisher information matrix of the parameters.
+
+    Example:
+
+    .. code-block:: python
+
+        import jax.numpy as jnp
+
+
+        def loss_fn(params):
+            x = params["a"].value
+            y = params["b"].value
+            return jnp.sum((x - 1.0) ** 2 + (y - 2.0) ** 2)
+
+
+        params = {
+            "a": evm.Parameter(value=jnp.array([1.0])),
+            "b": evm.Parameter(value=jnp.array([2.0])),
+        }
+
+        fisher = evm.loss.fisher_information_matrix(loss_fn, params)
+        fisher.shape
+        # (2, 2)
+    """
+    # calculate hessian
+    hessian = hessian_matrix(loss_fn, tree)
+    # invert to get the fisher information matrix under the Laplace assumption of normality
+    return jnp.linalg.inv(hessian)
+
+
+def covariance_matrix(
+    loss_fn: tp.Callable,
+    tree: PT,
+) -> Float[Array, "nparams nparams"]:
+    """
     Computes the covariance matrix of the parameters under the Laplace approximation,
     by inverting the Hessian of the loss function at the current parameter values.
 
@@ -113,45 +236,63 @@ def compute_covariance(
 
 
         params = {
-            "a": evm.Parameter(value=jnp.array([1.0]), prior=None, lower=0.0, upper=2.0),
-            "b": evm.Parameter(value=jnp.array([2.0]), prior=None, lower=1.0, upper=3.0),
+            "a": evm.Parameter(value=jnp.array([1.0])),
+            "b": evm.Parameter(value=jnp.array([2.0])),
         }
 
-        cov = evm.loss.compute_covariance(loss_fn, params)
+        cov = evm.loss.covariance(loss_fn, params)
         cov.shape
         # (2, 2)
     """
-    # first, compute the hessian at the current point
-    values = pure(tree)
-    flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
+    # calculate fisher information matrix
+    fisher = fisher_information_matrix(loss_fn, tree)
 
-    def _flat_loss(flat_values: Float[Array, "..."]) -> Float[Array, ""]:
-        param_values = unravel_fn(flat_values)
-
-        # update the parameters with the new values
-        # and call the loss function
-        # 1. partition the tree of parameters and other things
-        # 2. update the parameters with the new values
-        # 3. combine the updated parameters with the rest of the tree
-        # 4. call the loss function with the updated tree
-        params, rest = partition(tree, filter=is_parameter)
-
-        updated_params = jax.tree.map(
-            replace_value, params, param_values, is_leaf=is_parameter
-        )
-
-        updated_tree = combine(updated_params, rest)
-        return loss_fn(updated_tree)
-
-    # calculate hessian
-    hessian = jax.hessian(_flat_loss)(flat_values)
-
-    # invert to get the correlation matrix under the Laplace assumption of normality
-    cov = jnp.linalg.inv(hessian)
-
-    # normalize via D^-1 @ cov @ D^-1 with D being the diagnonal standard deviation matrix
-    d = jnp.sqrt(jnp.diag(cov))
-    cov = cov / jnp.outer(d, d)
+    # normalize via D^-1 @ fisher @ D^-1 with D being the diagnonal standard deviation matrix
+    d = jnp.sqrt(jnp.diag(fisher))
+    cov = fisher / jnp.outer(d, d)
 
     # to avoid numerical issues, fix the diagonal to 1
     return jnp.fill_diagonal(cov, 1.0, inplace=False)
+
+
+def cramer_rao_uncertainty(
+    loss_fn: tp.Callable,
+    tree: PT,
+) -> PT:
+    """
+    Computes the Cramer-Rao uncertainty of the parameters under the Laplace approximation,
+    by computing the square root of the diagonal of the Fisher information matrix.
+
+    Args:
+        loss_fn (Callable): The loss function. Should accept (tree) as arguments.
+            All other arguments have to be "partial'd" into the loss function.
+        tree (PT): A PyTree of parameters.
+
+    Returns:
+        PT: The Cramer-Rao uncertainty of the parameters.
+
+    Example:
+
+    .. code-block:: python
+
+        import jax.numpy as jnp
+
+
+        def loss_fn(params):
+            x = params["a"].value
+            y = params["b"].value
+            return jnp.sum((x - 1.0) ** 2 + (y - 2.0) ** 2)
+
+
+        params = {
+            "a": evm.Parameter(value=jnp.array([1.0])),
+            "b": evm.Parameter(value=jnp.array([2.0])),
+        }
+
+        uncertainties = evm.loss.cramer_rao_uncertainty(loss_fn, params)
+    """
+    _, unravel_fn = _ravel_pure_tree(tree)
+
+    # calculate fisher information matrix
+    fisher_info = fisher_information_matrix(loss_fn, tree)
+    return unravel_fn(jnp.sqrt(jnp.diag(fisher_info)))
