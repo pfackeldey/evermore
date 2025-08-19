@@ -82,7 +82,7 @@ if __name__ == "__main__":
     # partial it to only depend on `params`
     loss_fn = partial(optx_loss, args=(static, hists, observation))
 
-    fast_covariance_matrix = eqx.filter_jit(evm.loss.compute_covariance)
+    fast_covariance_matrix = eqx.filter_jit(evm.loss.covariance_matrix)
     covariance_matrix = fast_covariance_matrix(loss_fn, dynamic)
 
     # create 1 toy
