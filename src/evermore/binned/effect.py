@@ -18,7 +18,9 @@ __all__ = [
     "AbstractEffect",
     "AsymmetricExponential",
     "Identity",
+    "Lambda",
     "Linear",
+    "OffsetAndScale",
     "VerticalTemplateMorphing",
 ]
 
