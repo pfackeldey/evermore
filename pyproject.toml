@@ -28,7 +28,7 @@ classifiers = [
 ]
 dynamic = ["version"] # version is set in src/evermore/__init__.py
 dependencies = [
-    "jax>=0.7.0",     # jax.experimental.MutableArray
+    "jax>=0.7.1", # jax.ref
     "jaxlib",
     "jaxtyping",
     "equinox>=0.10.6", # eqx.field

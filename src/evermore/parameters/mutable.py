@@ -4,14 +4,12 @@ import typing as tp
 
 import equinox as eqx
 import jax
-from jax._src.state.types import AbstractRef  # noqa: PLC2701
-from jax.experimental import MutableArray, mutable_array
 from jaxtyping import PyTree
 
 
-def _is_mutable_array(x) -> tp.TypeGuard[MutableArray]:
-    return isinstance(x, jax.Array | AbstractRef | MutableArray) and isinstance(
-        jax.typeof(x), AbstractRef | MutableArray
+def _is_array_ref(x) -> tp.TypeGuard[jax.ArrayRef]:
+    return eqx.is_array(x) and isinstance(
+        jax.typeof(x), jax.ArrayRef | jax.ref.AbstractRef
     )
 
 
@@ -25,7 +23,7 @@ def to_refs(vals: PyTree) -> PyTree:
     Returns:
         PyTree: A new parameter tree where all mutable array-like elements have been converted using `mutable_array`.
     """
-    return jax.tree.map(lambda x: mutable_array(x) if eqx.is_array(x) else x, vals)
+    return jax.tree.map(lambda x: jax.array_ref(x) if eqx.is_array(x) else x, vals)
 
 
 def to_arrays(vals: PyTree) -> PyTree:
@@ -41,4 +39,4 @@ def to_arrays(vals: PyTree) -> PyTree:
     Returns:
         PyTree: A new parameter tree where all mutable arrays have been replaced with immutable copies.
     """
-    return jax.tree.map(lambda x: x[...] if _is_mutable_array(x) else x, vals)
+    return jax.tree.map(lambda x: x[...] if _is_array_ref(x) else x, vals)
