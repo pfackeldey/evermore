@@ -15,8 +15,6 @@ key = jax.random.PRNGKey(42)
 # --- Postfit sampling ---
 # use the following for correlated (postfit) sampling
 # (the following creates a Covariance matrix based the number of parameter in an arbitrary pytree)
-
-
 # first we have to run a fit to get the cov matrix
 
 
@@ -50,13 +48,16 @@ def postfit_toy_expectation(
     key: PRNGKeyArray,
     dynamic: PyTree[evm.Parameter],
     static: PyTree[evm.Parameter],
+    *,
     covariance_matrix: Float[Array, "x x"],
+    mask: PyTree[bool] | None = None,
     n_samples: int = 1,
 ) -> Hist1D:
     toy_dynamic = evm.sample.sample_from_covariance_matrix(
         key=key,
         params=dynamic,
         covariance_matrix=covariance_matrix,
+        mask=mask,
         n_samples=n_samples,
     )
     toy_params = evm.tree.combine(toy_dynamic, static)
@@ -65,8 +66,8 @@ def postfit_toy_expectation(
 
 
 @eqx.filter_jit
-def prefit_toy_expectation(params, key):
-    sampled_params = evm.sample.sample_from_priors(params, key)
+def prefit_toy_expectation(key, params):
+    sampled_params = evm.sample.sample_from_priors(key, params)
     expectations = model(sampled_params, hists)
     return evm.util.sum_over_leaves(expectations)
 
@@ -74,6 +75,7 @@ def prefit_toy_expectation(params, key):
 if __name__ == "__main__":
     print("Exp.:", evm.util.sum_over_leaves(model(params, hists)))
     print("Obs.:", observation)
+    print()
 
     # --- Postfit sampling ---
     bestfit_params = fit(params, hists, observation)
@@ -86,24 +88,57 @@ if __name__ == "__main__":
     covariance_matrix = fast_covariance_matrix(loss_fn, dynamic)
 
     # create 1 toy
-    expectation = postfit_toy_expectation(key, dynamic, static, covariance_matrix)
+    expectation = postfit_toy_expectation(
+        key, dynamic, static, covariance_matrix=covariance_matrix
+    )
     print("1 toy (postfit):", expectation)
 
     # vectorized toy expectation for 10k toys
     expectations = postfit_toy_expectation(
-        key, dynamic, static, covariance_matrix, n_samples=10_000
+        key, dynamic, static, covariance_matrix=covariance_matrix, n_samples=10_000
     )
     print("Mean of 10.000 toys (postfit):", jnp.mean(expectations, axis=0))
     print("Std of 10.000 toys (postfit):", jnp.std(expectations, axis=0))
+    print()
+
+    # using a mask to only sample some parameters (here: only `norm1` and `norm2`)
+    mask = jax.tree.map(
+        lambda p: p.name.startswith("norm"), params, is_leaf=evm.filter.is_parameter
+    )
+
+    # create 1 toy
+    expectation = postfit_toy_expectation(
+        key, dynamic, static, covariance_matrix=covariance_matrix, mask=mask
+    )
+    print("1 toy (postfit, only norm1 & norm2):", expectation)
+
+    # vectorized toy expectation for 10k toys
+    expectations = postfit_toy_expectation(
+        key,
+        dynamic,
+        static,
+        covariance_matrix=covariance_matrix,
+        n_samples=10_000,
+        mask=mask,
+    )
+    print(
+        "Mean of 10.000 toys (postfit, only norm1 & norm2):",
+        jnp.mean(expectations, axis=0),
+    )
+    print(
+        "Std of 10.000 toys (postfit, only norm1 & norm2):",
+        jnp.std(expectations, axis=0),
+    )
+    print()
 
     # --- Prefit sampling ---
     # create 1 toy
-    expectation = prefit_toy_expectation(params, key)
+    expectation = prefit_toy_expectation(key, params)
     print("1 toy (prefit):", expectation)
 
     # vectorized toy expectation for 10k toys
     keys = jax.random.split(key, 10_000)
-    expectations = jax.vmap(prefit_toy_expectation, in_axes=(None, 0))(params, keys)
+    expectations = jax.vmap(prefit_toy_expectation, in_axes=(0, None))(keys, params)
     print("Mean of 10.000 toys (prefit):", jnp.mean(expectations, axis=0))
     print("Std of 10.000 toys (prefit):", jnp.std(expectations, axis=0))
 

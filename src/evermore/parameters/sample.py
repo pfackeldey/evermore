@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, PRNGKeyArray
+from jaxtyping import Array, Float, PRNGKeyArray, PyTree
 
 from evermore.parameters.filter import is_parameter
 from evermore.parameters.parameter import (
     AbstractParameter,
     V,
-    replace_value,
+    update_value,
 )
-from evermore.parameters.tree import PT, only, pure
+from evermore.parameters.tree import PT, only, pure, update_values
 from evermore.pdf import AbstractPDF, PoissonBase
 from evermore.util import _missing
 
@@ -29,6 +29,7 @@ def sample_from_covariance_matrix(
     params: PT,
     *,
     covariance_matrix: Float[Array, "nparams nparams"],
+    mask: PyTree[bool] | None = None,
     n_samples: int = 1,
 ) -> PT:
     """
@@ -41,6 +42,8 @@ def sample_from_covariance_matrix(
         key (jax.random.PRNGKey): A JAX random key used for generating random samples.
         params (PT): A PyTree of parameters whose values will be used as the mean of the distribution.
         covariance_matrix (Float[Array, "nparams nparams"]): The covariance matrix for the multivariate normal distribution.
+        mask (PyTree[bool], optional): A PyTree with the same structure as `params`, where `True` indicates that the corresponding
+            parameter should be sampled, and `False` indicates it should remain unchanged. If `None`, all parameters are sampled.
         n_samples (int, optional): The number of samples to draw. Defaults to 1.
 
     Returns:
@@ -69,7 +72,7 @@ def sample_from_covariance_matrix(
         # (3, 1)
     """
     # get the value & make sure it has at least 1d so we insert a batch dim later
-    params_ = only(params, is_parameter)
+    params_ = only(params, filter=is_parameter)
     values = jax.tree.map(jnp.atleast_1d, pure(params_))
     flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
 
@@ -85,12 +88,12 @@ def sample_from_covariance_matrix(
     sampled_param_values = jax.vmap(unravel_fn)(flat_sampled_values)
 
     # put them into the original structure again
-    return jax.tree.map(
-        replace_value, params, sampled_param_values, is_leaf=is_parameter
-    )
+    return update_values(params, values=sampled_param_values, mask=mask)
 
 
-def sample_from_priors(params: PT, key: PRNGKeyArray) -> PT:
+def sample_from_priors(
+    key: PRNGKeyArray, params: PT, *, mask: PyTree[bool] | None = None
+) -> PT:
     """
     Samples from the individual prior distributions of the parameters in the given PyTree.
     Note that no correlations between parameters are taken into account during sampling.
@@ -98,8 +101,10 @@ def sample_from_priors(params: PT, key: PRNGKeyArray) -> PT:
     See ``examples/toy_generation.py`` for an example usage.
 
     Args:
-        params (PT): A PyTree of parameters from which to sample.
         key (PRNGKeyArray): A JAX random key used for generating random samples.
+        params (PT): A PyTree of parameters from which to sample.
+        mask (PyTree[bool] | None, optional): A PyTree with the same structure as `params`, where `True` indicates that the corresponding
+            parameter should be sampled, and `False` indicates it should remain unchanged. If `None`, all parameters are sampled.
 
     Returns:
         PT: A new PyTree with the parameters sampled from their respective prior distributions.
@@ -117,7 +122,7 @@ def sample_from_priors(params: PT, key: PRNGKeyArray) -> PT:
         param2 = evm.NormalParameter(value=jnp.array([0.0]))
         params = {"a": param1, "b": param2}
         key = jax.random.PRNGKey(0)
-        sampled = evm.sample.sample_from_priors(params, key)
+        sampled = evm.sample.sample_from_priors(key, params)
         sampled["a"].value.shape
         # ()
         sampled["b"].value.shape
@@ -130,8 +135,15 @@ def sample_from_priors(params: PT, key: PRNGKeyArray) -> PT:
     keys = jax.random.split(key, n_params)
     keys_tree = jax.tree.unflatten(treedef, keys)
 
-    def _sample_from_prior(param: AbstractParameter[V], key) -> V:
-        if isinstance(param.prior, AbstractPDF) and param.value is not _missing:
+    if mask is None:
+        mask = jax.tree.map(lambda _: True, keys_tree)
+
+    def _sample_from_prior(param: AbstractParameter[V], key, mask) -> V:
+        if (
+            mask
+            and isinstance(param.prior, AbstractPDF)
+            and param.value is not _missing
+        ):
             pdf = param.prior
 
             # Sample new value from the prior pdf
@@ -142,10 +154,14 @@ def sample_from_priors(params: PT, key: PRNGKeyArray) -> PT:
                 sampled_value = (sampled_value / pdf.lamb) - 1
 
             # replace in param:
-            return replace_value(param, sampled_value)
-        # can't sample if there's no pdf to sample from,
-        # or when the value is `_missing`
+            return update_value(param, sampled_value)
+        # can't sample if there's:
+        # - a mask that is False
+        # - no pdf to sample from
+        # - when the value is `_missing`
         return param
 
     # Sample for each parameter
-    return jax.tree.map(_sample_from_prior, params, keys_tree, is_leaf=is_parameter)
+    return jax.tree.map(
+        _sample_from_prior, params, keys_tree, mask, is_leaf=is_parameter
+    )

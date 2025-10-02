@@ -10,6 +10,7 @@ from typing import (
 import equinox as eqx
 from jaxtyping import Array, ArrayLike, Float
 
+from evermore.parameters.mutable import _is_array_ref
 from evermore.util import _missing, maybe_float_array
 from evermore.visualization import SupportsTreescope
 
@@ -24,7 +25,7 @@ __all__ = [
     "NormalParameter",
     "Parameter",
     "correlate",
-    "replace_value",
+    "update_value",
 ]
 
 
@@ -103,6 +104,15 @@ class AbstractParameter(
         It is defined as a property to allow for lazy evaluation and potential transformations.
         """
         return self.raw_value.value
+
+    def __setitem__(self, where, value):
+        if not _is_array_ref(self.value):
+            msg = "Parameter value is not mutable! Use 'evm.mutable.to_refs' to convert it to a mutable array first."
+            raise TypeError(msg)
+        self.value[where] = maybe_float_array(value, passthrough=False)
+
+    def __getitem__(self, where):
+        return self.value[where]
 
     def __jax_array__(self):
         return self.value
@@ -195,7 +205,7 @@ class Parameter(AbstractParameter[V]):
     """
 
     raw_value: V
-    name: str | None
+    name: str | None = eqx.field(static=True)
     lower: V | None
     upper: V | None
     prior: AbstractPDF | None
@@ -259,7 +269,7 @@ class NormalParameter(AbstractParameter[V]):
     """
 
     raw_value: V
-    name: str | None
+    name: str | None = eqx.field(static=True)
     lower: V | None
     upper: V | None
     prior: Normal
@@ -337,7 +347,7 @@ class NormalParameter(AbstractParameter[V]):
         )
 
 
-def replace_value(
+def update_value(
     param: AbstractParameter,
     value: V,
 ) -> AbstractParameter:

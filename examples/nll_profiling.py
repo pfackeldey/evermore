@@ -1,4 +1,3 @@
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optimistix as optx
@@ -12,17 +11,12 @@ solver = optx.BFGS(rtol=1e-5, atol=1e-7)
 def fixed_mu_fit(mu: Float[Array, ""]) -> Float[Array, ""]:
     from model import hists, loss, observation, params
 
-    # Fix `mu` and freeze the parameter
-    params = eqx.tree_at(lambda t: t.mu.frozen, params, True)
-    dynamic, static = evm.tree.partition(params)
+    # Freeze the parameter and update the `mu` value in the params tree:
+    params = evm.tree.update_value_and_freeze(
+        tree=params, where=lambda t: t.mu, value=mu
+    )
 
-    # Update the `mu` value in the static part, either:
-    # 1) using `evm.parameter.to_value`  and `eqx.tree_at`
-    static = eqx.tree_at(lambda t: t.mu.raw_value, static, evm.parameter.to_value(mu))
-    # or 2) using mutable arrays
-    # static_ref = evm.mutable.to_refs(static)
-    # static_ref.mu.raw_value[...] = evm.parameter.to_value(mu)
-    # static = evm.mutable.to_arrays(static_ref)
+    dynamic, static = evm.tree.partition(params)
 
     def twice_nll(dynamic, args):
         return 2.0 * loss(dynamic, *args)

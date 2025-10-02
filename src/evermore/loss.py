@@ -9,7 +9,7 @@ from evermore.parameters.filter import is_parameter
 from evermore.parameters.parameter import (
     AbstractParameter,
     V,
-    replace_value,
+    update_value,
 )
 from evermore.parameters.tree import PT, combine, only, partition, pure
 from evermore.pdf import AbstractPDF, ImplementsFromUnitNormalConversion, Normal
@@ -27,6 +27,35 @@ def __dir__():
     return __all__
 
 
+def _parameter_value_to_x(prior: AbstractPDF, value: V) -> V:
+    # all constrained parameters are 'moving' on a 'unit_normal' distribution (mean=0, width=1), i.e.:
+    # - param.value=0: no shift, no constrain
+    # - param.value=+1: +1 sigma shift, calculate the +1 sigma constrain based on prior pdf
+    # - param.value=-1: -1 sigma shift, calculate the -1 sigma constrain based on prior pdf
+    #
+    # Translating between this "unit_normal" pdf and any other pdf works as follows:
+    # x = AnyOtherPDF.inv_cdf(unit_normal.cdf(v))
+    #
+    # Some priors, such as other Normals, can do a shortcut to save compute:
+    # e.g. for Normal: x = mean + width * v
+    # these shortcuts are implemented by '__evermore_from_unit_normal__' as defined by the
+    # ImplementsFromUnitNormalConversion protocol.
+    #
+    # (in the following: x=x and v=param.value)
+    if isinstance(prior, ImplementsFromUnitNormalConversion):
+        # this is the fast-path
+        x = prior.__evermore_from_unit_normal__(value)
+    else:
+        # this is a general implementation to translate from a unit normal to any target AbstractPDF
+        # the only requirement is that the target pdf implements `.inv_cdf`.
+        unit_normal: Normal[V] = Normal(
+            mean=jnp.zeros_like(value), width=jnp.ones_like(value)
+        )
+        cdf = unit_normal.cdf(value)
+        x = prior.inv_cdf(cdf)
+    return x
+
+
 def get_log_probs(tree: PT) -> PT:
     """
     Compute the log probabilities for all parameters.
@@ -41,45 +70,22 @@ def get_log_probs(tree: PT) -> PT:
 
     Returns:
         PyTree: A PyTree with the same structure as the input, where each parameter
-        is replaced by its corresponding log probability.
+            is replaced by its corresponding log probability.
     """
 
     def _constraint(param: AbstractParameter[V]) -> V:
         prior: AbstractPDF | None = param.prior
-
         # unconstrained case is easy:
         if prior is None:
             return jnp.zeros_like(param.value)
-
-        # all constrained parameters are 'moving' on a 'unit_normal' distribution (mean=0, width=1), i.e.:
-        # - param.value=0: no shift, no constrain
-        # - param.value=+1: +1 sigma shift, calculate the +1 sigma constrain based on prior pdf
-        # - param.value=-1: -1 sigma shift, calculate the -1 sigma constrain based on prior pdf
-        #
-        # Translating between this "unit_normal" pdf and any other pdf works as follows:
-        # x = AnyOtherPDF.inv_cdf(unit_normal.cdf(v))
-        #
-        # Some priors, such as other Normals, can do a shortcut to save compute:
-        # e.g. for Normal: x = mean + width * v
-        # these shortcuts are implemented by '__evermore_from_unit_normal__' as defined by the
-        # ImplementsFromUnitNormalConversion protocol.
-        #
-        # (in the following: x=x and v=param.value)
-        if isinstance(prior, ImplementsFromUnitNormalConversion):
-            # this is the fast-path
-            x = prior.__evermore_from_unit_normal__(param.value)
-        else:
-            # this is a general implementation to translate from a unit normal to any target AbstractPDF
-            # the only requirement is that the target pdf implements `.inv_cdf`.
-            unit_normal: Normal[V] = Normal(
-                mean=jnp.zeros_like(param.value), width=jnp.ones_like(param.value)
-            )
-            cdf = unit_normal.cdf(param.value)
-            x = prior.inv_cdf(cdf)
+        # constrained case:
+        x = _parameter_value_to_x(prior, param.value)
         return prior.log_prob(x)
 
     # constraints from pdfs
-    return jax.tree.map(_constraint, only(tree, is_parameter), is_leaf=is_parameter)
+    return jax.tree.map(
+        _constraint, only(tree, filter=is_parameter), is_leaf=is_parameter
+    )
 
 
 def _ravel_pure_tree(tree: PT) -> tuple[Float[Array, " nparams"], tp.Callable]:
@@ -148,7 +154,7 @@ def hessian_matrix(
         params, rest = partition(tree, filter=is_parameter)
 
         updated_params = jax.tree.map(
-            replace_value, params, param_values, is_leaf=is_parameter
+            update_value, params, param_values, is_leaf=is_parameter
         )
 
         updated_tree = combine(updated_params, rest)

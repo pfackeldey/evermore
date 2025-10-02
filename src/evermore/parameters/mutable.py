@@ -7,9 +7,11 @@ import jax
 from jaxtyping import PyTree
 
 
-def _is_array_ref(x) -> tp.TypeGuard[jax.ArrayRef]:
-    return eqx.is_array(x) and isinstance(
-        jax.typeof(x), jax.ArrayRef | jax.ref.AbstractRef
+def _is_array_ref(x) -> tp.TypeGuard[jax.Ref]:
+    from jax._src.state.types import AbstractRef  # noqa: PLC2701
+
+    return isinstance(x, jax.Array | jax.Ref) and isinstance(
+        jax.typeof(x), jax.Ref | AbstractRef
     )
 
 
@@ -23,7 +25,7 @@ def to_refs(vals: PyTree) -> PyTree:
     Returns:
         PyTree: A new parameter tree where all mutable array-like elements have been converted using `mutable_array`.
     """
-    return jax.tree.map(lambda x: jax.array_ref(x) if eqx.is_array(x) else x, vals)
+    return jax.tree.map(lambda x: jax.new_ref(x) if eqx.is_array(x) else x, vals)
 
 
 def to_arrays(vals: PyTree) -> PyTree:

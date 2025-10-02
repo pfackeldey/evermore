@@ -36,6 +36,10 @@ run the following command:
 ```bash
 pre-commit run --all-files
 ```
+or with [`prek`](https://github.com/j178/prek):
+```bash
+uvx prek run -a
+```
 
 ### Build the documentation
 

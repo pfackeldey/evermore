@@ -160,21 +160,21 @@ tree = {
 }
 
 # parameter-only pytree
-params = evm.tree.only(tree, evm.filter.is_parameter)
+params = evm.tree.only(tree, filter=evm.filter.is_parameter)
 print("evm.filter.is_parameter:")
 wl.pprint(params, width=200)
 
 print("\nevm.filter.is_frozen:")
-wl.pprint(evm.tree.only(params, evm.filter.is_frozen), width=200)
+wl.pprint(evm.tree.only(params, filter=evm.filter.is_frozen), width=200)
 
 print("\nevm.filter.is_not_frozen:")
-wl.pprint(evm.tree.only(params, evm.filter.is_not_frozen), width=200)
+wl.pprint(evm.tree.only(params, filter=evm.filter.is_not_frozen), width=200)
 
 print("\nevm.filter.HasName('mu'):")
-wl.pprint(evm.tree.only(params, evm.filter.HasName("mu")), width=200)
+wl.pprint(evm.tree.only(params, filter=evm.filter.HasName("mu")), width=200)
 
 print("\nevm.filter.HasTags({'theory'}):")
-wl.pprint(evm.tree.only(params, evm.filter.HasTags(tags)), width=200)
+wl.pprint(evm.tree.only(params, filter=evm.filter.HasTags(tags)), width=200)
 ```
 
 `evm.tree.partition` also accepts a `filter` argument, and let's you partition any pytree as you want.
@@ -196,10 +196,10 @@ params = {"a": evm.NormalParameter(), "b": evm.NormalParameter()}
 rng_key = jax.random.key(0)
 rng_keys = jax.random.split(rng_key, 10_000)
 
-vec_sample = jax.vmap(evm.sample.sample_from_priors, in_axes=(None, 0))
+vec_sample = jax.vmap(evm.sample.sample_from_priors, in_axes=(0, None))
 
 with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
-    tree = vec_sample(params, rng_keys)
+    tree = vec_sample(rng_keys, params)
     treescope.display(tree)
 ```
 
