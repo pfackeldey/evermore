@@ -74,10 +74,10 @@ hists = {
 }
 
 params = Params(
-    mu=evm.Parameter(),
-    norm1=evm.NormalParameter(),
-    norm2=evm.NormalParameter(),
-    shape1=evm.NormalParameter(),
+    mu=evm.Parameter(name="mu"),
+    norm1=evm.NormalParameter(name="norm1"),
+    norm2=evm.NormalParameter(name="norm2"),
+    shape1=evm.NormalParameter(name="shape1"),
 )
 
 observation = jnp.array([37.0])

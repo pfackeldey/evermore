@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from typing import (
-    TYPE_CHECKING,
-    TypeVar,
-)
+from collections.abc import Callable
+from typing import TypeVar
 
 import equinox as eqx
 import jax
@@ -15,18 +13,16 @@ from evermore.parameters.filter import (
     is_parameter,
     is_value,
 )
-from evermore.parameters.parameter import AbstractParameter, V
+from evermore.parameters.mutable import to_arrays, to_refs
+from evermore.parameters.parameter import AbstractParameter, V, update_value
 from evermore.util import _missing
-
-if TYPE_CHECKING:
-    pass
-
 
 __all__ = [
     "combine",
     "only",
     "partition",
     "pure",
+    "update_value_and_freeze",
     "value_filter_spec",
 ]
 
@@ -34,7 +30,7 @@ __all__ = [
 PT = TypeVar("PT", bound=PyTree[AbstractParameter[V]])
 
 
-def only(tree: PT, filter: Filter) -> PT:
+def only(tree: PT, *, filter: Filter) -> PT:
     """
     Filters a PyTree to include only leaves that are instances of the specified type.
 
@@ -60,7 +56,7 @@ def only(tree: PT, filter: Filter) -> PT:
             "c": evm.Parameter(2.0),
         }
 
-        filtered = evm.tree.only(params, evm.filter.is_parameter)
+        filtered = evm.tree.only(params, filter=evm.filter.is_parameter)
         wl.pprint(filtered, width=150)
         # {
         #     'a': Parameter(raw_value=ValueAttr(value=f32[](jax)), name=None, lower=None, upper=None, prior=None, frozen=False, transform=None, tags=frozenset()),
@@ -99,11 +95,11 @@ def pure(tree: PT) -> PT:
         wl.pprint(pure_values, short_arrays=False, width=150)
         # {'a': Array(1., dtype=float32), 'b': --, 'c': Array(2., dtype=float32)}
     """
-    parameters = only(tree, is_parameter)
+    parameters = only(tree, filter=is_parameter)
     return jax.tree.map(lambda p: p.value, parameters, is_leaf=is_parameter)
 
 
-def value_filter_spec(tree: PT, filter: Filter) -> PT:
+def value_filter_spec(tree: PT, *, filter: Filter) -> PT:
     """
     Splits a PyTree of `AbstractParameter` instances into two PyTrees: one containing the values of the parameters
     and the other containing the rest of the PyTree. This is useful for defining which components are to be optimized
@@ -163,7 +159,7 @@ def value_filter_spec(tree: PT, filter: Filter) -> PT:
     return eqx.combine(value_tree, false_tree, is_leaf=filter.is_leaf)
 
 
-def partition(tree: PT, filter: Filter | None = None) -> tuple[PT, PT]:
+def partition(tree: PT, *, filter: Filter | None = None) -> tuple[PT, PT]:
     """
     Partitions a PyTree of parameters into two separate PyTrees: one containing the dynamic (optimizable) parts
     and the other containing the static parts.
@@ -260,3 +256,134 @@ def combine(*trees: tuple[PT]) -> PT:
         return _missing
 
     return jax.tree.map(_combine, *trees, is_leaf=lambda x: x is _missing)
+
+
+def update_values(tree: PT, *, values: PT, mask: PyTree[bool] | None = None) -> PT:
+    """
+    Updates the values of all parameters in the given PyTree.
+
+    This function traverses the input PyTree and, for each parameter, updates its value to the corresponding
+    value from the `values` PyTree. Non-parameter leaves are left unchanged.
+
+    Args:
+        tree (PT): A PyTree containing parameters to be updated.
+        values (PT): A PyTree with the same structure as `tree`, containing the new values for each parameter.
+        mask (PyTree[bool] | None, optional): A PyTree with the same structure as `tree`, where `True` indicates that the corresponding
+            parameter should be updated, and `False` indicates it should remain unchanged. If `None`, all parameters are updated.
+
+    Returns:
+        PT: A new PyTree with the same structure as `tree`, but with each parameter's value updated to the corresponding value from `values`.
+
+    Example:
+
+    .. code-block:: python
+
+        import equinox as eqx
+        import wadler_lindig as wl
+        import evermore as evm
+
+        params = {
+            "a": evm.Parameter(1.0),
+            "b": evm.Parameter(42),
+            "c": evm.Parameter(2.0),
+        }
+
+        new_values = {
+            "a": 3.14,
+            "b": 123,
+            "c": 6.28,
+        }
+
+        updated_params = evm.tree.update_values(params, new_values)
+        wl.pprint(updated_params, short_arrays=False, width=150)
+        # {
+        #   'a': Parameter(raw_value=ValueAttr(value=Array(3.14, dtype=float64)), ...),
+        #   'b': Parameter(raw_value=ValueAttr(value=Array(123, dtype=int64)), ...),
+        #   'c': Parameter(raw_value=ValueAttr(value=Array(6.28, dtype=float64)), ...),
+        # }
+
+        # Masked update
+        mask = {
+            "a": True,
+            "b": False,
+            "c": True,
+        }
+
+        updated_params = evm.tree.update_values(params, new_values, mask)
+        wl.pprint(updated_params, short_arrays=False, width=150)
+        # {
+        #   'a': Parameter(raw_value=ValueAttr(value=Array(3.14, dtype=float64)), ...),
+        #   'b': Parameter(raw_value=ValueAttr(value=Array(42, dtype=int64)), ...),
+        #   'c': Parameter(raw_value=ValueAttr(value=Array(6.28, dtype=float64)), ...),
+        # }
+    """
+    if mask is None:
+        mask = jax.tree.map(lambda _: True, values)
+
+    def _masked_update(
+        param: AbstractParameter[V], value: V, mask: bool
+    ) -> AbstractParameter[V]:
+        if mask:
+            return update_value(param, value)
+        return param
+
+    return jax.tree.map(
+        _masked_update,
+        tree,
+        values,
+        mask,
+        is_leaf=is_parameter,
+    )
+
+
+def update_value_and_freeze(tree: PT, *, where: Callable, value: V) -> PT:
+    """
+    Updates the value of all parameters in the given PyTree and freezes them.
+
+    This function traverses the input PyTree and, for each parameter, updates its value to `value`
+    and sets its `frozen` attribute to `True`. Non-parameter leaves are left unchanged.
+
+    Args:
+        tree (PT): A PyTree containing parameters to be updated.
+        where (Callable): A callable that determines which parameters to update. It should accept a parameter
+        value (V): The new value to set for each parameter.
+
+    Returns:
+        PT: A new PyTree with the same structure as `tree`, but with each parameter's value updated to `value`
+        and frozen.
+
+    Example:
+
+    .. code-block:: python
+
+        import equinox as eqx
+        import wadler_lindig as wl
+        import evermore as evm
+
+        params = {
+            "a": evm.Parameter(1.0),
+            "b": 42,
+            "c": evm.Parameter(2.0),
+        }
+        updated_params = evm.tree.update_value_and_freeze(params, lambda t: t["a"], value=3.14)
+        wl.pprint(updated_params, short_arrays=False, width=150)
+        # {
+        #   'a': Parameter(raw_value=ValueAttr(value=Array(3.14, dtype=float64)), ..., frozen=True, ...),
+        #   'b': 42,
+        #   'c': Parameter(raw_value=ValueAttr(value=Array(2.0, dtype=float64)), ...),
+        # }
+        assert updated_params["a"].value == 3.14
+        assert updated_params["a"].frozen is True
+
+    """
+    # First we update the value using mutable arrays
+    refs = to_refs(tree)
+    param = where(refs)
+    if not isinstance(param, AbstractParameter):
+        msg = f"Expected a Parameter, got {param} ({type(param)=}) using {where=}"  # type: ignore[unreachable]
+        raise ValueError(msg)
+    # set the value
+    param[...] = value
+    tree = to_arrays(refs)
+    # Then we freeze the parameter using `eqx.tree_at`
+    return eqx.tree_at(lambda t: where(t).frozen, tree, True)

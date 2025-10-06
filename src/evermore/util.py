@@ -60,7 +60,7 @@ def filter_tree_map(
 
 
 def sum_over_leaves(tree: PyTree) -> Array:
-    return jax.tree.reduce(operator.add, tree)
+    return jax.tree.reduce_associative(operator.add, tree)
 
 
 def tree_stack(

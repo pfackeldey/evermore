@@ -10,7 +10,7 @@ from evermore.parameters.filter import is_parameter
 from evermore.parameters.parameter import (
     AbstractParameter,
     V,
-    replace_value,
+    update_value,
 )
 from evermore.parameters.tree import PT, only
 
@@ -46,7 +46,9 @@ def unwrap(params: PT) -> PT:
             return param
         return param.transform.unwrap(param)
 
-    return jax.tree.map(_unwrap, only(params, is_parameter), is_leaf=is_parameter)
+    return jax.tree.map(
+        _unwrap, only(params, filter=is_parameter), is_leaf=is_parameter
+    )
 
 
 def wrap(params: PT) -> PT:
@@ -69,7 +71,7 @@ def wrap(params: PT) -> PT:
             return param
         return param.transform.wrap(param)
 
-    return jax.tree.map(_wrap, only(params, is_parameter), is_leaf=is_parameter)
+    return jax.tree.map(_wrap, only(params, filter=is_parameter), is_leaf=is_parameter)
 
 
 class AbstractParameterTransformation(eqx.Module):
@@ -203,7 +205,7 @@ class MinuitTransform(AbstractParameterTransformation):
             / (parameter.upper - parameter.lower)
             - 1.0
         )
-        return replace_value(parameter, value_t)
+        return update_value(parameter, value_t)
 
     def wrap(self, parameter: AbstractParameter[V]) -> AbstractParameter[V]:
         # short-cut
@@ -215,7 +217,7 @@ class MinuitTransform(AbstractParameterTransformation):
         value_t = parameter.lower + (parameter.upper - parameter.lower) / 2 * (
             jnp.sin(parameter.value) + 1
         )
-        return replace_value(parameter, value_t)
+        return update_value(parameter, value_t)
 
 
 class SoftPlusTransform(AbstractParameterTransformation):
@@ -273,8 +275,8 @@ class SoftPlusTransform(AbstractParameterTransformation):
             "Expected positive inputs to inv_softplus.",
         )
         value_t = jnp.log(-jnp.expm1(-parameter.value)) + parameter.value
-        return replace_value(parameter, value_t)
+        return update_value(parameter, value_t)
 
     def wrap(self, parameter: AbstractParameter[V]) -> AbstractParameter[V]:
         value_t = jax.nn.softplus(parameter.value)
-        return replace_value(parameter, value_t)
+        return update_value(parameter, value_t)

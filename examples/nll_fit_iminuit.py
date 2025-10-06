@@ -5,7 +5,7 @@ import iminuit
 import jax
 import jax.numpy as jnp
 import wadler_lindig as wl
-from jaxtyping import Array, Float, PyTree
+from jaxtyping import Array, Float
 from model import hists, loss, observation, params
 
 import evermore as evm
@@ -21,21 +21,10 @@ def fit(params, hists, observation):
     values = evm.tree.pure(dynamic)
     flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
 
-    def update(
-        params: PyTree[evm.Parameter],
-        values: FlatV,
-    ) -> PyTree[evm.Parameter]:
-        return jax.tree.map(
-            evm.parameter.replace_value,
-            params,
-            unravel_fn(values),
-            is_leaf=evm.filter.is_parameter,
-        )
-
     # wrap loss that works on flat array
     @eqx.filter_jit
     def flat_loss(flat_values: FlatV) -> Float[Array, ""]:
-        _dynamic = update(dynamic, flat_values)
+        _dynamic = evm.tree.update_values(dynamic, values=unravel_fn(flat_values))
         return loss(_dynamic, static, hists, observation)
 
     minuit = iminuit.Minuit(flat_loss, flat_values, grad=eqx.filter_grad(flat_loss))
@@ -48,7 +37,7 @@ def fit(params, hists, observation):
     bestfit_values = jnp.array(minuit.values)
 
     # wrap into pytree of parameters
-    bestfit_dynamic = update(dynamic, bestfit_values)
+    bestfit_dynamic = evm.tree.update_values(dynamic, values=unravel_fn(bestfit_values))
 
     # combine with static pytree
     return evm.tree.combine(bestfit_dynamic, static)
