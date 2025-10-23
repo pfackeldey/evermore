@@ -198,7 +198,6 @@ nnx.display(sample)
 @nnx.split_rngs(splits=10_000)
 @partial(nnx.vmap, in_axes=(0, None))
 def batched_sample_from_priors(rngs, params):
-    # Convert to pure values so the batch dimension is easy to inspect.
     return evm.sample.sample_from_priors(rngs, params)
 
 nnx.display(batched_sample_from_priors(rngs, params))
