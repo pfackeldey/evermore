@@ -39,7 +39,7 @@ def fit(params, hists, observation):
 
 
 if __name__ == "__main__":
-    bestfit_params = fit(params(), hists, observation)
+    bestfit_params = fit(params, hists, observation)
 
     print("Bestfit parameter:")
     wl.pprint(nnx.pure(bestfit_params), short_arrays=False)

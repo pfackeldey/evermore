@@ -5,7 +5,6 @@ from collections.abc import Callable
 from functools import partial
 from typing import Any
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PyTree, Shaped
@@ -57,26 +56,28 @@ def tree_stack(
         >>> stacked.parameter.value.shape
         (2, 1)
     """
-    dynamic_trees, static_trees = eqx.partition(trees, eqx.is_array)
-    for tree in static_trees[1:]:
-        if jax.tree.structure(tree) != jax.tree.structure(static_trees[0]):
+    # check that all trees have the same structure
+    first_treedef = jax.tree.structure(trees[0])
+    for tree in trees[1:]:
+        other_treedef = jax.tree.structure(tree)
+        if other_treedef != first_treedef:
             msg = (
                 "All static trees must have the same structure. "
-                f"Got {jax.tree.structure(tree)} and {jax.tree.structure(static_trees[0])}"
+                f"Got {other_treedef} and {first_treedef}"
             )
             raise ValueError(msg)
 
+    # actual stacking function for leaves
     def batch_axis_stack(*leaves: Array) -> Array:
         leaves = jax.tree.map(jnp.atleast_1d, leaves)  # ensure at least 1D
         if broadcast_leaves:
-            shape = jnp.broadcast_shapes(*[leaf.shape for leaf in leaves])
+            shape = jnp.broadcast_shapes(*(leaf.shape for leaf in leaves))
             return jnp.stack(
                 jax.tree.map(partial(jnp.broadcast_to, shape=shape), leaves)
             )
         return jnp.stack(leaves, axis=0)
 
-    dynamic_trees = jax.tree.map(batch_axis_stack, *dynamic_trees)
-    return eqx.combine(static_trees[0], dynamic_trees)
+    return jax.tree.map(batch_axis_stack, *trees)
 
 
 def dump_jaxpr(fun: Callable, *args: Any, **kwargs: Any) -> str:

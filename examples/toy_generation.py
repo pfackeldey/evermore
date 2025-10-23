@@ -74,8 +74,6 @@ def prefit_toy_expectation(rngs: nnx.Rngs):
 
 
 if __name__ == "__main__":
-    params = params()
-
     print("Exp.:", evm.util.sum_over_leaves(model(params, hists)))
     print("Obs.:", observation)
     print()

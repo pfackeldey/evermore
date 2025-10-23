@@ -13,9 +13,7 @@ def loss(dynamic, args):
 
 
 if __name__ == "__main__":
-    graphdef, dynamic, static = nnx.split(
-        params(), evm.filter.is_dynamic_parameter, ...
-    )
+    graphdef, dynamic, static = nnx.split(params, evm.filter.is_dynamic_parameter, ...)
     args = (graphdef, static, hists, observation)
     loss_val = loss(dynamic, args)
     print(f"{loss_val=}")

@@ -38,15 +38,13 @@ def test_has_name_filter_selects_expected_parameter():
     params_state, _ = nnx.state(_build_params(), filt.is_parameter, ...)
     filtered = params_state.filter(filt.HasName("tagged"))
 
-    pure = nnx.pure(filtered)
-    assert set(pure.keys()) == {"tagged"}
-    assert pure["tagged"] == params_state["tagged"]
+    assert set(filtered.keys()) == {"tagged"}
+    assert filtered["tagged"] == params_state["tagged"]
 
 
 def test_has_tags_filter_matches_subset():
     params_state, _ = nnx.state(_build_params(), filt.is_parameter, ...)
     filtered = params_state.filter(filt.HasTags(frozenset({"theory"})))
 
-    pure = nnx.pure(filtered)
-    assert set(pure.keys()) == {"tagged"}
-    assert pure["tagged"] == params_state["tagged"]
+    assert set(filtered.keys()) == {"tagged"}
+    assert filtered["tagged"] == params_state["tagged"]

@@ -30,8 +30,6 @@ def fit(params, hists, observation):
 
 
 if __name__ == "__main__":
-    params = params()
-
     bestfit_params = fit(params, hists, observation)
 
     print("Bestfit parameter:")

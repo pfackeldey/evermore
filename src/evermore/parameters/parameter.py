@@ -7,7 +7,6 @@ from typing import (
     TypeVar,
 )
 
-import jax
 from flax import nnx
 from jaxtyping import Array, ArrayLike, Float, PyTree
 
@@ -76,21 +75,6 @@ class BaseParameter(nnx.Variable[V]):
 
         # tags
         self.tags = tags
-
-    # hooks
-    def on_create_value(self, value: V) -> V:
-        if nnx.is_array_ref(value):
-            return value[...]
-        return float_array(value)
-
-    def on_set_value(self, value: V) -> V:
-        if nnx.is_array_ref(value):
-            return value[...]
-        return float_array(value)
-
-    def on_get_value(self, value: V) -> V:
-        sg = jax.lax.stop_gradient
-        return sg(value) if self.frozen else value
 
     # modifier shorthands
     def scale(self, slope: ArrayLike = 1.0, offset: ArrayLike = 0.0) -> Modifier:

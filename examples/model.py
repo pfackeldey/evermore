@@ -15,21 +15,6 @@ jax.config.update("jax_enable_x64", True)
 Hist1D: tp.TypeAlias = Float[Array, " nbins"]  # type: ignore[name-defined]
 
 
-# dataclass like container for parameters
-class Params(nnx.Module):
-    def __init__(
-        self,
-        mu: evm.Parameter,
-        norm1: evm.NormalParameter,
-        norm2: evm.NormalParameter,
-        shape1: evm.NormalParameter,
-    ):
-        self.mu = mu
-        self.norm1 = norm1
-        self.norm2 = norm2
-        self.shape1 = shape1
-
-
 def model(
     params: nnx.Module[evm.Parameter],
     hists: PyTree[Hist1D],
@@ -42,7 +27,7 @@ def model(
 
     # bkg1 process
     bkg1_lnN = params.norm1.scale_log(up=jnp.array([1.1]), down=jnp.array([0.9]))
-    bkg1_shape = params.shape1.morphing(
+    bkg1_shape = params.shape.morphing(
         up_template=hists["shape_up"]["bkg1"],
         down_template=hists["shape_down"]["bkg1"],
     )
@@ -52,7 +37,7 @@ def model(
 
     # bkg2 process
     bkg2_lnN = params.norm2.scale_log(up=jnp.array([1.05]), down=jnp.array([0.95]))
-    bkg2_shape = params.shape1.morphing(
+    bkg2_shape = params.shape.morphing(
         up_template=hists["shape_up"]["bkg2"],
         down_template=hists["shape_down"]["bkg2"],
     )
@@ -81,17 +66,31 @@ hists = {
 }
 
 
-def params():
-    return Params(
-        mu=evm.Parameter(name="mu"),
-        norm1=evm.NormalParameter(name="norm1"),
-        norm2=evm.NormalParameter(name="norm2"),
-        shape1=evm.NormalParameter(name="shape1"),
-    )
+# dataclass like container for parameters
+class Params(nnx.Pytree):
+    def __init__(
+        self,
+        mu: evm.Parameter,
+        norm1: evm.NormalParameter,
+        norm2: evm.NormalParameter,
+        shape: evm.NormalParameter,
+    ):
+        self.mu = mu
+        self.norm1 = norm1
+        self.norm2 = norm2
+        self.shape = shape
+
+
+params = Params(
+    mu=evm.Parameter(name="mu"),
+    norm1=evm.NormalParameter(name="norm1"),
+    norm2=evm.NormalParameter(name="norm2"),
+    shape=evm.NormalParameter(name="shape"),
+)
 
 
 observation = jnp.array([37.0])
-expectations = model(params(), hists)
+expectations = model(params, hists)
 
 
 @nnx.jit
