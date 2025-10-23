@@ -1,15 +1,15 @@
 from functools import partial
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optimistix as optx
-from jaxtyping import Array, Float, PRNGKeyArray, PyTree
+from flax import nnx
+from jaxtyping import Array, Float, PyTree
 from model import Hist1D, hists, loss, model, observation, params
 
 import evermore as evm
 
-key = jax.random.PRNGKey(42)
+rngs = nnx.Rngs(0)
 
 
 # --- Postfit sampling ---
@@ -18,105 +18,112 @@ key = jax.random.PRNGKey(42)
 # first we have to run a fit to get the cov matrix
 
 
-@eqx.filter_jit
+# @nnx.jit
 def optx_loss(dynamic, args):
-    return loss(dynamic, *args)
+    graphdef, static, hists, observation = args
+    params = nnx.merge(graphdef, dynamic, static)
+    return loss(params, hists=hists, observation=observation)
 
 
-@eqx.filter_jit
+@nnx.jit
 def fit(params, hists, observation):
     solver = optx.BFGS(rtol=1e-5, atol=1e-7)
 
-    dynamic, static = evm.tree.partition(params)
+    graphdef, dynamic, static = nnx.split(params, evm.filter.is_dynamic_parameter, ...)
 
     fitresult = optx.minimise(
         optx_loss,
         solver,
         dynamic,
         has_aux=False,
-        args=(static, hists, observation),
+        args=(graphdef, static, hists, observation),
         options={},
         max_steps=10_000,
         throw=True,
     )
-    return evm.tree.combine(fitresult.value, static)
+    return nnx.merge(graphdef, fitresult.value, static)
 
 
 # generate new expectation based on the postfit toy parameters
-@eqx.filter_jit
+@partial(nnx.jit, static_argnames=("n_samples",))
 def postfit_toy_expectation(
-    key: PRNGKeyArray,
-    dynamic: PyTree[evm.Parameter],
-    static: PyTree[evm.Parameter],
+    rngs: nnx.Rngs,
+    params: PyTree[evm.BaseParameter],
     *,
     covariance_matrix: Float[Array, "x x"],
     mask: PyTree[bool] | None = None,
     n_samples: int = 1,
 ) -> Hist1D:
-    toy_dynamic = evm.sample.sample_from_covariance_matrix(
-        key=key,
-        params=dynamic,
+    toy_params = evm.sample.sample_from_covariance_matrix(
+        rngs=rngs,
+        params=params,
         covariance_matrix=covariance_matrix,
         mask=mask,
         n_samples=n_samples,
     )
-    toy_params = evm.tree.combine(toy_dynamic, static)
+
     expectations = model(toy_params, hists)
     return evm.util.sum_over_leaves(expectations)
 
 
-@eqx.filter_jit
-def prefit_toy_expectation(key, params):
-    sampled_params = evm.sample.sample_from_priors(key, params)
+@nnx.jit
+def prefit_toy_expectation(rngs: nnx.Rngs):
+    sampled_params = evm.sample.sample_from_priors(rngs, params)
     expectations = model(sampled_params, hists)
     return evm.util.sum_over_leaves(expectations)
 
 
 if __name__ == "__main__":
+    params = params()
+
     print("Exp.:", evm.util.sum_over_leaves(model(params, hists)))
     print("Obs.:", observation)
     print()
 
     # --- Postfit sampling ---
     bestfit_params = fit(params, hists, observation)
-    dynamic, static = evm.tree.partition(bestfit_params)
+    graphdef, dynamic, static = nnx.split(
+        bestfit_params, evm.filter.is_dynamic_parameter, ...
+    )
 
-    # partial it to only depend on `params`
-    loss_fn = partial(optx_loss, args=(static, hists, observation))
+    # partial it to only depend on `dynamic`
+    loss_fn = jax.tree_util.Partial(
+        loss,
+        hists=hists,
+        observation=observation,
+    )
 
-    fast_covariance_matrix = eqx.filter_jit(evm.loss.covariance_matrix)
-    covariance_matrix = fast_covariance_matrix(loss_fn, dynamic)
+    fast_covariance_matrix = nnx.jit(evm.loss.covariance_matrix, static_argnums=(0,))
+    covariance_matrix = fast_covariance_matrix(loss_fn, bestfit_params)
 
     # create 1 toy
     expectation = postfit_toy_expectation(
-        key, dynamic, static, covariance_matrix=covariance_matrix
+        rngs, params, covariance_matrix=covariance_matrix
     )
     print("1 toy (postfit):", expectation)
 
     # vectorized toy expectation for 10k toys
     expectations = postfit_toy_expectation(
-        key, dynamic, static, covariance_matrix=covariance_matrix, n_samples=10_000
+        rngs, params, covariance_matrix=covariance_matrix, n_samples=10_000
     )
     print("Mean of 10.000 toys (postfit):", jnp.mean(expectations, axis=0))
     print("Std of 10.000 toys (postfit):", jnp.std(expectations, axis=0))
     print()
 
     # using a mask to only sample some parameters (here: only `norm1` and `norm2`)
-    mask = jax.tree.map(
-        lambda p: p.name.startswith("norm"), params, is_leaf=evm.filter.is_parameter
-    )
+    _params = nnx.state(params).filter(evm.filter.is_dynamic_parameter)
+    mask = nnx.map_state(lambda _, p: p.name.startswith("norm"), _params)
 
     # create 1 toy
     expectation = postfit_toy_expectation(
-        key, dynamic, static, covariance_matrix=covariance_matrix, mask=mask
+        rngs, params, covariance_matrix=covariance_matrix, mask=mask
     )
     print("1 toy (postfit, only norm1 & norm2):", expectation)
 
     # vectorized toy expectation for 10k toys
     expectations = postfit_toy_expectation(
-        key,
-        dynamic,
-        static,
+        rngs,
+        params,
         covariance_matrix=covariance_matrix,
         n_samples=10_000,
         mask=mask,
@@ -133,25 +140,29 @@ if __name__ == "__main__":
 
     # --- Prefit sampling ---
     # create 1 toy
-    expectation = prefit_toy_expectation(key, params)
+    expectation = prefit_toy_expectation(rngs)
     print("1 toy (prefit):", expectation)
 
     # vectorized toy expectation for 10k toys
-    keys = jax.random.split(key, 10_000)
-    expectations = jax.vmap(prefit_toy_expectation, in_axes=(0, None))(keys, params)
+    @nnx.split_rngs(splits=10_000)
+    @nnx.vmap
+    def vectorized_prefit_toy_expectation(rngs):
+        return prefit_toy_expectation(rngs)
+
+    expectations = vectorized_prefit_toy_expectation(rngs)
     print("Mean of 10.000 toys (prefit):", jnp.mean(expectations, axis=0))
     print("Std of 10.000 toys (prefit):", jnp.std(expectations, axis=0))
 
     # just sample observations with poisson
     poisson_obs = evm.pdf.PoissonDiscrete(observation)
-    sampled_observation = poisson_obs.sample(key, shape=(1,))
+    sampled_observation = poisson_obs.sample(rngs(), shape=(1,))
 
     N = 10_000
     # vectorized sampling (standard way)
-    sampled_observations = poisson_obs.sample(key, shape=(N, 1))
+    sampled_observations = poisson_obs.sample(rngs(), shape=(N, 1))
 
     # vectorized sampling (generically with `vmap`)
-    keys = jax.random.split(key, N)
+    keys = jax.random.split(rngs(), N)
 
     def sample_obs(k):
         return poisson_obs.sample(k, shape=(1,))

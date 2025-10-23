@@ -9,8 +9,7 @@ from jaxtyping import Array, Bool, Float, Scalar, Shaped
 from evermore.binned.effect import Identity, OffsetAndScale
 from evermore.binned.modifier import Modifier, ModifierBase, Where
 from evermore.parameters.parameter import NormalParameter
-from evermore.parameters.tree import PT
-from evermore.util import maybe_float_array
+from evermore.util import float_array
 
 __all__ = [
     "StatErrors",
@@ -24,43 +23,21 @@ def __dir__():
 N = TypeVar("N", bound=Shaped[Array, "..."])
 
 
-class StatErrors(ModifierBase[PT]):
-    """
-    Create staterror (barlow-beeston) parameters.
+class StatErrors(ModifierBase):
+    """Creates per-bin Barlow-Beeston statistical uncertainty modifiers.
 
-    Example:
+    Args:
+        hist: Nominal histogram bin contents.
+        variance: Estimated variance per bin.
 
-    .. code-block:: python
-
-        import jax.numpy as jnp
-        import jax.tree_util as jtu
-        import evermore as evm
-
-
-        # histograms with bin contents and variances
-        hists = {"qcd": jnp.array([10.0, 20.0, 30.0]), "signal": jnp.array([5.0, 10.0, 15.0])}
-        histsw2 = {"qcd": jnp.array([12.0, 21.0, 29.0]), "signal": jnp.array([5.0, 8.0, 11.0])}
-
-        # BB-full example:
-        staterrors = jtu.tree_map(
-            evm.staterror.StatErrors,
-            hists,
-            histsw2,
-        )
-
-        # apply it
-        modified_qcd = staterrors["qcd"](hists["qcd"])
-        modified_signal = staterrors["signal"](hists["signal"])
-
-        # BB-lite example:
-        staterrors = evm.staterror.StatErrors(
-            evm.util.sum_over_leaves(hists),
-            evm.util.sum_over_leaves(histsw2),
-        )
-
-        # apply it
-        modified_qcd = staterrors(hists["qcd"])
-        modified_signal = staterrors(hists["signal"])
+    Examples:
+        >>> import jax.numpy as jnp
+        >>> import evermore as evm
+        >>> hist = jnp.array([10.0, 20.0, 30.0])
+        >>> var = jnp.array([12.0, 21.0, 29.0])
+        >>> staterrors = evm.staterror.StatErrors(hist, var)
+        >>> staterrors(hist)
+        Array([10.        , 20.        , 29.999998], dtype=float32)
     """
 
     eps: Float[Scalar, ""]
@@ -75,7 +52,7 @@ class StatErrors(ModifierBase[PT]):
         variance: Float[N],
     ):
         # make sure they are of dtype float
-        hist, variance = jax.tree.map(maybe_float_array, (hist, variance))
+        hist, variance = jax.tree.map(float_array, (hist, variance))
 
         self.eps = jnp.finfo(variance.dtype).eps
 
@@ -93,8 +70,8 @@ class StatErrors(ModifierBase[PT]):
         )
         self.parameter = NormalParameter(jnp.zeros_like(self.n_entries))
 
-    def offset_and_scale(self, hist: Float[N]) -> OffsetAndScale[Float[N]]:
-        modifier: Where[PT] = Where(
+    def offset_and_scale(self, hist: Float[N]) -> OffsetAndScale:
+        modifier = Where(
             self.non_empty_mask,
             self.parameter.scale(slope=self.relative_error, offset=1.0),
             Modifier(parameter=self.parameter, effect=Identity()),

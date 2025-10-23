@@ -2,21 +2,18 @@ from __future__ import annotations
 
 import abc
 from collections.abc import Callable
-from typing import Generic, Literal, TypeVar
+from typing import Literal, TypeVar
 
-import equinox as eqx
-import jax
 import jax.numpy as jnp
+from flax import nnx
 from jaxtyping import Array, Float
 
-from evermore.parameters.parameter import AbstractParameter
-from evermore.parameters.tree import PT
-from evermore.util import maybe_float_array
-from evermore.visualization import SupportsTreescope
+from evermore.parameters.parameter import PT, BaseParameter
+from evermore.util import float_array
 
 __all__ = [
-    "AbstractEffect",
     "AsymmetricExponential",
+    "BaseEffect",
     "Identity",
     "Lambda",
     "Linear",
@@ -32,11 +29,12 @@ def __dir__():
 H = TypeVar("H", bound=Float[Array, "..."])
 
 
-class OffsetAndScale(eqx.Module, Generic[H]):
-    offset: H = eqx.field(converter=maybe_float_array, default=0.0)
-    scale: H = eqx.field(converter=maybe_float_array, default=1.0)
+class OffsetAndScale(nnx.Module):
+    def __init__(self, offset=0.0, scale=1.0):
+        self.offset = float_array(offset)
+        self.scale = float_array(scale)
 
-    def broadcast(self) -> OffsetAndScale[H]:
+    def broadcast(self) -> OffsetAndScale:
         shape = jnp.broadcast_shapes(self.offset.shape, self.scale.shape)
         return type(self)(
             offset=jnp.broadcast_to(self.offset, shape),
@@ -44,28 +42,30 @@ class OffsetAndScale(eqx.Module, Generic[H]):
         )
 
 
-class AbstractEffect(eqx.Module, Generic[H], SupportsTreescope):
+class BaseEffect(nnx.Module):
     @abc.abstractmethod
-    def __call__(self, parameter: PT, hist: H) -> OffsetAndScale[H]: ...
+    def __call__(self, parameter: PT, hist: H) -> OffsetAndScale: ...
 
 
-class Identity(AbstractEffect[H]):
-    @jax.named_scope("evm.effect.Identity")
-    def __call__(self, parameter: PT, hist: H) -> OffsetAndScale[H]:
+class Identity(BaseEffect):
+    def __call__(self, parameter: PT, hist: H) -> OffsetAndScale:
+        del parameter  # unused
         return OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.ones_like(hist)
         ).broadcast()
 
 
-class Lambda(AbstractEffect[H]):
-    fun: Callable[[PT, H], OffsetAndScale[H] | H]
-    normalize_by: Literal["offset", "scale"] | None = eqx.field(
-        static=True, default=None
-    )
+class Lambda(BaseEffect):
+    def __init__(
+        self,
+        fun: Callable[[PT, H], OffsetAndScale | H],
+        normalize_by: Literal["offset", "scale"] | None = None,
+    ):
+        self.fun = fun
+        self.normalize_by = normalize_by
 
-    @jax.named_scope("evm.effect.Lambda")
-    def __call__(self, parameter: PT, hist: H) -> OffsetAndScale[H]:
-        assert isinstance(parameter, AbstractParameter)
+    def __call__(self, parameter: PT, hist: H) -> OffsetAndScale:
+        assert isinstance(parameter, BaseParameter)
         res = self.fun(parameter, hist)
         if isinstance(res, OffsetAndScale) and self.normalize_by is None:
             return res
@@ -81,22 +81,23 @@ class Lambda(AbstractEffect[H]):
         raise ValueError(msg)
 
 
-class Linear(AbstractEffect[H]):
-    offset: H = eqx.field(converter=maybe_float_array)
-    slope: H = eqx.field(converter=maybe_float_array)
+class Linear(BaseEffect):
+    def __init__(self, offset: H, slope: H):
+        self.offset = float_array(offset)
+        self.slope = float_array(slope)
 
-    @jax.named_scope("evm.effect.Linear")
-    def __call__(self, parameter: PT, hist: H) -> OffsetAndScale[H]:
-        assert isinstance(parameter, AbstractParameter)
+    def __call__(self, parameter: PT, hist: H) -> OffsetAndScale:
+        assert isinstance(parameter, BaseParameter)
         sf = parameter.value * self.slope + self.offset
         return OffsetAndScale(offset=jnp.zeros_like(hist), scale=sf).broadcast()
 
 
-class VerticalTemplateMorphing(AbstractEffect[H]):
-    # + 1 sigma
-    up_template: H = eqx.field(converter=maybe_float_array)
-    # - 1 sigma
-    down_template: H = eqx.field(converter=maybe_float_array)
+class VerticalTemplateMorphing(BaseEffect):
+    def __init__(self, up_template: H, down_template: H):
+        # + 1 sigma
+        self.up_template = float_array(up_template)
+        # - 1 sigma
+        self.down_template = float_array(down_template)
 
     def vshift(self, x: H, hist: H) -> H:
         dx_sum = self.up_template + self.down_template - 2 * hist
@@ -116,16 +117,16 @@ class VerticalTemplateMorphing(AbstractEffect[H]):
             )
         )
 
-    @jax.named_scope("evm.effect.VerticalTemplateMorphing")
-    def __call__(self, parameter: PT, hist: H) -> OffsetAndScale[H]:
-        assert isinstance(parameter, AbstractParameter)
+    def __call__(self, parameter: PT, hist: H) -> OffsetAndScale:
+        assert isinstance(parameter, BaseParameter)
         offset = self.vshift(parameter.value, hist=hist)
         return OffsetAndScale(offset=offset, scale=jnp.ones_like(hist)).broadcast()
 
 
-class AsymmetricExponential(AbstractEffect[H]):
-    up: H = eqx.field(converter=maybe_float_array)
-    down: H = eqx.field(converter=maybe_float_array)
+class AsymmetricExponential(BaseEffect):
+    def __init__(self, up: H, down: H):
+        self.up = float_array(up)
+        self.down = float_array(down)
 
     def interpolate(self, x: H) -> H:
         # https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/be488af288361ef101859a398ae618131373cad7/src/ProcessNormalization.cc#L112-L129
@@ -142,9 +143,8 @@ class AsymmetricExponential(AbstractEffect[H]):
             jnp.abs(x) >= 0.5, jnp.where(x >= 0, hi, lo), avg + alpha * halfdiff
         )
 
-    @jax.named_scope("evm.effect.AsymmetricExponential")
-    def __call__(self, parameter: PT, hist: H) -> OffsetAndScale[H]:
-        assert isinstance(parameter, AbstractParameter)
+    def __call__(self, parameter: PT, hist: H) -> OffsetAndScale:
+        assert isinstance(parameter, BaseParameter)
         interp = self.interpolate(parameter.value)
         return OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.exp(parameter.value * interp)

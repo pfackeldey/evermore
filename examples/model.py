@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import typing as tp
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
+from flax import nnx
 from jaxtyping import Array, Float, PyTree
 
 import evermore as evm
@@ -16,15 +16,22 @@ Hist1D: tp.TypeAlias = Float[Array, " nbins"]  # type: ignore[name-defined]
 
 
 # dataclass like container for parameters
-class Params(eqx.Module):
-    mu: evm.Parameter
-    norm1: evm.NormalParameter
-    norm2: evm.NormalParameter
-    shape1: evm.NormalParameter
+class Params(nnx.Module):
+    def __init__(
+        self,
+        mu: evm.Parameter,
+        norm1: evm.NormalParameter,
+        norm2: evm.NormalParameter,
+        shape1: evm.NormalParameter,
+    ):
+        self.mu = mu
+        self.norm1 = norm1
+        self.norm2 = norm2
+        self.shape1 = shape1
 
 
 def model(
-    params: PyTree[evm.Parameter],
+    params: nnx.Module[evm.Parameter],
     hists: PyTree[Hist1D],
 ) -> PyTree[Hist1D]:
     expectations = {}
@@ -73,25 +80,27 @@ hists = {
     },
 }
 
-params = Params(
-    mu=evm.Parameter(name="mu"),
-    norm1=evm.NormalParameter(name="norm1"),
-    norm2=evm.NormalParameter(name="norm2"),
-    shape1=evm.NormalParameter(name="shape1"),
-)
+
+def params():
+    return Params(
+        mu=evm.Parameter(name="mu"),
+        norm1=evm.NormalParameter(name="norm1"),
+        norm2=evm.NormalParameter(name="norm2"),
+        shape1=evm.NormalParameter(name="shape1"),
+    )
+
 
 observation = jnp.array([37.0])
-expectations = model(params, hists)
+expectations = model(params(), hists)
 
 
-@eqx.filter_jit
+# @nnx.jit
 def loss(
-    dynamic: PyTree[evm.Parameter],
-    static: PyTree[evm.Parameter],
+    params: Params,
+    *,
     hists: PyTree[Hist1D],
     observation: Hist1D,
 ) -> Float[Array, ""]:
-    params = evm.tree.combine(dynamic, static)
     expectations = model(params, hists)
     constraints = evm.loss.get_log_probs(params)
     loss_val = (

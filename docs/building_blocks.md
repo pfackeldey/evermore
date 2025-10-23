@@ -63,7 +63,7 @@ PDFs
 
     :::{tip}
 
-    You can use _any_ JAX-compatible PDF that satisfies the `evm.pdf.AbstractPDF` interface.
+    You can use _any_ JAX-compatible PDF that satisfies the `evm.pdf.BasePDF` interface.
 
 
 Parameter Boundaries
@@ -76,7 +76,7 @@ More information can be found in <project:#parameter-transformations>.
 Freeze a Parameter
 
 :   For the minimization of a likelihood it is necessary to differentiate with respect to the _differentiable_ part, i.e., the `.value` attributes, of a PyTree of `evm.Parameters`.
-    Splitting this tree into the differentiable and non-differentiable part is done with `evm.tree.partition`. You can freeze a `evm.Parameter` by setting `frozen=True`, this will
+    Splitting this tree into the differentiable and non-differentiable part is done with `nnx.split(..., evm.filter.is_dynamic_parameter, ...)`. You can freeze a `evm.Parameter` by setting `frozen=True`, this will
     put the frozen parameter in the non-differentiable part.
 
 Correlate a Parameter
@@ -129,14 +129,13 @@ Inspect a (PyTree of) `evm.Parameters` with [treescope](https://treescope.readth
 You can even add custom visualizers, such as:
 
 ```{code-block} python
-import treescope
+from flax import nnx
 import evermore as evm
 
 
 tree = {"a": evm.NormalParameter(), "b": evm.NormalParameter()}
 
-with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
-    treescope.display(tree)
+nnx.display(tree)
 ```
 :::
 
@@ -171,7 +170,7 @@ Asymmetric Exponential Scaling
     The mathematical description can be found [here](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/latest/what_combine_does/model_and_likelihood/#normalization-effects).
 
 
-Custom effects can be either implemented by inheriting from `evm.effect.AbstractEffect` or - more conveniently - be defined with `evm.effect.Lambda`.
+Custom effects can be either implemented by inheriting from `evm.effect.BaseEffect` or - more conveniently - be defined with `evm.effect.Lambda`.
 Exemplary, a custom effect that varies a 3-bin histogram by a constant absolute {math}`1\sigma` uncertainty of `[1.0, 1.5, 2.0]` and returns an additive (`normalize_by="offset"`) variation:
 
 ```{code-block} python
@@ -275,7 +274,7 @@ Multiple modifiers should be combined using `evm.modifier.Compose` or the `@` op
 import jax
 import jax.numpy as jnp
 import evermore as evm
-import treescope
+from flax import nnx
 
 
 jax.config.update("jax_enable_x64", True)
@@ -293,7 +292,6 @@ modifier2 = param.scale_log(up=1.1, down=0.9)
 (modifier1 @ modifier2)(jnp.array([10., 20., 30.]))
 # -> Array([10.259877, 20.500944, 30.760822], dtype=float32)
 
-with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
-    composition = modifier1 @ modifier2
-    treescope.display(composition)
+composition = modifier1 @ modifier2
+nnx.display(composition)
 ```

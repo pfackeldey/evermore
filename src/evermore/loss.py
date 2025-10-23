@@ -3,16 +3,17 @@ import typing as tp
 import jax
 import jax.flatten_util
 import jax.numpy as jnp
+import jax.tree_util as jtu
+from flax import nnx
 from jaxtyping import Array, Float
 
-from evermore.parameters.filter import is_parameter
+from evermore.parameters.filter import is_dynamic_parameter, is_parameter
 from evermore.parameters.parameter import (
-    AbstractParameter,
+    PT,
+    BaseParameter,
     V,
-    update_value,
 )
-from evermore.parameters.tree import PT, combine, only, partition, pure
-from evermore.pdf import AbstractPDF, ImplementsFromUnitNormalConversion, Normal
+from evermore.pdf import BasePDF, ImplementsFromUnitNormalConversion, Normal
 
 __all__ = [
     "covariance_matrix",
@@ -27,7 +28,7 @@ def __dir__():
     return __all__
 
 
-def _parameter_value_to_x(prior: AbstractPDF, value: V) -> V:
+def _parameter_value_to_x(prior: BasePDF, value: V) -> V:
     # all constrained parameters are 'moving' on a 'unit_normal' distribution (mean=0, width=1), i.e.:
     # - param.value=0: no shift, no constrain
     # - param.value=+1: +1 sigma shift, calculate the +1 sigma constrain based on prior pdf
@@ -46,35 +47,33 @@ def _parameter_value_to_x(prior: AbstractPDF, value: V) -> V:
         # this is the fast-path
         x = prior.__evermore_from_unit_normal__(value)
     else:
-        # this is a general implementation to translate from a unit normal to any target AbstractPDF
+        # this is a general implementation to translate from a unit normal to any target BasePDF
         # the only requirement is that the target pdf implements `.inv_cdf`.
-        unit_normal: Normal[V] = Normal(
-            mean=jnp.zeros_like(value), width=jnp.ones_like(value)
-        )
+        unit_normal = Normal(mean=jnp.zeros_like(value), width=jnp.ones_like(value))
         cdf = unit_normal.cdf(value)
         x = prior.inv_cdf(cdf)
     return x
 
 
-def get_log_probs(tree: PT) -> PT:
-    """
-    Compute the log probabilities for all parameters.
+def get_log_probs(tree: PT) -> nnx.State:
+    """Computes log probabilities for every parameter in a PyTree.
 
-    This function iterates over all parameters in the provided PyTree tree,
-    applies their associated prior distributions (if any), and computes the
-    log probability for each parameter. If a parameter does not have a prior
-    distribution, a default log probability of 0.0 is returned.
+    The function iterates over each parameter, evaluates its prior distribution
+    (if present), and returns an ``nnx.State`` whose leaves store the
+    corresponding log probabilities.
 
     Args:
-        tree (PyTree): A PyTree containing parameters to compute log probabilities for.
+        tree: PyTree that may contain parameters and auxiliary nodes.
 
     Returns:
-        PyTree: A PyTree with the same structure as the input, where each parameter
-            is replaced by its corresponding log probability.
+        nnx.State: State matching the input structure with log probabilities in
+            place of the original parameters.
     """
+    params_state, _ = nnx.state(tree, is_parameter, ...)
 
-    def _constraint(param: AbstractParameter[V]) -> V:
-        prior: AbstractPDF | None = param.prior
+    def _constraint(path, param: BaseParameter[V]) -> V:
+        del path  # unused
+        prior: BasePDF | None = param.prior
         # unconstrained case is easy:
         if prior is None:
             return jnp.zeros_like(param.value)
@@ -83,81 +82,93 @@ def get_log_probs(tree: PT) -> PT:
         return prior.log_prob(x)
 
     # constraints from pdfs
-    return jax.tree.map(
-        _constraint, only(tree, filter=is_parameter), is_leaf=is_parameter
-    )
+    return nnx.map_state(_constraint, params_state)
 
 
 def _ravel_pure_tree(tree: PT) -> tuple[Float[Array, " nparams"], tp.Callable]:
     """Flattens a PyTree of parameters into a 1D array of parameter values.
+
     Args:
-        tree (PT): A PyTree of parameters.
+        tree: PyTree of parameters.
 
     Returns:
-        tuple[Float[Array, "nparams"], Callable]: A tuple containing the flattened
-        array of parameter values and a function to unflatten the array back into
-        the original PyTree structure.
+        tuple[Float[Array, "nparams"], tp.Callable]: Pair containing the flattened
+            parameter values and a function that reconstructs the original PyTree.
     """
-    values = pure(tree)
+    values = nnx.pure(tree)
     flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
     return flat_values, unravel_fn
+
+
+def _pytree_path_value_map(tree: PT) -> dict[tuple, Array]:
+    leaves, _ = jtu.tree_flatten_with_path(tree)
+
+    def _entry_to_key(entry):
+        if isinstance(entry, jtu.GetAttrKey):
+            return entry.name
+        if isinstance(entry, jtu.DictKey):
+            return entry.key
+        if isinstance(entry, jtu.SequenceKey):
+            return entry.idx
+        return entry
+
+    return {tuple(_entry_to_key(e) for e in path): value for path, value in leaves}
 
 
 def hessian_matrix(
     loss_fn: tp.Callable,
     tree: PT,
 ) -> Float[Array, "nparams nparams"]:
-    """
-    Computes the Hessian matrix of the loss function at the current parameter values.
+    """Computes the Hessian of a scalar loss with respect to dynamic parameters.
+
+    The function leverages ``flax.nnx.split`` to separate differentiable and
+    static state and evaluates the Hessian of ``loss_fn`` at the current
+    parameter values.
 
     Args:
-        loss_fn (Callable): The loss function. Should accept (tree) as arguments.
-            All other arguments have to be "partial'd" into the loss function.
-        tree (PT): A PyTree of parameters.
+        loss_fn: Callable that accepts a PyTree of parameters and returns a scalar loss.
+        tree: PyTree containing parameters and auxiliary nodes.
 
     Returns:
-        Float[Array, "nparams nparams"]: The Hessian matrix of the loss function.
+        Float[Array, "nparams nparams"]: Hessian of ``loss_fn`` with respect to the
+            dynamic parameter values.
 
-    Example:
-
-    .. code-block:: python
-
-        import jax.numpy as jnp
-
-
-        def loss_fn(params):
-            x = params["a"].value
-            y = params["b"].value
-            return jnp.sum((x - 1.0) ** 2 + (y - 2.0) ** 2)
-
-
-        params = {
-            "a": evm.Parameter(value=jnp.array([1.0])),
-            "b": evm.Parameter(value=jnp.array([2.0])),
-        }
-
-        hessian = evm.loss.hessian(loss_fn, params)
-        hessian.shape
-        # (2, 2)
+    Examples:
+        >>> import evermore as evm
+        >>> import jax.numpy as jnp
+        >>> params = {
+        ...     "a": evm.Parameter(value=jnp.array([1.0])),
+        ...     "b": evm.Parameter(value=jnp.array([2.0])),
+        ... }
+        >>> def loss_fn(pytree):
+        ...     return jnp.sum(
+        ...         (pytree["a"].value - 1.0) ** 2 + (pytree["b"].value - 2.0) ** 2
+        ...     )
+        >>> evm.loss.hessian_matrix(loss_fn, params).shape
+        (2, 2)
     """
-    flat_values, unravel_fn = _ravel_pure_tree(tree)
+    graphdef, dynamic, rest = nnx.split(tree, is_dynamic_parameter, ...)
+    flat_values, unravel_fn = _ravel_pure_tree(dynamic)
 
     def _flat_loss(flat_values: Float[Array, "..."]) -> Float[Array, ""]:
         param_values = unravel_fn(flat_values)
 
         # update the parameters with the new values
         # and call the loss function
-        # 1. partition the tree of parameters and other things
+        # 1. split the tree of parameters and other things
         # 2. update the parameters with the new values
-        # 3. combine the updated parameters with the rest of the tree
+        # 3. combine the updated parameters with the rest of the graph
         # 4. call the loss function with the updated tree
-        params, rest = partition(tree, filter=is_parameter)
 
-        updated_params = jax.tree.map(
-            update_value, params, param_values, is_leaf=is_parameter
-        )
+        # update them
+        updates = _pytree_path_value_map(param_values)
 
-        updated_tree = combine(updated_params, rest)
+        def _assign(path, variable):
+            value = updates.get(tuple(path), variable.value)
+            return variable.replace(value=value)
+
+        updated_dynamic = nnx.map_state(_assign, dynamic)
+        updated_tree = nnx.merge(graphdef, updated_dynamic, rest, copy=True)
         return loss_fn(updated_tree)
 
     # calculate hessian
@@ -168,39 +179,33 @@ def fisher_information_matrix(
     loss_fn: tp.Callable,
     tree: PT,
 ) -> Float[Array, "nparams nparams"]:
-    """
-    Computes the Fisher information matrix of the parameters under the Laplace approximation,
-    by computing the Hessian of the loss function at the current parameter values.
+    """Builds the Fisher information matrix under the Laplace approximation.
+
+    The Fisher matrix is obtained by evaluating the Hessian of ``loss_fn`` and
+    inverting it. Only differentiable parameters, as determined by
+    ``flax.nnx.split`` and ``evermore.filter.is_dynamic_parameter``, contribute.
 
     Args:
-        loss_fn (Callable): The loss function. Should accept (tree) as arguments.
-            All other arguments have to be "partial'd" into the loss function.
-        tree (PT): A PyTree of parameters.
+        loss_fn: Callable that accepts a PyTree of parameters and returns a scalar loss.
+        tree: PyTree containing the parameters of interest.
 
     Returns:
-        Float[Array, "nparams nparams"]: The Fisher information matrix of the parameters.
+        Float[Array, "nparams nparams"]: Fisher information matrix evaluated at
+            the provided parameter values.
 
-    Example:
-
-    .. code-block:: python
-
-        import jax.numpy as jnp
-
-
-        def loss_fn(params):
-            x = params["a"].value
-            y = params["b"].value
-            return jnp.sum((x - 1.0) ** 2 + (y - 2.0) ** 2)
-
-
-        params = {
-            "a": evm.Parameter(value=jnp.array([1.0])),
-            "b": evm.Parameter(value=jnp.array([2.0])),
-        }
-
-        fisher = evm.loss.fisher_information_matrix(loss_fn, params)
-        fisher.shape
-        # (2, 2)
+    Examples:
+        >>> import evermore as evm
+        >>> import jax.numpy as jnp
+        >>> params = {
+        ...     "a": evm.Parameter(value=jnp.array([1.0])),
+        ...     "b": evm.Parameter(value=jnp.array([2.0])),
+        ... }
+        >>> def loss_fn(pytree):
+        ...     return jnp.sum(
+        ...         (pytree["a"].value - 1.0) ** 2 + (pytree["b"].value - 2.0) ** 2
+        ...     )
+        >>> evm.loss.fisher_information_matrix(loss_fn, params).shape
+        (2, 2)
     """
     # calculate hessian
     hessian = hessian_matrix(loss_fn, tree)
@@ -212,43 +217,33 @@ def covariance_matrix(
     loss_fn: tp.Callable,
     tree: PT,
 ) -> Float[Array, "nparams nparams"]:
-    """
-    Computes the covariance matrix of the parameters under the Laplace approximation,
-    by inverting the Hessian of the loss function at the current parameter values.
+    """Derives a correlation matrix under the Laplace approximation.
 
-    See ``examples/toy_generation.py`` for an example usage.
+    The Fisher information matrix is inverted and re-scaled so that the
+    resulting matrix has unit diagonal entries. This corresponds to the
+    correlation matrix implied by the Laplace approximation.
 
     Args:
-        loss_fn (Callable): The loss function. Should accept (tree) as arguments.
-            All other arguments have to be "partial'd" into the loss function.
-        tree (PT): A PyTree of parameters.
+        loss_fn: Callable that accepts a PyTree of parameters and returns a scalar loss.
+        tree: PyTree containing the parameters of interest.
 
     Returns:
-        Float[Array, "nparams nparams"]: The covariance matrix of the parameters.
+        Float[Array, "nparams nparams"]: Correlation matrix associated with the
+            supplied parameter PyTree (diagonal entries are 1).
 
-    Example:
-
-    .. code-block:: python
-
-        import evermore as evm
-        import jax
-        import jax.numpy as jnp
-
-
-        def loss_fn(params):
-            x = params["a"].value
-            y = params["b"].value
-            return jnp.sum((x - 1.0) ** 2 + (y - 2.0) ** 2)
-
-
-        params = {
-            "a": evm.Parameter(value=jnp.array([1.0])),
-            "b": evm.Parameter(value=jnp.array([2.0])),
-        }
-
-        cov = evm.loss.covariance(loss_fn, params)
-        cov.shape
-        # (2, 2)
+    Examples:
+        >>> import evermore as evm
+        >>> import jax.numpy as jnp
+        >>> params = {
+        ...     "a": evm.Parameter(value=jnp.array([1.0])),
+        ...     "b": evm.Parameter(value=jnp.array([2.0])),
+        ... }
+        >>> def loss_fn(pytree):
+        ...     return jnp.sum(
+        ...         (pytree["a"].value - 1.0) ** 2 + (pytree["b"].value - 2.0) ** 2
+        ...     )
+        >>> evm.loss.covariance_matrix(loss_fn, params).shape
+        (2, 2)
     """
     # calculate fisher information matrix
     fisher = fisher_information_matrix(loss_fn, tree)
@@ -265,37 +260,33 @@ def cramer_rao_uncertainty(
     loss_fn: tp.Callable,
     tree: PT,
 ) -> PT:
-    """
-    Computes the Cramer-Rao uncertainty of the parameters under the Laplace approximation,
-    by computing the square root of the diagonal of the Fisher information matrix.
+    """Estimates Cramér-Rao uncertainties under the Laplace approximation.
+
+    The uncertainties are the square roots of the diagonal of the Fisher
+    information matrix for the provided parameter PyTree.
 
     Args:
-        loss_fn (Callable): The loss function. Should accept (tree) as arguments.
-            All other arguments have to be "partial'd" into the loss function.
-        tree (PT): A PyTree of parameters.
+        loss_fn: Callable that accepts a PyTree of parameters and returns a scalar loss.
+        tree: PyTree containing the parameters of interest.
 
     Returns:
-        PT: The Cramer-Rao uncertainty of the parameters.
+        PT: PyTree matching ``tree`` with each parameter replaced by its estimated
+            standard deviation.
 
-    Example:
-
-    .. code-block:: python
-
-        import jax.numpy as jnp
-
-
-        def loss_fn(params):
-            x = params["a"].value
-            y = params["b"].value
-            return jnp.sum((x - 1.0) ** 2 + (y - 2.0) ** 2)
-
-
-        params = {
-            "a": evm.Parameter(value=jnp.array([1.0])),
-            "b": evm.Parameter(value=jnp.array([2.0])),
-        }
-
-        uncertainties = evm.loss.cramer_rao_uncertainty(loss_fn, params)
+    Examples:
+        >>> import evermore as evm
+        >>> import jax.numpy as jnp
+        >>> params = {
+        ...     "a": evm.Parameter(value=jnp.array([1.0])),
+        ...     "b": evm.Parameter(value=jnp.array([2.0])),
+        ... }
+        >>> def loss_fn(pytree):
+        ...     return jnp.sum(
+        ...         (pytree["a"].value - 1.0) ** 2 + (pytree["b"].value - 2.0) ** 2
+        ...     )
+        >>> uncertainties = evm.loss.cramer_rao_uncertainty(loss_fn, params)
+        >>> {name: value.shape for name, value in uncertainties.items()}
+        {'a': (1,), 'b': (1,)}
     """
     _, unravel_fn = _ravel_pure_tree(tree)
 

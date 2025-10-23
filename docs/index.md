@@ -21,10 +21,9 @@ python -m pip install .
 ```{code-block} python
 from typing import NamedTuple, TypeAlias
 
-import equinox as eqx
+from flax import nnx
 import jax
 import jax.numpy as jnp
-import wadler_lindig as wl
 from jaxtyping import Array, Float, Scalar
 
 import evermore as evm
@@ -44,11 +43,10 @@ def model(params: evm.PT, hists: Hists1D) -> Array:
 
 def loss(
     dynamic: evm.PT,
-    static: evm.PT,
-    hists: Hists1D,
-    observation: Hist1D,
+    args,
 ) -> Float[Scalar, ""]:
-    params = evm.tree.combine(dynamic, static)
+    graphdef, static, hists, observation = args
+    params = nnx.merge(graphdef, dynamic, static)
     expectation = model(params, hists)
     # Poisson NLL of the expectation and observation
     log_likelihood = (
@@ -74,13 +72,16 @@ class Params(NamedTuple):
 params = Params(mu=evm.Parameter(1.0), syst=evm.NormalParameter(0.0))
 
 # split tree of parameters in a differentiable part and a static part
-dynamic, static = evm.tree.partition(params)
+graphdef, dynamic, static = nnx.split(
+    params, evm.filter.is_dynamic_parameter, ...
+)
+args = (graphdef, static, hists, observation)
 
 # Calculate negative log-likelihood/loss
-loss_val = loss(dynamic, static, hists, observation)
+loss_val = loss(dynamic, args)
 # gradients of negative log-likelihood w.r.t. dynamic parameters
-grads = eqx.filter_grad(loss)(dynamic, static, hists, observation)
-wl.pprint(evm.tree.pure(grads), short_arrays=False)
+grads = nnx.grad(loss)(dynamic, args)
+nnx.display(nnx.pure(grads))
 # -> Params(mu=Array(-0.46153846, dtype=float64), syst=Array(-0.15436207, dtype=float64))
 
 ```

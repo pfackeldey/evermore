@@ -1,6 +1,6 @@
-import jax
 import jax.numpy as jnp
 import optimistix as optx
+from flax import nnx
 from jaxtyping import Array, Float
 
 import evermore as evm
@@ -11,28 +11,32 @@ solver = optx.BFGS(rtol=1e-5, atol=1e-7)
 def fixed_mu_fit(mu: Float[Array, ""]) -> Float[Array, ""]:
     from model import hists, loss, observation, params
 
-    # Freeze the parameter and update the `mu` value in the params tree:
-    params = evm.tree.update_value_and_freeze(
-        tree=params, where=lambda t: t.mu, value=mu
-    )
+    # create a new params instance in each fit to avoid side effects
+    params = params()
 
-    dynamic, static = evm.tree.partition(params)
+    # Freeze the parameter and update the `mu` value in the params tree:
+    params.mu.value = mu
+    params.mu.set_metadata(frozen=True)
+
+    graphdef, dynamic, static = nnx.split(params, evm.filter.is_dynamic_parameter, ...)
 
     def twice_nll(dynamic, args):
-        return 2.0 * loss(dynamic, *args)
+        graphdef, static, hists, observation = args
+        params = nnx.merge(graphdef, dynamic, static)
+        return 2 * loss(params, hists=hists, observation=observation)
 
     fitresult = optx.minimise(
         twice_nll,
         solver,
         dynamic,
         has_aux=False,
-        args=(static, hists, observation),
+        args=(graphdef, static, hists, observation),
         options={},
         max_steps=10_000,
         throw=True,
     )
 
-    return twice_nll(fitresult.value, (static, hists, observation))
+    return twice_nll(fitresult.value, (graphdef, static, hists, observation))
 
 
 if __name__ == "__main__":
@@ -42,6 +46,6 @@ if __name__ == "__main__":
         print(f"[for-loop] mu={mu:.2f} - NLL={fixed_mu_fit(jnp.array(mu)):.6f}")
 
     # or vectorized!!!
-    likelihood_scan = jax.vmap(fixed_mu_fit)(mus)
+    likelihood_scan = nnx.vmap(fixed_mu_fit)(mus)
     for mu, nll in zip(mus, likelihood_scan, strict=False):
         print(f"[jax.vmap] mu={mu:.2f} - NLL={nll:.6f}")
