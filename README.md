@@ -94,8 +94,11 @@ args = (graphdef, static, hists, observation)
 loss_val = loss(dynamic, args)
 # gradients of negative log-likelihood w.r.t. dynamic parameters
 grads = nnx.grad(loss)(dynamic, args)
-nnx.display(nnx.pure(grads), short_arrays=False)
-# -> Params(mu=Array(-0.46153846, dtype=float64), syst=Array(-0.15436207, dtype=float64))
+nnx.display(nnx.pure(grads))
+# State({
+#   'mu': Array(-0.46153846, dtype=float64, weak_type=True),
+#   'syst': Array(-0.15436207, dtype=float64, weak_type=True)
+# })
 ```
 
 ## Contributing
