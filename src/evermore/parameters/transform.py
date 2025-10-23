@@ -182,36 +182,42 @@ class MinuitTransform(BaseParameterTransformation):
         Array(True, dtype=bool)
     """
 
-    def _check(self, parameter: BaseParameter[V]) -> None:
+    def _check_and_regularize(self, parameter: BaseParameter[V]) -> tuple[V, V, V]:
+        # this is not allowed here
         if (parameter.lower is None and parameter.upper is not None) or (
             parameter.lower is not None and parameter.upper is None
         ):
             msg = f"{parameter} must have both lower and upper boundaries set, or none of them."
             raise ValueError(msg)
 
+        value = float_array(parameter.value)
+        lower = float_array(parameter.lower)
+        upper = float_array(parameter.upper)
+
         # check for finite boundaries
-        _safe_assert(_check_is_finite, float_array(parameter.lower))
-        _safe_assert(_check_is_finite, float_array(parameter.upper))
+        _safe_assert(_check_is_finite, lower)
+        _safe_assert(_check_is_finite, upper)
+
+        return value, lower, upper
 
     def unwrap(self, parameter: BaseParameter[V]) -> BaseParameter[V]:
         # short-cut
         if parameter.lower is None and parameter.upper is None:
             return parameter
 
-        value = float_array(parameter.value)
+        value, lower, upper = self._check_and_regularize(parameter)
 
         # for unwrapping, we need to make sure the value is within the boundaries initially
         _safe_assert(
             _check_in_bounds,
             value,
-            lower=parameter.lower,
-            upper=parameter.upper,
+            lower=lower,
+            upper=upper,
         )
-        self._check(parameter)
 
         # this formula turns user-provided "external" parameter values into "internal" values
         new_value = jnp.arcsin(
-            2.0 * (value - parameter.lower) / (parameter.upper - parameter.lower)  # type: ignore[operator]
+            2.0 * (value - lower) / (upper - lower)  # type: ignore[operator]
             - 1.0
         )
         return parameter.replace(value=new_value)
@@ -221,14 +227,10 @@ class MinuitTransform(BaseParameterTransformation):
         if parameter.lower is None and parameter.upper is None:
             return parameter
 
-        self._check(parameter)
-
-        value = float_array(parameter.value)
+        value, lower, upper = self._check_and_regularize(parameter)
 
         # this formula turns "internal" parameter values into "external" values
-        new_value = parameter.lower + (parameter.upper - parameter.lower) / 2 * (  # type: ignore[operator]
-            jnp.sin(value) + 1
-        )
+        new_value = lower + (upper - lower) / 2.0 * (jnp.sin(value) + 1.0)
         return parameter.replace(value=new_value)
 
 
