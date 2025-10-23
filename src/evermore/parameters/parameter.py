@@ -46,7 +46,7 @@ class BaseParameter(nnx.Variable[V]):
         tags: frozenset[Hashable] = frozenset(),
         **kwargs: Any,
     ) -> None:
-        super().__init__(value=value, **kwargs)
+        super().__init__(value=float_array(value), **kwargs)
 
         # store other metadata
         self.name = name
@@ -153,7 +153,7 @@ class NormalParameter(Parameter[V]):
         """
         from evermore.pdf import Normal
 
-        return Normal(mean=0.0, width=1.0)
+        return Normal(mean=float_array(0.0), width=float_array(1.0))
 
     def scale_log(self, up: ArrayLike, down: ArrayLike) -> Modifier:
         """Creates an asymmetric log-normal modifier for this parameter.

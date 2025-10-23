@@ -14,6 +14,7 @@ from evermore.parameters.parameter import (
     BaseParameter,
     V,
 )
+from evermore.util import float_array
 
 __all__ = [
     "BaseParameterTransformation",
@@ -189,18 +190,20 @@ class MinuitTransform(BaseParameterTransformation):
             raise ValueError(msg)
 
         # check for finite boundaries
-        _safe_assert(_check_is_finite, parameter.lower)
-        _safe_assert(_check_is_finite, parameter.upper)
+        _safe_assert(_check_is_finite, float_array(parameter.lower))
+        _safe_assert(_check_is_finite, float_array(parameter.upper))
 
     def unwrap(self, parameter: BaseParameter[V]) -> BaseParameter[V]:
         # short-cut
         if parameter.lower is None and parameter.upper is None:
             return parameter
 
+        value = float_array(parameter.value)
+
         # for unwrapping, we need to make sure the value is within the boundaries initially
         _safe_assert(
             _check_in_bounds,
-            parameter.value,
+            value,
             lower=parameter.lower,
             upper=parameter.upper,
         )
@@ -208,9 +211,7 @@ class MinuitTransform(BaseParameterTransformation):
 
         # this formula turns user-provided "external" parameter values into "internal" values
         new_value = jnp.arcsin(
-            2.0
-            * (parameter.value - parameter.lower)
-            / (parameter.upper - parameter.lower)  # type: ignore[operator]
+            2.0 * (value - parameter.lower) / (parameter.upper - parameter.lower)  # type: ignore[operator]
             - 1.0
         )
         return parameter.replace(value=new_value)
@@ -222,9 +223,11 @@ class MinuitTransform(BaseParameterTransformation):
 
         self._check(parameter)
 
+        value = float_array(parameter.value)
+
         # this formula turns "internal" parameter values into "external" values
         new_value = parameter.lower + (parameter.upper - parameter.lower) / 2 * (  # type: ignore[operator]
-            jnp.sin(parameter.value) + 1
+            jnp.sin(value) + 1
         )
         return parameter.replace(value=new_value)
 
@@ -252,11 +255,13 @@ class SoftPlusTransform(BaseParameterTransformation):
     def unwrap(self, parameter: BaseParameter[V]) -> BaseParameter[V]:
         # from: https://github.com/danielward27/paramax/blob/main/paramax/utils.py
         """Applies the inverse softplus transformation after validating the value."""
-        _safe_assert(_check_is_non_negative, parameter.value)
+        value = float_array(parameter.value)
 
-        new_value = jnp.log(-jnp.expm1(-parameter.value)) + parameter.value
+        _safe_assert(_check_is_non_negative, value)
+
+        new_value = jnp.log(-jnp.expm1(-value)) + value
         return parameter.replace(value=new_value)
 
     def wrap(self, parameter: BaseParameter[V]) -> BaseParameter[V]:
-        new_value = jax.nn.softplus(parameter.value)
+        new_value = jax.nn.softplus(float_array(parameter.value))
         return parameter.replace(value=new_value)
