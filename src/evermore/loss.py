@@ -3,7 +3,6 @@ import typing as tp
 import jax
 import jax.flatten_util
 import jax.numpy as jnp
-import jax.tree_util as jtu
 from flax import nnx
 from jaxtyping import Array, Float
 
@@ -100,21 +99,6 @@ def _ravel_pure_tree(tree: PT) -> tuple[Float[Array, " nparams"], tp.Callable]:
     return flat_values, unravel_fn
 
 
-def _pytree_path_value_map(tree: PT) -> dict[tuple, Array]:
-    leaves, _ = jtu.tree_flatten_with_path(tree)
-
-    def _entry_to_key(entry):
-        if isinstance(entry, jtu.GetAttrKey):
-            return entry.name
-        if isinstance(entry, jtu.DictKey):
-            return entry.key
-        if isinstance(entry, jtu.SequenceKey):
-            return entry.idx
-        return entry
-
-    return {tuple(_entry_to_key(e) for e in path): value for path, value in leaves}
-
-
 def hessian_matrix(
     loss_fn: tp.Callable,
     tree: PT,
@@ -161,13 +145,17 @@ def hessian_matrix(
         # 4. call the loss function with the updated tree
 
         # update them
-        updates = _pytree_path_value_map(param_values)
-
-        def _assign(path, variable):
-            value = updates.get(tuple(path), variable.value)
+        def _update(variable, value):
             return variable.replace(value=value)
 
-        updated_dynamic = nnx.map_state(_assign, dynamic)
+        # using jax.tree.map here to not do inplace updates
+        updated_dynamic = jax.tree.map(
+            _update,
+            dynamic,
+            param_values,
+            is_leaf=lambda x: isinstance(x, BaseParameter),
+        )
+
         updated_tree = nnx.merge(graphdef, updated_dynamic, rest, copy=True)
         return loss_fn(updated_tree)
 
