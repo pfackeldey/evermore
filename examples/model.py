@@ -94,7 +94,7 @@ observation = jnp.array([37.0])
 expectations = model(params(), hists)
 
 
-# @nnx.jit
+@nnx.jit
 def loss(
     params: Params,
     *,
