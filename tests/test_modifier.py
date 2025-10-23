@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from typing import TypeAlias
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float
 
 import evermore as evm
+
+jax.config.update("jax_enable_x64", True)
+
 
 FScalar: TypeAlias = Float[Array, ""]  # type: ignore[name-defined]
 

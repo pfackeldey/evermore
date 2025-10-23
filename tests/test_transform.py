@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 import pytest
 from jaxtyping import PyTree
 
 import evermore as evm
+
+jax.config.update("jax_enable_x64", True)
 
 
 def test_minuit_transform_round_trip():

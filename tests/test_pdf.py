@@ -12,6 +12,8 @@ from evermore.pdf import (
     discrete_inv_cdf_search,
 )
 
+jax.config.update("jax_enable_x64", True)
+
 
 def test_Normal():
     pdf = Normal(mean=jnp.array(0.0), width=jnp.array(1.0))

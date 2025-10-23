@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 import pytest
 
 from evermore.util import sum_over_leaves, tree_stack
+
+jax.config.update("jax_enable_x64", True)
 
 
 def test_sum_over_leaves():

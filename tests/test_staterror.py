@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 
 import evermore as evm
+
+jax.config.update("jax_enable_x64", True)
 
 
 def test_staterrors_preserves_hist_for_default_values():

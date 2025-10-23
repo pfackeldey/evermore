@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import typing as tp
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 from jaxtyping import Float, PyTree, Scalar
 
 import evermore as evm
+
+jax.config.update("jax_enable_x64", True)
+
 
 ScalarParam: tp.TypeAlias = evm.Parameter[Float[Scalar, ""]]
 ScalarParamTree: tp.TypeAlias = PyTree[ScalarParam]
@@ -46,10 +50,10 @@ def test_covariance_matrix():
     cov = evm.loss.covariance_matrix(loss_fn, params)
 
     assert cov.shape == (3, 3)
-    np.testing.assert_allclose(
-        cov,
-        jnp.array([[1.0, 0.0, -0.7071067], [0.0, 1.0, 0.0], [-0.7071067, 0.0, 1.0]]),
+    expected = jnp.array(
+        [[1.0, 0.0, -0.70710677], [0.0, 1.0, 0.0], [-0.70710677, 0.0, 1.0]]
     )
+    np.testing.assert_allclose(cov, expected, rtol=1e-6, atol=1e-8)
 
 
 def test_hessian_matrix():

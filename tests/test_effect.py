@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 
 from evermore import Parameter
@@ -12,6 +13,8 @@ from evermore.binned.effect import (
     OffsetAndScale,
     VerticalTemplateMorphing,
 )
+
+jax.config.update("jax_enable_x64", True)
 
 
 def compare_offset_and_scale(a: OffsetAndScale, b: OffsetAndScale) -> bool:

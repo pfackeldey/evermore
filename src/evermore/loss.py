@@ -249,11 +249,11 @@ def covariance_matrix(
     fisher = fisher_information_matrix(loss_fn, tree)
 
     # normalize via D^-1 @ fisher @ D^-1 with D being the diagnonal standard deviation matrix
-    d = jnp.sqrt(jnp.diag(fisher))
+    d = jnp.sqrt(jnp.diagonal(fisher))
     cov = fisher / jnp.outer(d, d)
 
     # to avoid numerical issues, fix the diagonal to 1
-    return jnp.fill_diagonal(cov, 1.0, inplace=False)
+    return jnp.where(jnp.eye(cov.shape[0], dtype=cov.dtype), 1.0, cov)
 
 
 def cramer_rao_uncertainty(

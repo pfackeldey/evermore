@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import jax
 from flax import nnx
 
 import evermore as evm
 from evermore.parameters import filter as filt
+
+jax.config.update("jax_enable_x64", True)
 
 
 def _build_params():

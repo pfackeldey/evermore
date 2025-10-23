@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -7,6 +8,8 @@ from flax import nnx
 from jaxtyping import PyTree
 
 import evermore as evm
+
+jax.config.update("jax_enable_x64", True)
 
 
 def test_sample_from_covariance_matrix_preserves_structure():
