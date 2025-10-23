@@ -18,13 +18,13 @@ Here are some advanced tips and tricks.
 (treescope-visualization)=
 ## treescope Visualization
 
-evermore components can be visualized with [treescope](https://treescope.readthedocs.io/en/stable/index.html). In IPython notebooks you can display the tree using `treescope.display`.
+evermore components can be visualized with [treescope](https://treescope.readthedocs.io/en/stable/index.html). In IPython notebooks you can display the tree using `nnx.display`.
 
 ```{code-cell} ipython3
 import jax
 import jax.numpy as jnp
 import evermore as evm
-import equinox as eqx
+from flax import nnx
 import treescope
 
 jax.config.update("jax_enable_x64", True)
@@ -50,17 +50,7 @@ composition = evm.modifier.Compose(
     evm.Modifier(parameter=sigma1, effect=evm.effect.AsymmetricExponential(up=1.2, down=0.8)),
 )
 
-with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
-    treescope.display(composition)
-```
-
-You can also save the tree to an HTML file.
-```{code-cell} python
-with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
-    contents = treescope.render_to_html(composition)
-
-with open("composition.html", "w") as f:
-    f.write(contents)
+nnx.display(composition)
 ```
 
 (parameter-transformations)=
@@ -82,21 +72,22 @@ pytree = {
     "b": evm.Parameter(0.1, transform=enforce_positivity),
 }
 
+nnx.display({"Original": pytree})
+
 # unwrap (or "transform")
 pytree_t = evm.transform.unwrap(pytree)
+nnx.display({"Transformed": pytree_t})
+
 # wrap back (or "inverse transform")
 pytree_tt = evm.transform.wrap(pytree_t)
-
-wl.pprint(("Original", pytree), width=150, short_arrays=False)
-wl.pprint(("Transformed", pytree_t), width=150, short_arrays=False)
-wl.pprint(("Transformed back / Original", pytree_tt), width=150, short_arrays=False)
+nnx.display({"Transformed back / Original": pytree_tt})
 ```
 
 Transformations always transform into the unconstrained real space (using [`evm.transform.unwrap`](#evermore.parameters.transform.unwrap)) and back to the constrained space (using [`evm.transform.wrap`](#evermore.parameters.transform.wrap)).
 Typically, you would transform your parameters as a first step inside your loss (or model) function.
 Then, a minimizer can optimize the transformed parameters in the unconstrained space. Finally, you can transform them back to the constrained space for further processing.
 
-Custom transformations can be defined by subclassing [`evm.transform.ParameterTransformation`](#evermore.parameters.transform.AbstractParameterTransformation) and implementing the [`wrap`](#evermore.parameters.transform.AbstractParameterTransformation.wrap) and [`unwrap`](#evermore.parameters.transform.AbstractParameterTransformation.unwrap) methods.
+Custom transformations can be defined by subclassing [`evm.transform.ParameterTransformation`](#evermore.parameters.transform.BaseParameterTransformation) and implementing the [`wrap`](#evermore.parameters.transform.BaseParameterTransformation.wrap) and [`unwrap`](#evermore.parameters.transform.BaseParameterTransformation.unwrap) methods.
 
 
 ## Parameter Partitioning
@@ -108,8 +99,8 @@ the PyTree of `evm.Parameters` into a differentiable and a non-differentiable pa
 w.r.t. both parts. Gradient calculation is performed only w.r.t. the differentiable argument, see:
 
 ```{code-block} python
+from flax import nnx
 from jaxtyping import Array, PyTree
-import equinox as eqx
 import evermore as evm
 
 # define a PyTree of parameters
@@ -118,34 +109,40 @@ params = {
     "b": evm.Parameter(),
 }
 
-dynamic, static = evm.tree.partition(params)
-print(f"{dynamic=}")
-print(f"{static=}")
+graphdef, dynamic, static = nnx.split(
+    params, evm.filter.is_dynamic_parameter, ...
+)
+print(f"{nnx.pure(dynamic)=}")
+print(f"{nnx.pure(static)=}")
 
-# loss's first argument is only the dynamic part of the parameter Pytree!
-def loss(dynamic: PyTree[evm.Parameter], static: PyTree[evm.Parameter], hists: PyTree[Array]) -> Array:
+
+# loss's first argument is only the dynamic part of the parameter PyTree!
+def loss(dynamic_state: PyTree[evm.Parameter], args) -> Array:
+    graphdef, static_state, hists = args
     # combine the dynamic and static parts of the parameter PyTree
-    parameters = evm.tree.combine(dynamic, static)
+    parameters = nnx.merge(graphdef, dynamic_state, static_state)
     assert parameters == params
     # use the parameters to calculate the loss as usual
     ...
 
-grad_loss = eqx.filter_grad(loss)(dynamic, static, ...)
+    hists: PyTree[Array] = ...
+args = (graphdef, static, hists)
+grad_loss = nnx.grad(loss)(dynamic, args)
 ```
 
 If you need to further exclude parameter from being optimized you can either set `frozen=True`.
-For a more precise handling of the partitioning and combining step, have a look at `eqx.partition`, `eqx.combine`, and `evm.tree.value_filter_spec`.
+For a more precise handling of the partitioning and combining step, have a look at `nnx.split`, `nnx.merge`, and `nnx.state`.
 
 
 (tree-manipulations)=
 ## PyTree Manipulations
 
 `evermore` provides (similarly to `nnx`) a little filter DSL to allow more powerful manipulations of PyTrees of `evm.Parameters`.
-The following example highlights the `evm.tree.only` function using various filters:
+The following example highlights using `nnx.state(...).filter(...)` with various filters:
 
 ```{code-cell} ipython3
+from flax import nnx
 import evermore as evm
-import wadler_lindig as wl
 
 tags = frozenset({"theory"})
 
@@ -159,25 +156,24 @@ tree = {
     "not_a_parameter": 0.0,
 }
 
-# parameter-only pytree
-params = evm.tree.only(tree, filter=evm.filter.is_parameter)
+params_state, _ = nnx.state(tree, evm.filter.is_parameter, ...)
 print("evm.filter.is_parameter:")
-wl.pprint(params, width=200)
+nnx.display(nnx.pure(params_state))
 
 print("\nevm.filter.is_frozen:")
-wl.pprint(evm.tree.only(params, filter=evm.filter.is_frozen), width=200)
+nnx.display(nnx.pure(params_state.filter(evm.filter.is_frozen)))
 
 print("\nevm.filter.is_not_frozen:")
-wl.pprint(evm.tree.only(params, filter=evm.filter.is_not_frozen), width=200)
+nnx.display(nnx.pure(params_state.filter(evm.filter.is_not_frozen)))
 
 print("\nevm.filter.HasName('mu'):")
-wl.pprint(evm.tree.only(params, filter=evm.filter.HasName("mu")), width=200)
+nnx.display(nnx.pure(params_state.filter(evm.filter.HasName("mu"))))
 
 print("\nevm.filter.HasTags({'theory'}):")
-wl.pprint(evm.tree.only(params, filter=evm.filter.HasTags(tags)), width=200)
+nnx.display(nnx.pure(params_state.filter(evm.filter.HasTags(tags))))
 ```
 
-`evm.tree.partition` also accepts a `filter` argument, and let's you partition any pytree as you want.
+`nnx.split` also accepts a `filter` argument, and lets you partition any PyTree as you want.
 
 
 ## JAX Transformations
@@ -186,21 +182,25 @@ Evert component of evermore is compatible with JAX transformations. That means y
 You can e.g. sample the parameter values multiple times vectorized from its prior PDF:
 
 ```{code-cell} ipython3
-import jax
 import evermore as evm
-import treescope
+from flax import nnx
 
 
 params = {"a": evm.NormalParameter(), "b": evm.NormalParameter()}
+rngs = nnx.Rngs(0)
 
-rng_key = jax.random.key(0)
-rng_keys = jax.random.split(rng_key, 10_000)
+sample = evm.sample.sample_from_priors(rngs, params)
+nnx.display(sample)
 
-vec_sample = jax.vmap(evm.sample.sample_from_priors, in_axes=(0, None))
+# Batched draws with independent RNG streams.
+@nnx.split_rngs(splits=10_000)
+@nnx.vmap
+def batched_priors(rngs):
+    # Convert to pure values so the batch dimension is easy to inspect.
+    return nnx.pure(evm.sample.sample_from_priors(rngs, params))
 
-with treescope.active_autovisualizer.set_scoped(treescope.ArrayAutovisualizer()):
-    tree = vec_sample(rng_keys, params)
-    treescope.display(tree)
+batched = batched_priors(rngs)
+nnx.display(batched)
 ```
 
 Many minimizers from the JAX ecosystem are e.g. batchable (`optax`, `optimistix`), which allows you vectorize _full fits_, e.g., for embarrassingly parallel likelihood profiles.
@@ -212,13 +212,13 @@ You can visualize the computational graph of a JAX computation by:
 ```{code-block} python
 import pathlib
 import jax.numpy as jnp
-import equinox as eqx
+from flax import nnx
 import evermore as evm
 
 param = evm.Parameter(value=1.1)
 
 # create the modifier and JIT it
-modify = eqx.filter_jit(param.scale())
+modify = nnx.jit(param.scale())
 
 # apply the modifier
 hist = jnp.array([10, 20, 30])

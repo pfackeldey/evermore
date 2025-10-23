@@ -20,7 +20,7 @@ __version__ = "0.3.5"
 
 __all__ = [
     "PT",
-    "AbstractParameter",
+    "BaseParameter",
     "Modifier",
     "NormalParameter",
     # explicitly expose some classes
@@ -31,15 +31,12 @@ __all__ = [
     "filter",
     "loss",
     "modifier",
-    "mutable",
     "parameter",
     "pdf",
     "sample",
     "staterror",
     "transform",
-    "tree",
     "util",
-    "visualization",
 ]
 
 
@@ -51,7 +48,6 @@ from evermore import (  # noqa: E402
     loss,
     pdf,
     util,
-    visualization,
 )
 from evermore.binned import (  # noqa: E402
     effect,
@@ -61,16 +57,14 @@ from evermore.binned import (  # noqa: E402
 from evermore.binned.modifier import Modifier  # noqa: E402
 from evermore.parameters import (  # noqa: E402
     filter,
-    mutable,
     parameter,
     sample,
     transform,
-    tree,
 )
 from evermore.parameters.parameter import (  # noqa: E402
-    AbstractParameter,
+    PT,
+    BaseParameter,
     NormalParameter,
     Parameter,
     V,
 )
-from evermore.parameters.tree import PT  # noqa: E402

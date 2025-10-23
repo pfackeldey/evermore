@@ -2,21 +2,20 @@ from __future__ import annotations
 
 import abc
 from collections.abc import Callable
-from typing import Generic, Literal, Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
+from flax import nnx
 from jax._src.random import Shape
 from jax.scipy.special import digamma, gammaln, xlogy
 from jaxtyping import Array, Float, PRNGKeyArray
 
 from evermore.parameters.parameter import V
-from evermore.util import maybe_float_array
-from evermore.visualization import SupportsTreescope
+from evermore.util import float_array
 
 __all__ = [
-    "AbstractPDF",
+    "BasePDF",
     "Normal",
     "PoissonBase",
     "PoissonContinuous",
@@ -29,11 +28,11 @@ def __dir__():
 
 
 @runtime_checkable
-class ImplementsFromUnitNormalConversion(Protocol[V]):
+class ImplementsFromUnitNormalConversion(Protocol):
     def __evermore_from_unit_normal__(self, x: V) -> V: ...
 
 
-class AbstractPDF(eqx.Module, Generic[V], SupportsTreescope):
+class BasePDF(nnx.Pytree):
     @abc.abstractmethod
     def log_prob(self, x: V) -> V: ...
 
@@ -50,9 +49,10 @@ class AbstractPDF(eqx.Module, Generic[V], SupportsTreescope):
         return jnp.exp(self.log_prob(x, **kwargs))
 
 
-class Normal(AbstractPDF[V]):
-    mean: V = eqx.field(converter=maybe_float_array)
-    width: V = eqx.field(converter=maybe_float_array)
+class Normal(BasePDF):
+    def __init__(self, mean: V, width: V):
+        self.mean = float_array(mean)
+        self.width = float_array(width)
 
     def log_prob(self, x: V) -> V:
         logpdf_max = jax.scipy.stats.norm.logpdf(
@@ -75,14 +75,16 @@ class Normal(AbstractPDF[V]):
         return self.__evermore_from_unit_normal__(jax.random.normal(key, shape=shape))
 
 
-class PoissonBase(AbstractPDF[V]):
-    lamb: V = eqx.field(converter=maybe_float_array)
+class PoissonBase(BasePDF):
+    def __init__(self, lamb: V):
+        self.lamb = float_array(lamb)
 
 
-class PoissonDiscrete(PoissonBase[V]):
-    """
-    Poisson distribution with discrete support. Float inputs are floored to the nearest integer,
-    similar to the behavior implemented in other libraries like SciPy or RooFit.
+class PoissonDiscrete(PoissonBase):
+    """Poisson distribution with discrete support.
+
+    Float inputs are floored to the nearest integer, matching the behaviour of
+    libraries such as SciPy or RooFit.
     """
 
     def log_prob(
@@ -127,7 +129,7 @@ class PoissonDiscrete(PoissonBase[V]):
         return jax.random.poisson(key, self.lamb, shape=shape)
 
 
-class PoissonContinuous(PoissonBase[V]):
+class PoissonContinuous(PoissonBase):
     def log_prob(
         self,
         x: V,
@@ -178,45 +180,27 @@ def discrete_inv_cdf_search(
     start_fn: Callable[[V], V],
     rounding: DiscreteRounding,
 ) -> V:
-    """
-    Computes the inverse CDF (percent point function) at integral values *x* for a discrete CDF
-    distribution *cdf* using an iterative search strategy. The search starts at values provided by
-    *start_fn* and progresses in integer steps towards the target values.
-
-    .. code-block:: python
-
-        # this example mimics the PoissonDiscrete.inv_cdf implementation
-
-        import jax
-        import jax.numpy as jnp
-        import evermore as evm
-
-        # parameter of the poisson distribution
-        lamb = 5.0
-
-        # the normal approximation is a good starting point
-        def start_fn(x):
-            return jnp.floor(lamb + jax.scipy.stats.norm.ppf(x) * jnp.sqrt(lamb))
-
-
-        # define the cdf function
-        def cdf_fn(k):
-            return jax.scipy.stats.poisson.cdf(k, lamb)
-
-
-        k = discrete_inv_cdf_search(jnp.array(0.9), cdf_fn, start_fn, "floor")
-        # -> 7.0
+    """Computes an inverse CDF for discrete distributions via iterative search.
 
     Args:
-        x (V): Integral values to compute the inverse CDF for.
-        cdf_fn (Callable): A callable representing the discrete CDF function. It is called with a
-            single argument and supposed to return the CDF value for that argument.
-        start_fn (Callable): A callable that provides a starting point for the search. It is called
-            with a reshaped representation of *x*.
-        rounding (DiscreteRounding): One of "floor", "ceil" or "closest".
+        x: Values between 0 and 1 for which the inverse CDF should be evaluated.
+        cdf_fn: Callable returning the cumulative distribution evaluated at a given integer.
+        start_fn: Callable providing an initial guess for the search (usually via an approximation).
+        rounding: Strategy used when the target value lies between two integers.
 
     Returns:
-        V: The computed inverse CDF values in the same shape as *x*.
+        V: Integral values with the same shape as ``x`` that correspond to the requested quantiles.
+
+    Examples:
+        >>> import jax.numpy as jnp
+        >>> import jax.scipy.stats
+        >>> lamb = 5.0
+        >>> def start_fn(q):
+        ...     return jnp.floor(lamb + jax.scipy.stats.norm.ppf(q) * jnp.sqrt(lamb))
+        >>> def cdf_fn(k):
+        ...     return jax.scipy.stats.poisson.cdf(k, lamb)
+        >>> discrete_inv_cdf_search(jnp.array(0.9), cdf_fn, start_fn, \"floor\")
+        Array(7., dtype=float32)
     """
     # store masks for injecting exact values for known edge cases later on
     # inject 0 for x == 0
