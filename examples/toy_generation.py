@@ -67,7 +67,7 @@ def postfit_toy_expectation(
 
 
 @nnx.jit
-def prefit_toy_expectation(rngs: nnx.Rngs):
+def prefit_toy_expectation(rngs: nnx.Rngs, params: PyTree[evm.BaseParameter]) -> Hist1D:
     sampled_params = evm.sample.sample_from_priors(rngs, params)
     expectations = model(sampled_params, hists)
     return evm.util.sum_over_leaves(expectations)
@@ -138,16 +138,16 @@ if __name__ == "__main__":
 
     # --- Prefit sampling ---
     # create 1 toy
-    expectation = prefit_toy_expectation(rngs)
+    expectation = prefit_toy_expectation(rngs, params)
     print("1 toy (prefit):", expectation)
 
     # vectorized toy expectation for 10k toys
     @nnx.split_rngs(splits=10_000)
-    @nnx.vmap
-    def vectorized_prefit_toy_expectation(rngs):
-        return prefit_toy_expectation(rngs)
+    @partial(nnx.vmap, in_axes=(0, None))
+    def vectorized_prefit_toy_expectation(rngs, params):
+        return prefit_toy_expectation(rngs, params)
 
-    expectations = vectorized_prefit_toy_expectation(rngs)
+    expectations = vectorized_prefit_toy_expectation(rngs, params)
     print("Mean of 10.000 toys (prefit):", jnp.mean(expectations, axis=0))
     print("Std of 10.000 toys (prefit):", jnp.std(expectations, axis=0))
 

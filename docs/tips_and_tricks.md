@@ -184,23 +184,24 @@ You can e.g. sample the parameter values multiple times vectorized from its prio
 ```{code-cell} ipython3
 import evermore as evm
 from flax import nnx
+from functools import partial
 
 
 params = {"a": evm.NormalParameter(), "b": evm.NormalParameter()}
 rngs = nnx.Rngs(0)
 
+# Single sample
 sample = evm.sample.sample_from_priors(rngs, params)
 nnx.display(sample)
 
-# Batched draws with independent RNG streams.
+# Batched sampling with independent RNG streams (total: 10_000 samples)
 @nnx.split_rngs(splits=10_000)
-@nnx.vmap
-def batched_priors(rngs):
+@partial(nnx.vmap, in_axes=(0, None))
+def batched_sample_from_priors(rngs, params):
     # Convert to pure values so the batch dimension is easy to inspect.
-    return nnx.pure(evm.sample.sample_from_priors(rngs, params))
+    return evm.sample.sample_from_priors(rngs, params)
 
-batched = batched_priors(rngs)
-nnx.display(batched)
+nnx.display(batched_sample_from_priors(rngs, params))
 ```
 
 Many minimizers from the JAX ecosystem are e.g. batchable (`optax`, `optimistix`), which allows you vectorize _full fits_, e.g., for embarrassingly parallel likelihood profiles.
