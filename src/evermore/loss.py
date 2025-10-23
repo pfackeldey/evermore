@@ -76,7 +76,12 @@ def get_log_probs(tree: PT) -> nnx.State:
         # unconstrained case is easy:
         if prior is None:
             return jnp.zeros_like(param.value)
+
         # constrained case:
+        if not isinstance(param.prior, BasePDF):
+            msg = f"Prior must be a BasePDF object for a constrained BaseParameter (or 'None' for an unconstrained one), got {param.prior=} ({type(param.prior)=})"  # type: ignore[unreachable]
+            raise ValueError(msg)
+
         x = _parameter_value_to_x(prior, param.value)
         return prior.log_prob(x)
 

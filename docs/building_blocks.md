@@ -35,7 +35,6 @@ parameter = evm.Parameter(
     name="my_param",    # default: None
     lower=0.0,          # default: None
     upper=10.0,         # default: None
-    prior=None,         # default: None
     frozen=False,       # default: False
     transform=None,     # default: None
 )
@@ -57,8 +56,13 @@ PDFs
     # parameter with standardized Normal constraint, `prior=Normal(mean=0, width=1)`
     parameter = evm.NormalParameter()
 
-    # or explicit
-    parameter = evm.Parameter(prior=evm.pdf.Normal(mean=0.0, width=1.0))
+    # or explicit to customize the prior
+    class MyParam(evm.Parameter):
+        @property
+        def prior(self):
+            return evm.pdf.Normal(mean=0.0, width=1.0)
+
+    parameter = MyParam()
     ```
 
     :::{tip}

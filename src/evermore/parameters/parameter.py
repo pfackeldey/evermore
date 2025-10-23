@@ -41,14 +41,11 @@ class BaseParameter(nnx.Variable[V]):
         name: str | None = None,
         lower: V | ArrayLike | None = None,
         upper: V | ArrayLike | None = None,
-        prior: BasePDF | None = None,
         frozen: bool = False,
         transform: BaseParameterTransformation | None = None,
         tags: frozenset[Hashable] = frozenset(),
         **kwargs: Any,
     ) -> None:
-        from evermore.pdf import BasePDF
-
         super().__init__(value=value, **kwargs)
 
         # store other metadata
@@ -62,19 +59,21 @@ class BaseParameter(nnx.Variable[V]):
         self.lower = lower
         self.upper = upper
 
-        # prior
-        self.prior = prior
-        # runtime check to be sure
-        if self.prior is not None and not isinstance(self.prior, BasePDF):
-            msg = f"Prior must be a BasePDF object for a constrained BaseParameter (or 'None' for an unconstrained one), got {self.prior=} ({type(self.prior)=})"  # type: ignore[unreachable]
-            raise ValueError(msg)
-
         # frozen: if True, the parameter is not updated during optimization
         self.frozen = frozen
         self.transform = transform
 
         # tags
         self.tags = tags
+
+    @property
+    def prior(self) -> BasePDF | None:
+        """Returns the prior distribution associated with this parameter.
+
+        Returns:
+            BasePDF | None: Prior distribution, or ``None`` if no prior is set.
+        """
+        return None
 
     # modifier shorthands
     def scale(self, slope: ArrayLike = 1.0, offset: ArrayLike = 0.0) -> Modifier:
@@ -134,19 +133,27 @@ class NormalParameter(Parameter[V]):
         tags: frozenset[Hashable] = frozenset(),
         **kwargs: Any,
     ) -> None:
-        from evermore.pdf import Normal
-
         super().__init__(
             value=value,
             name=name,
             lower=lower,
             upper=upper,
-            prior=Normal(mean=0.0, width=1.0),
             frozen=frozen,
             transform=transform,
             tags=tags,
             **kwargs,
         )
+
+    @property
+    def prior(self) -> BasePDF:
+        """Returns the standard normal prior distribution for this parameter.
+
+        Returns:
+            BasePDF: Standard normal distribution.
+        """
+        from evermore.pdf import Normal
+
+        return Normal(mean=0.0, width=1.0)
 
     def scale_log(self, up: ArrayLike, down: ArrayLike) -> Modifier:
         """Creates an asymmetric log-normal modifier for this parameter.
