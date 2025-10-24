@@ -74,15 +74,17 @@ def sample_from_covariance_matrix(
     # insert batch dim
     sampled_param_values = jax.vmap(unravel_fn)(flat_sampled_values)
 
-    def _update(variable, value):
+    def _update(path, variable, value):
+        del path  # unused
         return variable.replace(value=value)
 
     # using jax.tree.map here to not do inplace updates
-    sampled_params_state = jax.tree.map(
+    sampled_params_state = jax.tree.map_with_path(
         _update,
         params_state,
         sampled_param_values,
-        is_leaf=lambda x: isinstance(x, BaseParameter),
+        is_leaf=is_parameter,
+        is_leaf_takes_path=True,
     )
     return nnx.merge(graphdef, sampled_params_state, rest)
 

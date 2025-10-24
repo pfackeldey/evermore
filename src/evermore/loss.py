@@ -150,15 +150,17 @@ def hessian_matrix(
         # 4. call the loss function with the updated tree
 
         # update them
-        def _update(variable, value):
+        def _update(path, variable, value):
+            del path  # unused
             return variable.replace(value=value)
 
         # using jax.tree.map here to not do inplace updates
-        updated_dynamic = jax.tree.map(
+        updated_dynamic = jax.tree.map_with_path(
             _update,
             dynamic,
             param_values,
-            is_leaf=lambda x: isinstance(x, BaseParameter),
+            is_leaf=is_parameter,
+            is_leaf_takes_path=True,
         )
 
         updated_tree = nnx.merge(graphdef, updated_dynamic, rest, copy=True)

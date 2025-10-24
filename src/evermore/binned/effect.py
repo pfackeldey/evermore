@@ -29,7 +29,7 @@ def __dir__():
 H = TypeVar("H", bound=Float[Array, "..."])
 
 
-class OffsetAndScale(nnx.Module):
+class OffsetAndScale(nnx.Pytree):
     def __init__(self, offset=0.0, scale=1.0):
         self.offset = float_array(offset)
         self.scale = float_array(scale)
