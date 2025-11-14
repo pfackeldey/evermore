@@ -18,6 +18,7 @@ __all__ = [
     "Lambda",
     "Linear",
     "OffsetAndScale",
+    "SymmetricExponential",
     "VerticalTemplateMorphing",
 ]
 
@@ -148,4 +149,18 @@ class AsymmetricExponential(BaseEffect):
         interp = self.interpolate(parameter.value)
         return OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.exp(parameter.value * interp)
+        ).broadcast()
+
+
+class SymmetricExponential(BaseEffect):
+    def __init__(self, kappa: H):
+        self.kappa = float_array(kappa)
+
+    def __call__(self, parameter: PT, hist: H) -> OffsetAndScale:
+        # https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/be488af288361ef101859a398ae618131373cad7/src/ProcessNormalization.cc#L90
+        assert isinstance(parameter, BaseParameter)
+        # scale with exp(log(kappa) * theta) = kappa^theta
+        return OffsetAndScale(
+            offset=jnp.zeros_like(hist),
+            scale=self.kappa**parameter.value,
         ).broadcast()

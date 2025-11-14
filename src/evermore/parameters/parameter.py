@@ -170,6 +170,20 @@ class NormalParameter(Parameter[V]):
 
         return Modifier(parameter=self, effect=AsymmetricExponential(up=up, down=down))
 
+    def scale_log_sym(self, kappa: ArrayLike) -> Modifier:
+        """Creates a symmetric log-normal modifier for this parameter.
+
+        Args:
+            kappa: scaling factor
+
+        Returns:
+            Modifier: Modifier representing the symmetric exponential effect.
+        """
+        from evermore.binned.effect import SymmetricExponential
+        from evermore.binned.modifier import Modifier
+
+        return Modifier(parameter=self, effect=SymmetricExponential(kappa=kappa))
+
     def morphing(
         self,
         up_template: H,
