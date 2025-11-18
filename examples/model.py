@@ -26,7 +26,9 @@ def model(
     expectations["signal"] = sig_mod(hists["nominal"]["signal"])
 
     # bkg1 process
-    bkg1_lnN = params.norm1.scale_log(up=jnp.array([1.1]), down=jnp.array([0.9]))
+    bkg1_lnN = params.norm1.scale_log_asymmetric(
+        up=jnp.array([1.1]), down=jnp.array([0.9])
+    )
     bkg1_shape = params.shape.morphing(
         up_template=hists["shape_up"]["bkg1"],
         down_template=hists["shape_down"]["bkg1"],
@@ -36,7 +38,9 @@ def model(
     expectations["bkg1"] = bkg1_mod(hists["nominal"]["bkg1"])
 
     # bkg2 process
-    bkg2_lnN = params.norm2.scale_log(up=jnp.array([1.05]), down=jnp.array([0.95]))
+    bkg2_lnN = params.norm2.scale_log_asymmetric(
+        up=jnp.array([1.05]), down=jnp.array([0.95])
+    )
     bkg2_shape = params.shape.morphing(
         up_template=hists["shape_up"]["bkg2"],
         down_template=hists["shape_down"]["bkg2"],

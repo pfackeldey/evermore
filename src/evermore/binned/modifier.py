@@ -98,7 +98,7 @@ class Where(ModifierBase):
         >>> import evermore as evm
         >>> hist = jnp.array([5, 20, 30])
         >>> syst = evm.NormalParameter(value=0.1)
-        >>> norm = syst.scale_log(up=jnp.array([1.1]), down=jnp.array([0.9]))
+        >>> norm = syst.scale_log_asymmetric(up=jnp.array([1.1]), down=jnp.array([0.9]))
         >>> shape = syst.morphing(
         ...     up_template=jnp.array([7, 22, 31]),
         ...     down_template=jnp.array([4, 16, 27]),
@@ -143,7 +143,7 @@ class BooleanMask(ModifierBase):
         >>> import evermore as evm
         >>> hist = jnp.array([5, 20, 30])
         >>> syst = evm.NormalParameter(value=0.1)
-        >>> norm = syst.scale_log(up=1.1, down=0.9)
+        >>> norm = syst.scale_log_asymmetric(up=1.1, down=0.9)
         >>> mask = jnp.array([True, False, True])
         >>> modifier = evm.modifier.BooleanMask(mask, norm)
         >>> modifier(hist)
@@ -185,7 +185,7 @@ class Transform(ModifierBase):
         >>> import evermore as evm
         >>> hist = jnp.array([5, 20, 30])
         >>> syst = evm.NormalParameter(value=0.1)
-        >>> norm = syst.scale_log(up=1.1, down=0.9)
+        >>> norm = syst.scale_log_asymmetric(up=1.1, down=0.9)
         >>> transformed_norm = evm.modifier.Transform(jnp.sqrt, norm)
         >>> transformed_norm(hist)
         Array([ 5.024686, 20.098743, 30.148115], dtype=float32)
@@ -252,7 +252,7 @@ class Compose(ModifierBase):
         >>> hist = jnp.array([10, 20, 30])
         >>> composition = evm.modifier.Compose(
         ...     mu.scale(offset=0, slope=1),
-        ...     syst.scale_log(up=1.1, down=0.9),
+        ...     syst.scale_log_asymmetric(up=1.1, down=0.9),
         ... )
         >>> composition(hist)
         Array([11.155, 22.237, 33.318], dtype=float32)

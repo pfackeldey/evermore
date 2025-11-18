@@ -290,7 +290,7 @@ modifier1 = param.morphing(
     down_template=jnp.array([9., 17., 26.]),
 )
 
-modifier2 = param.scale_log(up=1.1, down=0.9)
+modifier2 = param.scale_log_asymmetric(up=1.1, down=0.9)
 
 # apply the composed modifier
 (modifier1 @ modifier2)(jnp.array([10., 20., 30.]))
