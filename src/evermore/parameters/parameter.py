@@ -49,22 +49,23 @@ class BaseParameter(nnx.Variable[V]):
         super().__init__(value=float_array(value), **kwargs)
 
         # store other metadata
-        self.name = name
+        self.set_metadata(name=name)
 
         # boundaries
         if lower is not None:
             lower = float_array(lower)
         if upper is not None:
             upper = float_array(upper)
-        self.lower = lower
-        self.upper = upper
+        self.set_metadata(lower=lower, upper=upper)
 
         # frozen: if True, the parameter is not updated during optimization
-        self.frozen = frozen
-        self.transform = transform
+        self.set_metadata(frozen=frozen)
+
+        # transform
+        self.set_metadata(transform=transform)
 
         # tags
-        self.tags = tags
+        self.set_metadata(tags=tags)
 
     @property
     def prior(self) -> BasePDF | None:
@@ -155,7 +156,7 @@ class NormalParameter(Parameter[V]):
 
         return Normal(mean=float_array(0.0), width=float_array(1.0))
 
-    def scale_log(self, up: ArrayLike, down: ArrayLike) -> Modifier:
+    def scale_log_asymmetric(self, up: ArrayLike, down: ArrayLike) -> Modifier:
         """Creates an asymmetric log-normal modifier for this parameter.
 
         Args:
@@ -169,6 +170,20 @@ class NormalParameter(Parameter[V]):
         from evermore.binned.modifier import Modifier
 
         return Modifier(parameter=self, effect=AsymmetricExponential(up=up, down=down))
+
+    def scale_log_symmetric(self, kappa: ArrayLike) -> Modifier:
+        """Creates a symmetric log-normal modifier for this parameter.
+
+        Args:
+            kappa: scaling factor
+
+        Returns:
+            Modifier: Modifier representing the symmetric exponential effect.
+        """
+        from evermore.binned.effect import SymmetricExponential
+        from evermore.binned.modifier import Modifier
+
+        return Modifier(parameter=self, effect=SymmetricExponential(kappa=kappa))
 
     def morphing(
         self,

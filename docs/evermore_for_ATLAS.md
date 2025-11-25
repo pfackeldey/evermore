@@ -73,7 +73,7 @@ data = jnp.array([51.0, 48.0])
 
 def model(params: dict, hists: dict) -> jnp.ndarray:
     mu_modifier = params["mu"].scale()
-    syst_modifier = params["bkg_norm"].scale_log(up=1.1, down=0.9)
+    syst_modifier = params["bkg_norm"].scale_log_asymmetric(up=1.1, down=0.9)
     return mu_modifier(hists["signal"]) + syst_modifier(hists["background"])
 
 
@@ -212,7 +212,7 @@ modifier = evm.Modifier(
 )
 
 # or short-hand:
-modifier = param.scale_log(up=1.1, down=0.9)
+modifier = param.scale_log_asymmetric(up=1.1, down=0.9)
 ```
 
 :::
