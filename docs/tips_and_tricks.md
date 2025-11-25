@@ -38,8 +38,8 @@ hist = jnp.array([10, 20, 30])
 
 
 mu_mod = mu.scale(offset=0, slope=1)
-sigma1_mod = sigma1.scale_log(up=1.1, down=0.9)
-sigma2_mod = sigma2.scale_log(up=1.05, down=0.95)
+sigma1_mod = sigma1.scale_log_asymmetric(up=1.1, down=0.9)
+sigma2_mod = sigma2.scale_log_asymmetric(up=1.05, down=0.95)
 composition = evm.modifier.Compose(
     mu_mod,
     sigma1_mod,

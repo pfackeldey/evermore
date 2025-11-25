@@ -52,7 +52,7 @@ data = jnp.array([51.0])
 
 def model(params: dict, hists: dict) -> jnp.ndarray:
     mu_modifier = params["mu"].scale()
-    syst_modifier = params["bkg_norm"].scale_log(up=1.1, down=0.9)
+    syst_modifier = params["bkg_norm"].scale_log_asymmetric(up=1.1, down=0.9)
     return mu_modifier(hists["signal"]) + syst_modifier(hists["background"])
 
 
@@ -75,6 +75,43 @@ the [{math}`\Combine`](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimi
 ### Normalization Effects (lnN)
 
 See [normalization effects](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/latest/what_combine_does/model_and_likelihood/#normalization-effects).
+
+#### Symmetric exponential
+
+::::{tab-set}
+:::{tab-item} Combine
+
+```{code-block}
+:caption: datacard.txt {octicon}`file;1em`
+[...]
+-------
+norm_sys   lnN   1.1
+```
+
+:::
+
+:::{tab-item} evermore <img src="../assets/favicon.png" height="1.5em">
+
+```{code-block} python
+import jax.numpy as jnp
+import evermore as evm
+
+
+param = evm.NormalParameter()
+
+norm_sys = evm.Modifier(
+    parameter=param,
+    effect=evm.effect.SymmetricExponential(kappa=1.1),
+)
+
+# or short-hand:
+norm_sys = param.scale_log_symmetric(kappa=1.1)
+```
+
+:::
+::::
+
+#### Asymmetric exponential
 
 ::::{tab-set}
 :::{tab-item} Combine
@@ -103,7 +140,7 @@ norm_sys = evm.Modifier(
 )
 
 # or short-hand:
-norm_sys = param.scale_log(up=1.1, down=0.9)
+norm_sys = param.scale_log_asymmetric(up=1.1, down=0.9)
 ```
 
 :::

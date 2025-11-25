@@ -49,8 +49,8 @@ def tree_stack(
         >>> import evermore as evm
         >>> import jax.numpy as jnp
         >>> modifiers = [
-        ...     evm.NormalParameter().scale_log(up=jnp.array([1.1]), down=jnp.array([0.9])),
-        ...     evm.NormalParameter().scale_log(up=jnp.array([1.2]), down=jnp.array([0.8])),
+        ...     evm.NormalParameter().scale_log_asymmetric(up=jnp.array([1.1]), down=jnp.array([0.9])),
+        ...     evm.NormalParameter().scale_log_asymmetric(up=jnp.array([1.2]), down=jnp.array([0.8])),
         ... ]
         >>> stacked = evm.util.tree_stack(modifiers)
         >>> stacked.parameter.value.shape
