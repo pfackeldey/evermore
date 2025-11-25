@@ -52,7 +52,7 @@ Hists1D: TypeAlias = dict[str, Hist1D]
 # define a simple model with two processes and two parameters
 def model(params: evm.PT, hists: Hists1D) -> Array:
     mu_modifier = params.mu.scale()
-    syst_modifier = params.syst.scale_log(up=1.1, down=0.9)
+    syst_modifier = params.syst.scale_log_asymmetric(up=1.1, down=0.9)
     return mu_modifier(hists["signal"]) + syst_modifier(hists["bkg"])
 
 

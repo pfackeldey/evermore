@@ -11,6 +11,7 @@ from evermore.binned.effect import (
     Identity,
     Linear,
     OffsetAndScale,
+    SymmetricExponential,
     VerticalTemplateMorphing,
 )
 
@@ -114,6 +115,31 @@ def test_AsymmetricExponential():
         effect(parameter=Parameter(value=-1.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.full_like(hist, 0.9)
+        ).broadcast(),
+    )
+
+
+def test_SymmetricExponential():
+    effect: SymmetricExponential = SymmetricExponential(kappa=1.1)
+
+    hist = jnp.array([1.0])
+
+    assert compare_offset_and_scale(
+        effect(parameter=Parameter(value=0.0), hist=hist),
+        OffsetAndScale(
+            offset=jnp.zeros_like(hist), scale=jnp.ones_like(hist)
+        ).broadcast(),
+    )
+    assert compare_offset_and_scale(
+        effect(parameter=Parameter(value=+1.0), hist=hist),
+        OffsetAndScale(
+            offset=jnp.zeros_like(hist), scale=jnp.full_like(hist, 1.1)
+        ).broadcast(),
+    )
+    assert compare_offset_and_scale(
+        effect(parameter=Parameter(value=-1.0), hist=hist),
+        OffsetAndScale(
+            offset=jnp.zeros_like(hist), scale=jnp.full_like(hist, 1 / 1.1)
         ).broadcast(),
     )
 
