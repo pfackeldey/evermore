@@ -49,22 +49,23 @@ class BaseParameter(nnx.Variable[V]):
         super().__init__(value=float_array(value), **kwargs)
 
         # store other metadata
-        self.name = name
+        self.set_metadata(name=name)
 
         # boundaries
         if lower is not None:
             lower = float_array(lower)
         if upper is not None:
             upper = float_array(upper)
-        self.lower = lower
-        self.upper = upper
+        self.set_metadata(lower=lower, upper=upper)
 
         # frozen: if True, the parameter is not updated during optimization
-        self.frozen = frozen
-        self.transform = transform
+        self.set_metadata(frozen=frozen)
+
+        # transform
+        self.set_metadata(transform=transform)
 
         # tags
-        self.tags = tags
+        self.set_metadata(tags=tags)
 
     @property
     def prior(self) -> BasePDF | None:
