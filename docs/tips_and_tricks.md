@@ -47,7 +47,7 @@ composition = evm.modifier.Compose(
 )
 composition = evm.modifier.Compose(
     composition,
-    evm.Modifier(parameter=sigma1, effect=evm.effect.AsymmetricExponential(up=1.2, down=0.8)),
+    evm.Modifier(value=sigma1.get_value(), effect=evm.effect.AsymmetricExponential(up=1.2, down=0.8)),
 )
 
 nnx.display(composition)
