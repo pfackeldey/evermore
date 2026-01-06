@@ -123,4 +123,4 @@ def dump_hlo_graph(fun: Callable, *args: Any, **kwargs: Any) -> str:
         >>> pathlib.Path("graph.gv").write_text(graph, encoding="ascii")
         143
     """
-    return jax.jit(fun).lower(*args, **kwargs).compiler_ir("hlo").as_hlo_dot_graph()
+    return jax.jit(fun).lower(*args, **kwargs).compiler_ir("hlo").as_hlo_dot_graph()  # ty:ignore[possibly-missing-attribute]

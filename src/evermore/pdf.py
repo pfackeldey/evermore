@@ -46,7 +46,7 @@ class BasePDF(nnx.Pytree):
     def sample(self, key: PRNGKeyArray, shape: Shape) -> Float[Array, ...]: ...
 
     def prob(self, x: V, **kwargs) -> V:
-        return jnp.exp(self.log_prob(x, **kwargs))
+        return jnp.exp(self.log_prob(x, **kwargs))  # ty:ignore[invalid-return-type]
 
 
 class Normal(BasePDF):
@@ -59,16 +59,16 @@ class Normal(BasePDF):
             self.mean, loc=self.mean, scale=self.width
         )
         unnormalized = jax.scipy.stats.norm.logpdf(x, loc=self.mean, scale=self.width)
-        return unnormalized - logpdf_max
+        return unnormalized - logpdf_max  # ty:ignore[invalid-return-type]
 
     def cdf(self, x: V) -> V:
-        return jax.scipy.stats.norm.cdf(x, loc=self.mean, scale=self.width)
+        return jax.scipy.stats.norm.cdf(x, loc=self.mean, scale=self.width)  # ty:ignore[invalid-return-type]
 
     def inv_cdf(self, x: V) -> V:
-        return jax.scipy.stats.norm.ppf(x, loc=self.mean, scale=self.width)
+        return jax.scipy.stats.norm.ppf(x, loc=self.mean, scale=self.width)  # ty:ignore[invalid-return-type]
 
     def __evermore_from_unit_normal__(self, x: V) -> V:
-        return self.mean + self.width * x
+        return self.mean + self.width * x  # ty:ignore[invalid-return-type]
 
     def sample(self, key: PRNGKeyArray, shape: Shape) -> Float[Array, ...]:
         # sample parameter from pdf
@@ -97,26 +97,26 @@ class PoissonDiscrete(PoissonBase):
         # plain evaluation of the pmf
         unnormalized = jax.scipy.stats.poisson.logpmf(k, self.lamb)
         if not normalize:
-            return unnormalized
+            return unnormalized  # ty:ignore[invalid-return-type]
 
         # when normalizing, divide (subtract in log space) by maximum over k range
         logpdf_max = jax.scipy.stats.poisson.logpmf(k, k)
-        return unnormalized - logpdf_max
+        return unnormalized - logpdf_max  # ty:ignore[invalid-return-type]
 
     def cdf(self, x: V) -> V:
         # no need to round x to k, already done by cdf library function
-        return jax.scipy.stats.poisson.cdf(x, self.lamb)
+        return jax.scipy.stats.poisson.cdf(x, self.lamb)  # ty:ignore[invalid-return-type]
 
     def inv_cdf(self, x: V, rounding: DiscreteRounding = "floor") -> V:
         # define starting point for search from normal approximation
         def start_fn(x: V) -> V:
             return jnp.floor(
                 self.lamb + jax.scipy.stats.norm.ppf(x) * jnp.sqrt(self.lamb)
-            )
+            )  # ty:ignore[invalid-return-type]
 
         # define the cdf function
         def cdf_fn(k: V) -> V:
-            return jax.scipy.stats.poisson.cdf(k, self.lamb)
+            return jax.scipy.stats.poisson.cdf(k, self.lamb)  # ty:ignore[invalid-return-type]
 
         return discrete_inv_cdf_search(
             x,

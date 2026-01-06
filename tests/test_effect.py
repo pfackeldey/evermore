@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import jax
 import jax.numpy as jnp
+from flax import nnx
+from jaxtyping import Array, Bool
 
-from evermore import Parameter
 from evermore.binned.effect import (
     AsymmetricExponential,
     Identity,
@@ -18,7 +19,7 @@ from evermore.binned.effect import (
 jax.config.update("jax_enable_x64", True)
 
 
-def compare_offset_and_scale(a: OffsetAndScale, b: OffsetAndScale) -> bool:
+def compare_offset_and_scale(a: OffsetAndScale, b: OffsetAndScale) -> Bool[Array, ""]:
     return jnp.array_equal(a.offset, b.offset) and jnp.array_equal(a.scale, b.scale)
 
 
@@ -28,19 +29,19 @@ def test_Identity():
     hist = jnp.array([1.0, 2.0, 3.0])
 
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=0.0), hist=hist),
+        effect(value=jnp.array(0.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.ones_like(hist)
         ).broadcast(),
     )
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=1.0), hist=hist),
+        effect(value=jnp.array(1.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.ones_like(hist)
         ).broadcast(),
     )
     assert compare_offset_and_scale(
-        effect(parameter=(Parameter(), Parameter()), hist=hist),
+        effect(value=nnx.List([jnp.array(0.0), jnp.array(0.0)]), hist=hist),  # ty:ignore[invalid-argument-type]
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.ones_like(hist)
         ).broadcast(),
@@ -53,13 +54,13 @@ def test_Linear():
     hist = jnp.array([1.0, 2.0, 3.0])
 
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=0.0), hist=hist),
+        effect(value=jnp.array(0.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.zeros_like(hist)
         ).broadcast(),
     )
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=1.0), hist=hist),
+        effect(value=jnp.array(1.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.ones_like(hist)
         ).broadcast(),
@@ -67,13 +68,13 @@ def test_Linear():
 
     effect = Linear(slope=0.0, offset=1.0)
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=0.0), hist=hist),
+        effect(value=jnp.array(0.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.ones_like(hist)
         ).broadcast(),
     )
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=1.0), hist=hist),
+        effect(value=jnp.array(1.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.ones_like(hist)
         ).broadcast(),
@@ -81,13 +82,13 @@ def test_Linear():
 
     effect = Linear(slope=1.0, offset=1.0)
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=0.0), hist=hist),
+        effect(value=jnp.array(0.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.ones_like(hist)
         ).broadcast(),
     )
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=1.0), hist=hist),
+        effect(value=jnp.array(1.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.full_like(hist, 2.0)
         ).broadcast(),
@@ -95,24 +96,26 @@ def test_Linear():
 
 
 def test_AsymmetricExponential():
-    effect: AsymmetricExponential = AsymmetricExponential(up=1.2, down=0.9)
+    effect: AsymmetricExponential = AsymmetricExponential(
+        up=jnp.array(1.2), down=jnp.array(0.9)
+    )
 
     hist = jnp.array([1.0])
 
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=0.0), hist=hist),
+        effect(value=jnp.array(0.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.ones_like(hist)
         ).broadcast(),
     )
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=+1.0), hist=hist),
+        effect(value=jnp.array(+1.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.full_like(hist, 1.2)
         ).broadcast(),
     )
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=-1.0), hist=hist),
+        effect(value=jnp.array(-1.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.full_like(hist, 0.9)
         ).broadcast(),
@@ -120,24 +123,24 @@ def test_AsymmetricExponential():
 
 
 def test_SymmetricExponential():
-    effect: SymmetricExponential = SymmetricExponential(kappa=1.1)
+    effect: SymmetricExponential = SymmetricExponential(kappa=jnp.array(1.1))
 
     hist = jnp.array([1.0])
 
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=0.0), hist=hist),
+        effect(value=jnp.array(0.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.ones_like(hist)
         ).broadcast(),
     )
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=+1.0), hist=hist),
+        effect(value=jnp.array(+1.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.full_like(hist, 1.1)
         ).broadcast(),
     )
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=-1.0), hist=hist),
+        effect(value=jnp.array(-1.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.full_like(hist, 1 / 1.1)
         ).broadcast(),
@@ -152,19 +155,19 @@ def test_VerticalTemplateMorphing():
     hist = jnp.array([10.0])
 
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=0.0), hist=hist),
+        effect(value=jnp.array(0.0), hist=hist),
         OffsetAndScale(
             offset=jnp.zeros_like(hist), scale=jnp.ones_like(hist)
         ).broadcast(),
     )
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=+1.0), hist=hist),
+        effect(value=jnp.array(+1.0), hist=hist),
         OffsetAndScale(
             offset=jnp.full_like(hist, 2.0), scale=jnp.ones_like(hist)
         ).broadcast(),
     )
     assert compare_offset_and_scale(
-        effect(parameter=Parameter(value=-1.0), hist=hist),
+        effect(value=jnp.array(-1.0), hist=hist),
         OffsetAndScale(
             offset=jnp.full_like(hist, -3.0), scale=jnp.ones_like(hist)
         ).broadcast(),

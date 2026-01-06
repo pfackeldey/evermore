@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 import jax
+import jax.flatten_util
 import jax.numpy as jnp
 from flax import nnx
 from jaxtyping import Array, Float, PyTree
 
 from evermore.parameters.filter import is_dynamic_parameter, is_parameter
-from evermore.parameters.parameter import (
-    PT,
-    BaseParameter,
-    V,
-)
+from evermore.parameters.parameter import BaseParameter, V
 from evermore.pdf import BasePDF, PoissonBase
 
 __all__ = [
@@ -25,12 +22,12 @@ def __dir__():
 
 def sample_from_covariance_matrix(
     rngs: nnx.Rngs,
-    params: PT,
+    params: PyTree[BaseParameter],
     *,
     covariance_matrix: Float[Array, "nparams nparams"],
     mask: PyTree[bool] | None = None,
     n_samples: int = 1,
-) -> PT:
+) -> PyTree[BaseParameter]:
     """Samples new parameter configurations from a multivariate normal.
 
     Args:
@@ -41,7 +38,7 @@ def sample_from_covariance_matrix(
         n_samples: Number of samples to draw; adds a leading batch dimension when ``> 1``.
 
     Returns:
-        PT: PyTree with sampled parameter values replacing the originals.
+        PyTree with sampled parameter values replacing the originals.
 
     Examples:
         >>> import evermore as evm
@@ -89,7 +86,9 @@ def sample_from_covariance_matrix(
     return nnx.merge(graphdef, sampled_params_state, rest)
 
 
-def sample_from_priors(rngs: nnx.Rngs, params: PT) -> PT:
+def sample_from_priors(
+    rngs: nnx.Rngs, params: PyTree[BaseParameter]
+) -> PyTree[BaseParameter]:
     """Samples independent values from each parameter's prior distribution.
 
     Args:
@@ -97,7 +96,7 @@ def sample_from_priors(rngs: nnx.Rngs, params: PT) -> PT:
         params: PyTree containing the parameters to sample.
 
     Returns:
-        PT: PyTree mirroring ``params`` with sampled values substituted in place of ``.value``.
+        PyTree mirroring ``params`` with sampled values substituted in place of ``.value``.
 
     Examples:
         >>> import evermore as evm
@@ -125,7 +124,7 @@ def sample_from_priors(rngs: nnx.Rngs, params: PT) -> PT:
             if isinstance(pdf, PoissonBase):
                 sampled_value = (sampled_value / pdf.lamb) - 1
 
-            return param.replace(value=sampled_value)
+            return param.replace(value=sampled_value)  # ty:ignore[invalid-return-type]
         # can't sample if there's:
         # - no pdf to sample from
         return param

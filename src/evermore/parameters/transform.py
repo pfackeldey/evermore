@@ -7,13 +7,10 @@ import jax
 import jax.numpy as jnp
 from flax import nnx
 from jax.experimental import checkify
+from jaxtyping import PyTree
 
 from evermore.parameters.filter import is_parameter
-from evermore.parameters.parameter import (
-    PT,
-    BaseParameter,
-    V,
-)
+from evermore.parameters.parameter import BaseParameter, V
 from evermore.util import float_array
 
 __all__ = [
@@ -88,14 +85,14 @@ def _check_is_non_negative(value: V) -> None:
     )
 
 
-def unwrap(params: PT) -> PT:
+def unwrap(params: PyTree[BaseParameter]) -> PyTree[BaseParameter]:
     """Applies registered transformations to move parameters into unconstrained space.
 
     Args:
         params: PyTree that may contain parameters with attached transformations.
 
     Returns:
-        PT: PyTree where each parameter has been transformed via ``unwrap``.
+        PyTree where each parameter has been transformed via ``unwrap``.
     """
 
     def _unwrap(path, param: BaseParameter[V]) -> BaseParameter[V]:
@@ -109,14 +106,14 @@ def unwrap(params: PT) -> PT:
     return nnx.merge(graphdef, params_state_t, rest)
 
 
-def wrap(params: PT) -> PT:
+def wrap(params: PyTree[BaseParameter]) -> PyTree[BaseParameter]:
     """Applies registered transformations to move parameters back to constrained space.
 
     Args:
         params: PyTree that may contain parameters with attached transformations.
 
     Returns:
-        PT: PyTree where each parameter has been transformed via ``wrap``.
+        PyTree where each parameter has been transformed via ``wrap``.
     """
 
     def _wrap(path, param: BaseParameter[V]) -> BaseParameter[V]:
@@ -198,7 +195,7 @@ class MinuitTransform(BaseParameterTransformation):
         _safe_assert(_check_is_finite, lower)
         _safe_assert(_check_is_finite, upper)
 
-        return value, lower, upper
+        return value, lower, upper  # ty:ignore[invalid-return-type]
 
     def unwrap(self, parameter: BaseParameter[V]) -> BaseParameter[V]:
         # short-cut
@@ -220,7 +217,7 @@ class MinuitTransform(BaseParameterTransformation):
             2.0 * (value - lower) / (upper - lower)  # type: ignore[operator]
             - 1.0
         )
-        return parameter.replace(value=new_value)
+        return parameter.replace(value=new_value)  # ty:ignore[invalid-return-type]
 
     def wrap(self, parameter: BaseParameter[V]) -> BaseParameter[V]:
         # short-cut
@@ -231,7 +228,7 @@ class MinuitTransform(BaseParameterTransformation):
 
         # this formula turns "internal" parameter values into "external" values
         new_value = lower + (upper - lower) / 2.0 * (jnp.sin(value) + 1.0)
-        return parameter.replace(value=new_value)
+        return parameter.replace(value=new_value)  # ty:ignore[invalid-return-type]
 
 
 class SoftPlusTransform(BaseParameterTransformation):
@@ -262,8 +259,8 @@ class SoftPlusTransform(BaseParameterTransformation):
         _safe_assert(_check_is_non_negative, value)
 
         new_value = jnp.log(-jnp.expm1(-value)) + value
-        return parameter.replace(value=new_value)
+        return parameter.replace(value=new_value)  # ty:ignore[invalid-return-type]
 
     def wrap(self, parameter: BaseParameter[V]) -> BaseParameter[V]:
         new_value = jax.nn.softplus(float_array(parameter.value))
-        return parameter.replace(value=new_value)
+        return parameter.replace(value=new_value)  # ty:ignore[invalid-return-type]

@@ -1,25 +1,20 @@
 from __future__ import annotations
 
+import typing as tp
 from collections.abc import Hashable
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    TypeVar,
-)
 
 from flax import nnx
-from jaxtyping import Array, ArrayLike, Float, PyTree
+from jaxtyping import Array, ArrayLike, Float
 
 from evermore.util import float_array
 
-if TYPE_CHECKING:
+if tp.TYPE_CHECKING:
     from evermore.binned.modifier import H, Modifier
     from evermore.parameters.transform import BaseParameterTransformation
     from evermore.pdf import BasePDF
 
 
 __all__ = [
-    "PT",
     "BaseParameter",
     "NormalParameter",
     "Parameter",
@@ -31,7 +26,7 @@ def __dir__():
     return __all__
 
 
-V = TypeVar("V", bound=Float[Array, "..."])
+V = tp.TypeVar("V", bound=Float[Array, "..."])
 
 
 class BaseParameter(nnx.Variable[V]):
@@ -44,7 +39,7 @@ class BaseParameter(nnx.Variable[V]):
         frozen: bool = False,
         transform: BaseParameterTransformation | None = None,
         tags: frozenset[Hashable] = frozenset(),
-        **kwargs: Any,
+        **kwargs: tp.Any,
     ) -> None:
         super().__init__(value=float_array(value), **kwargs)
 
@@ -91,7 +86,7 @@ class BaseParameter(nnx.Variable[V]):
         from evermore.binned.modifier import Modifier
 
         return Modifier(
-            parameter=self,
+            value=self.get_value(),
             effect=Linear(slope=slope, offset=offset),
         )
 
@@ -132,7 +127,7 @@ class NormalParameter(Parameter[V]):
         frozen: bool = False,
         transform: BaseParameterTransformation | None = None,
         tags: frozenset[Hashable] = frozenset(),
-        **kwargs: Any,
+        **kwargs: tp.Any,
     ) -> None:
         super().__init__(
             value=value,
@@ -169,7 +164,10 @@ class NormalParameter(Parameter[V]):
         from evermore.binned.effect import AsymmetricExponential
         from evermore.binned.modifier import Modifier
 
-        return Modifier(parameter=self, effect=AsymmetricExponential(up=up, down=down))
+        return Modifier(
+            value=self.get_value(),
+            effect=AsymmetricExponential(up=float_array(up), down=float_array(down)),
+        )
 
     def scale_log_symmetric(self, kappa: ArrayLike) -> Modifier:
         """Creates a symmetric log-normal modifier for this parameter.
@@ -183,7 +181,10 @@ class NormalParameter(Parameter[V]):
         from evermore.binned.effect import SymmetricExponential
         from evermore.binned.modifier import Modifier
 
-        return Modifier(parameter=self, effect=SymmetricExponential(kappa=kappa))
+        return Modifier(
+            value=self.get_value(),
+            effect=SymmetricExponential(kappa=float_array(kappa)),
+        )
 
     def morphing(
         self,
@@ -203,11 +204,8 @@ class NormalParameter(Parameter[V]):
         from evermore.binned.modifier import Modifier
 
         return Modifier(
-            parameter=self,
+            value=self.get_value(),
             effect=VerticalTemplateMorphing(
                 up_template=up_template, down_template=down_template
             ),
         )
-
-
-PT = TypeVar("PT", bound=PyTree[BaseParameter[V]])

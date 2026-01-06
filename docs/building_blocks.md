@@ -183,8 +183,8 @@ import jax.numpy as jnp
 import evermore as evm
 
 
-def fun(parameter: evm.Parameter, hist: Array) -> Array:
-    return hist + parameter.value * jnp.array([1.0, 1.5, 2.0])
+def fun(value: Array, hist: Array) -> Array:
+    return hist + value * jnp.array([1.0, 1.5, 2.0])
 
 custom_effect = evm.effect.Lambda(fun, normalize_by="offset")
 ```
@@ -198,21 +198,22 @@ Custom effects can accept multiple `evm.Parameters`, e.g., a PyTree of `evm.Para
 from jaxtyping import Array, PyTree
 import jax.numpy as jnp
 import evermore as evm
+from flax import nnx
 
 
-def fun(parameter: PyTree[evm.Parameter], hist: Array) -> Array:
-    return parameter["slope"].value * hist + parameter["intercept"].value * jnp.array([1.0, 1.5, 2.0])
+def fun(tree: PyTree[Array], hist: Array) -> Array:
+    return tree["slope"] * hist + tree["intercept"] * jnp.array([1.0, 1.5, 2.0])
 
 custom_effect = evm.effect.Lambda(fun, normalize_by="offset")
 
 # use with `evm.Modifier` as follows:
 custom_modifier = evm.Modifier(
-    parameter={
-        "slope": evm.Parameter(),
-        "intercept": evm.NormalParameter(),
+    value=nnx.Dict({
+        "slope": jnp.array(1.1),
+        "intercept": jnp.array(0.1),
     },
     effect=custom_effect,
-)
+))
 ```
 :::
 
@@ -228,7 +229,7 @@ import evermore as evm
 param = evm.Parameter(value=1.1)
 
 # create the modifier
-modify = evm.Modifier(parameter=param, effect=evm.effect.Linear(offset=0, slope=1))
+modify = evm.Modifier(value=param.get_value(), effect=evm.effect.Linear(offset=0, slope=1))
 
 # apply the modifier
 modify(jnp.array([10, 20, 30]))

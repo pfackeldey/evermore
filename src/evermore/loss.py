@@ -4,14 +4,10 @@ import jax
 import jax.flatten_util
 import jax.numpy as jnp
 from flax import nnx
-from jaxtyping import Array, Float
+from jaxtyping import Array, Float, PyTree
 
 from evermore.parameters.filter import is_dynamic_parameter, is_parameter
-from evermore.parameters.parameter import (
-    PT,
-    BaseParameter,
-    V,
-)
+from evermore.parameters.parameter import BaseParameter, V
 from evermore.pdf import BasePDF, ImplementsFromUnitNormalConversion, Normal
 
 __all__ = [
@@ -54,7 +50,7 @@ def _parameter_value_to_x(prior: BasePDF, value: V) -> V:
     return x
 
 
-def get_log_probs(tree: PT) -> nnx.State:
+def get_log_probs(tree: PyTree[BaseParameter]) -> nnx.State:
     """Computes log probabilities for every parameter in a PyTree.
 
     The function iterates over each parameter, evaluates its prior distribution
@@ -75,21 +71,23 @@ def get_log_probs(tree: PT) -> nnx.State:
         prior: BasePDF | None = param.prior
         # unconstrained case is easy:
         if prior is None:
-            return jnp.zeros_like(param.value)
+            return jnp.zeros_like(param.get_value())  # ty:ignore[invalid-return-type]
 
         # constrained case:
         if not isinstance(param.prior, BasePDF):
             msg = f"Prior must be a BasePDF object for a constrained BaseParameter (or 'None' for an unconstrained one), got {param.prior=} ({type(param.prior)=})"  # type: ignore[unreachable]
             raise ValueError(msg)
 
-        x = _parameter_value_to_x(prior, param.value)
+        x = _parameter_value_to_x(prior, param.get_value())
         return prior.log_prob(x)
 
     # constraints from pdfs
     return nnx.map_state(_constraint, params_state)
 
 
-def _ravel_pure_tree(tree: PT) -> tuple[Float[Array, " nparams"], tp.Callable]:
+def _ravel_pure_tree(
+    tree: PyTree[BaseParameter],
+) -> tuple[Float[Array, " nparams"], tp.Callable]:
     """Flattens a PyTree of parameters into a 1D array of parameter values.
 
     Args:
@@ -106,7 +104,7 @@ def _ravel_pure_tree(tree: PT) -> tuple[Float[Array, " nparams"], tp.Callable]:
 
 def hessian_matrix(
     loss_fn: tp.Callable,
-    tree: PT,
+    tree: PyTree[BaseParameter],
 ) -> Float[Array, "nparams nparams"]:
     """Computes the Hessian of a scalar loss with respect to dynamic parameters.
 
@@ -172,7 +170,7 @@ def hessian_matrix(
 
 def fisher_information_matrix(
     loss_fn: tp.Callable,
-    tree: PT,
+    tree: PyTree[BaseParameter],
 ) -> Float[Array, "nparams nparams"]:
     """Builds the Fisher information matrix under the Laplace approximation.
 
@@ -210,7 +208,7 @@ def fisher_information_matrix(
 
 def covariance_matrix(
     loss_fn: tp.Callable,
-    tree: PT,
+    tree: PyTree[BaseParameter],
 ) -> Float[Array, "nparams nparams"]:
     """Derives a correlation matrix under the Laplace approximation.
 
@@ -253,8 +251,8 @@ def covariance_matrix(
 
 def cramer_rao_uncertainty(
     loss_fn: tp.Callable,
-    tree: PT,
-) -> PT:
+    tree: PyTree[BaseParameter],
+) -> PyTree[BaseParameter]:
     """Estimates Cramér-Rao uncertainties under the Laplace approximation.
 
     The uncertainties are the square roots of the diagonal of the Fisher
@@ -265,7 +263,7 @@ def cramer_rao_uncertainty(
         tree: PyTree containing the parameters of interest.
 
     Returns:
-        PT: PyTree matching ``tree`` with each parameter replaced by its estimated
+        PyTree matching ``tree`` with each parameter replaced by its estimated
             standard deviation.
 
     Examples:

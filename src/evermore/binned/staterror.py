@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import TypeVar
+from typing import cast
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float, Scalar, Shaped
+from jaxtyping import Array, Bool, Float, Scalar
 
-from evermore.binned.effect import Identity, OffsetAndScale
+from evermore.binned.effect import H, Identity, OffsetAndScale
 from evermore.binned.modifier import Modifier, ModifierBase, Where
 from evermore.parameters.parameter import NormalParameter
 from evermore.util import float_array
@@ -18,9 +18,6 @@ __all__ = [
 
 def __dir__():
     return __all__
-
-
-N = TypeVar("N", bound=Shaped[Array, "..."])
 
 
 class StatErrors(ModifierBase):
@@ -41,20 +38,20 @@ class StatErrors(ModifierBase):
     """
 
     eps: Float[Scalar, ""]
-    n_entries: Float[N]
-    non_empty_mask: Bool[N]
-    relative_error: Float[N]
-    parameter: NormalParameter[Float[N]]
+    n_entries: Float[Array, "..."]  # noqa: UP037
+    non_empty_mask: Bool[Array, "..."]  # noqa: UP037
+    relative_error: Float[Array, "..."]  # noqa: UP037
+    parameter: NormalParameter[Float[Array, "..."]]  # noqa: UP037
 
     def __init__(
         self,
-        hist: Float[N],
-        variance: Float[N],
+        hist: Float[Array, "..."],  # noqa: UP037
+        variance: Float[Array, "..."],  # noqa: UP037
     ):
         # make sure they are of dtype float
         hist, variance = jax.tree.map(float_array, (hist, variance))
 
-        self.eps = jnp.finfo(variance.dtype).eps
+        self.eps = cast(Float[Scalar, ""], jnp.finfo(variance.dtype).eps)
 
         self.n_entries = jnp.where(
             variance != 0.0,
@@ -70,10 +67,10 @@ class StatErrors(ModifierBase):
         )
         self.parameter = NormalParameter(jnp.zeros_like(self.n_entries))
 
-    def offset_and_scale(self, hist: Float[N]) -> OffsetAndScale:
+    def offset_and_scale(self, hist: H) -> OffsetAndScale:
         modifier = Where(
             self.non_empty_mask,
             self.parameter.scale(slope=self.relative_error, offset=1.0),
-            Modifier(parameter=self.parameter, effect=Identity()),
+            Modifier(value=self.parameter.get_value(), effect=Identity()),
         )
         return modifier.offset_and_scale(hist)

@@ -24,7 +24,7 @@ from typing import NamedTuple, TypeAlias
 from flax import nnx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Scalar
+from jaxtyping import Array, Float, PyTree, Scalar
 
 import evermore as evm
 
@@ -32,18 +32,24 @@ jax.config.update("jax_enable_x64", True)
 
 Hist1D: TypeAlias = Float[Array, "..."]
 Hists1D: TypeAlias = dict[str, Hist1D]
+Args: TypeAlias = tuple[
+    nnx.GraphDef,
+    nnx.State,
+    Hists1D,
+    Hist1D,
+]
 
 
 # define a simple model with two processes and two parameters
-def model(params: evm.PT, hists: Hists1D) -> Array:
+def model(params: PyTree, hists: Hists1D) -> Array:
     mu_modifier = params.mu.scale()
     syst_modifier = params.syst.scale_log_asymmetric(up=1.1, down=0.9)
     return mu_modifier(hists["signal"]) + syst_modifier(hists["bkg"])
 
 
 def loss(
-    dynamic: evm.PT,
-    args,
+    dynamic: nnx.State,
+    args: Args,
 ) -> Float[Scalar, ""]:
     graphdef, static, hists, observation = args
     params = nnx.merge(graphdef, dynamic, static)
@@ -72,9 +78,7 @@ class Params(NamedTuple):
 params = Params(mu=evm.Parameter(1.0), syst=evm.NormalParameter(0.0))
 
 # split tree of parameters in a differentiable part and a static part
-graphdef, dynamic, static = nnx.split(
-    params, evm.filter.is_dynamic_parameter, ...
-)
+graphdef, dynamic, static = nnx.split(params, evm.filter.is_dynamic_parameter, ...)
 args = (graphdef, static, hists, observation)
 
 # Calculate negative log-likelihood/loss

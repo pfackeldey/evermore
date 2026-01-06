@@ -10,7 +10,7 @@ from flax import nnx
 from jaxtyping import Array, Bool
 
 from evermore.binned.effect import H, OffsetAndScale
-from evermore.parameters.parameter import PT
+from evermore.parameters.parameter import V
 from evermore.util import tree_stack
 
 if TYPE_CHECKING:
@@ -52,7 +52,7 @@ class ModifierBase(nnx.Module):
 
     def __call__(self: ModifierBase, hist: H) -> H:
         os = self.offset_and_scale(hist=hist)
-        return os.scale * (hist + os.offset)
+        return os.scale * (hist + os.offset)  # ty:ignore[invalid-return-type]
 
     def __matmul__(self: ModifierBase, other: ModifierBase) -> Compose:
         return Compose(self, other)
@@ -77,12 +77,12 @@ class Modifier(ModifierBase):
         Array([11., 22., 33.], dtype=float32)
     """
 
-    def __init__(self, parameter: PT, effect: BaseEffect) -> None:
-        self.parameter = parameter
+    def __init__(self, value: V, effect: BaseEffect) -> None:
+        self.value = value
         self.effect = effect
 
     def offset_and_scale(self, hist: H) -> OffsetAndScale:
-        return self.effect(parameter=self.parameter, hist=hist)
+        return self.effect(value=self.value, hist=hist)
 
 
 class Where(ModifierBase):
@@ -168,8 +168,8 @@ class BooleanMask(ModifierBase):
             return jnp.where(self.mask, true, false)
 
         return OffsetAndScale(
-            offset=_mask(os.offset, 0.0),
-            scale=_mask(os.scale, 1.0),
+            offset=_mask(os.offset, jnp.zeros_like(os.offset)),
+            scale=_mask(os.scale, jnp.ones_like(os.offset)),
         ).broadcast()
 
 

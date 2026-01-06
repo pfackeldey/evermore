@@ -28,6 +28,13 @@ We use `ruff` to lint the code. Run the following command to check the code:
 uv run ruff check . --fix --show-fixes
 ```
 
+### Type checking
+
+We use `ty` to statically type check the code.
+```bash
+uvx ty check src/
+```
+
 ### Check all files
 
 **Recommended before creating a commit**: to run all checks against all files,
@@ -38,7 +45,7 @@ pre-commit run --all-files
 ```
 or with [`prek`](https://github.com/j178/prek):
 ```bash
-uvx prek run -a
+uvx prek -a .
 ```
 
 ### Build the documentation

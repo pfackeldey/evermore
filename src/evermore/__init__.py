@@ -19,7 +19,6 @@ __version__ = "0.4.0"
 # expose public API
 
 __all__ = [
-    "PT",
     "BaseParameter",
     "Modifier",
     "NormalParameter",
@@ -44,16 +43,8 @@ def __dir__():
     return __all__
 
 
-from evermore import (  # noqa: E402
-    loss,
-    pdf,
-    util,
-)
-from evermore.binned import (  # noqa: E402
-    effect,
-    modifier,
-    staterror,
-)
+from evermore import loss, pdf, util  # noqa: E402
+from evermore.binned import effect, modifier, staterror  # noqa: E402
 from evermore.binned.modifier import Modifier  # noqa: E402
 from evermore.parameters import (  # noqa: E402
     filter,
@@ -62,7 +53,6 @@ from evermore.parameters import (  # noqa: E402
     transform,
 )
 from evermore.parameters.parameter import (  # noqa: E402
-    PT,
     BaseParameter,
     NormalParameter,
     Parameter,
