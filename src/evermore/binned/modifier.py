@@ -279,19 +279,19 @@ class Compose(ModifierBase):
         offset = jnp.zeros_like(hist)
 
         groups = defaultdict(list)
-        # first group modifiers into same tree structures
+        # first group modifiers into same NNX graph structures
         for mod in self.modifiers:
-            groups[hash(jax.tree.structure(mod))].append(mod)
-        # then do the `jax.vmap` trick to calculate the scale factors in parallel per group.
-        for _, group_mods in groups.items():
+            graphdef, state = nnx.split(mod)
+            groups[graphdef].append(state)
+        # then do the `vmap` trick to calculate the scale factors in parallel per group.
+        for graphdef, states in groups.items():
             # skip empty groups
-            if not group_mods:
+            if not states:
                 continue
             # Essentially we are turning an array of modifiers (AOS) into a single modifier of stacked leaves (SOA).
             # Then we can use XLA's vectorization/loop constructs (e.g.: `jax.vmap` or `jax.lax.scan`) to calculate
             # the scale factors without having to compile the fully unrolled loop.
-            stack = tree_stack(group_mods, broadcast_leaves=True)
-            graphdef, dynamic_stack = nnx.split(stack)
+            dynamic_stack = tree_stack(states, broadcast_leaves=True)
 
             def calc_sf(_hist, dynamic_stack, graphdef):
                 stack = nnx.merge(graphdef, dynamic_stack)
@@ -302,7 +302,7 @@ class Compose(ModifierBase):
             # however it needs `hist` and `dynamic_stack` to fit into memory.
             # If this is not the case, we should consider using `jax.lax.scan` instead.
             # See: https://github.com/jax-ml/jax/discussions/19114#discussioncomment-7996283
-            vec_calc_sf = jax.vmap(
+            vec_calc_sf = nnx.vmap(
                 jax.tree_util.Partial(calc_sf, graphdef=graphdef),
                 in_axes=(None, 0),  # vectorize over the batch axis of the dynamic_stack
                 out_axes=0,  # return a tree of scale factors

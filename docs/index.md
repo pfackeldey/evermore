@@ -30,6 +30,7 @@ import evermore as evm
 
 jax.config.update("jax_enable_x64", True)
 
+# type defs
 Hist1D: TypeAlias = Float[Array, "..."]
 Hists1D: TypeAlias = dict[str, Hist1D]
 Args: TypeAlias = tuple[
