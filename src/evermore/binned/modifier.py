@@ -68,9 +68,8 @@ class Modifier(ModifierBase):
     Examples:
         >>> import jax.numpy as jnp
         >>> import evermore as evm
-        >>> mu = evm.Parameter(value=1.1)
         >>> modifier = evm.Modifier(
-        ...     parameter=mu,
+        ...     value=1.1,
         ...     effect=evm.effect.Linear(offset=0.0, slope=1.0),
         ... )
         >>> modifier(jnp.array([10, 20, 30]))
