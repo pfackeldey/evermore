@@ -1,23 +1,22 @@
+from functools import partial
+
 import wadler_lindig as wl
 from flax import nnx
-from model import hists, observation, params
-from model import loss as _loss
+from model import hists, loss, make_model, observation
 
 import evermore as evm
 
-
-def loss(dynamic, args):
-    (graphdef, static, hists, observation) = args
-    params = nnx.merge(graphdef, dynamic, static)
-    return _loss(params, hists=hists, observation=observation)
-
-
 if __name__ == "__main__":
-    graphdef, dynamic, static = nnx.split(params, evm.filter.is_dynamic_parameter, ...)
+    model = make_model()
+    # split the model into metadata (graphdef), dynamic and static part
+    graphdef, dynamic, static = nnx.split(model, evm.filter.is_dynamic_parameter, ...)
+    # create a loss function depending only on the dynamic part
     args = (graphdef, static, hists, observation)
-    loss_val = loss(dynamic, args)
+    loss_fn = partial(loss, args=args)
+    # eval and differentiate loss_fn
+    loss_val = loss_fn(dynamic)
     print(f"{loss_val=}")
-    grads = nnx.grad(loss)(dynamic, args)
+    grads = nnx.grad(loss_fn)(dynamic)
     print("Gradients:")
     wl.pprint(
         nnx.pure(grads),

@@ -1,34 +1,30 @@
-import typing as tp
-
 import iminuit
 import jax
 import jax.numpy as jnp
 import wadler_lindig as wl
 from flax import nnx
 from jaxtyping import Array, Float
-from model import hists, loss, observation, params
+from model import hists, loss, make_model, observation
 
 import evermore as evm
 
-FlatV: tp.TypeAlias = Float[Array, " nparams"]  # type: ignore[name-defined]
 
-
-def fit(params, hists, observation):
+def fit(model, hists, observation):
     # partition into dynamic and static parts
-    graphdef, dynamic, static = nnx.split(params, evm.filter.is_dynamic_parameter, ...)
+    graphdef, dynamic, static = nnx.split(model, evm.filter.is_dynamic_parameter, ...)
+    args = (graphdef, static, hists, observation)
 
     # flatten parameter.value(s) for iminuit
     values = nnx.pure(dynamic)
-    flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
+    flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)  # ty:ignore[possibly-missing-attribute]
 
     # wrap loss that works on flat array
     @nnx.jit
-    def iminuit_loss(flat_values: FlatV) -> Float[Array, ""]:
+    def iminuit_loss(flat_values: Float[Array, " nparams"]) -> Float[Array, ""]:
         dynamic.replace_by_pure_dict(unravel_fn(flat_values))
-        params = nnx.merge(graphdef, dynamic, static, copy=True)
-        return loss(params, hists=hists, observation=observation)
+        return loss(dynamic, args)
 
-    minuit = iminuit.Minuit(iminuit_loss, flat_values, grad=nnx.grad(iminuit_loss))
+    minuit = iminuit.Minuit(iminuit_loss, flat_values, grad=nnx.grad(iminuit_loss))  # ty:ignore[invalid-argument-type]
     minuit.errordef = iminuit.Minuit.LIKELIHOOD
     minuit.tol = 1e-5
     minuit.migrad()
@@ -41,7 +37,8 @@ def fit(params, hists, observation):
 
 
 if __name__ == "__main__":
-    bestfit_params = fit(params, hists, observation)
+    model = make_model()
+    bestfit_params = fit(model, hists, observation)
 
     print("Bestfit parameter:")
     wl.pprint(nnx.pure(bestfit_params), short_arrays=False)

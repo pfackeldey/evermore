@@ -4,6 +4,7 @@ import typing as tp
 
 import jax
 import jax.numpy as jnp
+from flax import nnx
 from jaxtyping import Array, Float, PyTree
 
 import evermore as evm
@@ -13,22 +14,26 @@ jax.config.update("jax_enable_x64", True)
 Hist1D = tp.TypeVar("Hist1D", bound=Float[Array, " nbins"])
 
 
-def model(
-    staterrors: evm.staterror.StatErrors, hists: PyTree[Hist1D]
-) -> PyTree[Hist1D]:
-    expectations = {}
+class ModelWithStatErrors(nnx.Module):
+    def __init__(self, hists: PyTree[Hist1D], variances: PyTree[Hist1D]) -> None:
+        self.staterrors = nnx.Dict(
+            jax.tree.map(evm.staterror.StatErrors, hists, histsw2)
+        )
 
-    # signal process
-    expectations["signal"] = staterrors["signal"](hists["signal"])
+    def __call__(self, hists: PyTree[Hist1D]) -> PyTree[Hist1D]:
+        expectations = {}
 
-    # bkg1 process
-    expectations["bkg1"] = staterrors["bkg1"](hists["bkg1"])
+        # signal process
+        expectations["signal"] = self.staterrors["signal"](hists["signal"])
 
-    # bkg2 process
-    expectations["bkg2"] = staterrors["bkg2"](hists["bkg2"])
+        # bkg1 process
+        expectations["bkg1"] = self.staterrors["bkg1"](hists["bkg1"])
 
-    # return the modified expectations
-    return expectations
+        # bkg2 process
+        expectations["bkg2"] = self.staterrors["bkg2"](hists["bkg2"])
+
+        # return the modified expectations
+        return expectations
 
 
 hists = {
@@ -43,13 +48,9 @@ histsw2 = {
 }
 observation = jnp.array([34.0])
 
-# `staterrors` is just a pytree of `evm.Parameter`(s)
-staterrors = jax.tree.map(
-    evm.staterror.StatErrors,
-    hists,
-    histsw2,
-)
 
 if __name__ == "__main__":
     # test the model
-    expectations = model(staterrors, hists)
+    model_with_staterrors = ModelWithStatErrors(hists, histsw2)
+    expectations = model_with_staterrors(hists)
+    print(expectations)

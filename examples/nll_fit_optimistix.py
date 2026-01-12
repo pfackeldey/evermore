@@ -1,23 +1,20 @@
 import optimistix as optx
 import wadler_lindig as wl
 from flax import nnx
-from model import hists, loss, observation, params
+from model import hists, loss, make_model, observation
 
 import evermore as evm
 
 
-def fit(params, hists, observation):
+def fit(model, hists, observation):
     solver = optx.BFGS(rtol=1e-5, atol=1e-7)
 
-    graphdef, dynamic, static = nnx.split(params, evm.filter.is_dynamic_parameter, ...)
+    # split the model into metadata (graphdef), dynamic and static part
+    graphdef, dynamic, static = nnx.split(model, evm.filter.is_dynamic_parameter, ...)
 
-    def optx_loss(dynamic, args):
-        graphdef, static, hists, observation = args
-        params = nnx.merge(graphdef, dynamic, static)
-        return loss(params, hists=hists, observation=observation)
-
+    # run the minimization
     fitresult = optx.minimise(
-        optx_loss,
+        loss,
         solver,
         dynamic,
         has_aux=False,
@@ -30,7 +27,8 @@ def fit(params, hists, observation):
 
 
 if __name__ == "__main__":
-    bestfit_params = fit(params, hists, observation)
+    model = make_model()
+    bestfit_params = fit(model, hists, observation)
 
     print("Bestfit parameter:")
     wl.pprint(nnx.pure(bestfit_params), short_arrays=False)

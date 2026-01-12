@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import optimistix as optx
 from flax import nnx
 from jaxtyping import Array, Float
-from model import hists, loss, observation, params
+from model import hists, loss, make_model, observation
 
 import evermore as evm
 
@@ -10,21 +10,18 @@ solver = optx.BFGS(rtol=1e-5, atol=1e-7)
 
 
 @nnx.jit
-def fixed_mu_fit(mu: Float[Array, ""], params: nnx.Module) -> Float[Array, ""]:
-    # shallow copy, i.e. not copying arrays, so that we
-    # can modify the params tree per 'mu' in `vmap`
-    params = nnx.merge(*nnx.split(params), copy=True)
+def fixed_mu_fit(mu: Float[Array, ""]) -> Float[Array, ""]:
+    model = make_model()
 
-    # Freeze the parameter and update the `mu` value in the params tree:
-    params.mu.value = mu
-    params.mu.set_metadata(frozen=True)
+    # Set & freeze the `mu` parameter in the model (it's mutable!):
+    model.mu[...] = mu
+    model.mu.set_metadata(frozen=True)
 
-    graphdef, dynamic, static = nnx.split(params, evm.filter.is_dynamic_parameter, ...)
+    # split the model into metadata (graphdef), dynamic and static part
+    graphdef, dynamic, static = nnx.split(model, evm.filter.is_dynamic_parameter, ...)
 
     def twice_nll(dynamic, args):
-        graphdef, static, hists, observation = args
-        params = nnx.merge(graphdef, dynamic, static)
-        return 2 * loss(params, hists=hists, observation=observation)
+        return 2 * loss(dynamic, args)
 
     fitresult = optx.minimise(
         twice_nll,
@@ -44,13 +41,12 @@ if __name__ == "__main__":
     mus = jnp.linspace(0, 5, 11)
     # for-loop over mu values
     for mu in mus:
-        print(
-            f"[for-loop] mu={mu:.2f} - NLL={fixed_mu_fit(jnp.array(mu), params=params):.6f}"
-        )
+        nll = fixed_mu_fit(mu)
+        print(f"[for-loop] mu={mu:.2f} - NLL={nll:.6f}")
 
     print("---------------------------------")
 
     # or vectorized!!!
-    likelihood_scan = nnx.vmap(fixed_mu_fit, in_axes=(0, None))(mus, params=params)
+    likelihood_scan = nnx.vmap(fixed_mu_fit, in_axes=(0,))(mus)
     for mu, nll in zip(mus, likelihood_scan, strict=False):
         print(f"[jax.vmap] mu={mu:.2f} - NLL={nll:.6f}")
