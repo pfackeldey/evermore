@@ -20,14 +20,14 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.14.6"
+    rev: "v0.14.11"
     hooks:
       - id: ruff
         args: ["--fix", "--show-fixes"]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-    rev: v0.14.6
+    rev: v0.14.11
     hooks:
       - id: ruff-format
 
@@ -60,12 +60,12 @@ repos:
         exclude: ^(LICENSE$)
 
   - repo: https://github.com/henryiii/validate-pyproject-schema-store
-    rev: 2025.11.21
+    rev: 2026.01.10
     hooks:
       - id: validate-pyproject
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.35.0
+    rev: 0.36.0
     hooks:
       - id: check-readthedocs
       - id: check-github-workflows
