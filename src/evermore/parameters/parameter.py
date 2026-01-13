@@ -95,7 +95,7 @@ class Parameter(BaseParameter[V]):
     """Generic parameter with optional bounds, priors, and metadata.
 
     Attributes:
-        value: Current parameter value (mutable via ``.value``).
+        value: Current parameter value (mutable via ``.get_value()``).
         name: Optional human-readable identifier.
         lower: Optional lower bound enforced via transformations.
         upper: Optional upper bound enforced via transformations.
@@ -107,7 +107,7 @@ class Parameter(BaseParameter[V]):
     Examples:
         >>> import evermore as evm
         >>> theta = evm.Parameter(value=1.0, lower=0.0, upper=2.0)
-        >>> theta.value
+        >>> theta.get_value()
         Array(1., dtype=float32)
     """
 

@@ -94,7 +94,7 @@ Custom transformations can be defined by subclassing [`evm.transform.ParameterTr
 
 For optimization it is necessary to differentiate only against meaningful leaves of the PyTree of `evm.Parameters`.
 By default JAX would differentiate w.r.t. every non-static leaf of a `evm.Parameter`, including the prior PDF and its bounds.
-Gradients are typically only wanted w.r.t. the `.value` attribute of the `evm.Parameters`. This is solved by splitting
+Gradients are typically only wanted w.r.t. the `.get_value()` attribute of the `evm.Parameters`. This is solved by splitting
 the PyTree of `evm.Parameters` into a differentiable and a non-differentiable part, and then defining the loss function
 w.r.t. both parts. Gradient calculation is performed only w.r.t. the differentiable argument, see:
 

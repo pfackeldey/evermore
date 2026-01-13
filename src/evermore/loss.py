@@ -25,9 +25,9 @@ def __dir__():
 
 def _parameter_value_to_x(prior: BasePDF, value: V) -> V:
     # all constrained parameters are 'moving' on a 'unit_normal' distribution (mean=0, width=1), i.e.:
-    # - param.value=0: no shift, no constrain
-    # - param.value=+1: +1 sigma shift, calculate the +1 sigma constrain based on prior pdf
-    # - param.value=-1: -1 sigma shift, calculate the -1 sigma constrain based on prior pdf
+    # - param.get_value()=0: no shift, no constrain
+    # - param.get_value()=+1: +1 sigma shift, calculate the +1 sigma constrain based on prior pdf
+    # - param.get_value()=-1: -1 sigma shift, calculate the -1 sigma constrain based on prior pdf
     #
     # Translating between this "unit_normal" pdf and any other pdf works as follows:
     # x = AnyOtherPDF.inv_cdf(unit_normal.cdf(v))
@@ -37,7 +37,7 @@ def _parameter_value_to_x(prior: BasePDF, value: V) -> V:
     # these shortcuts are implemented by '__evermore_from_unit_normal__' as defined by the
     # ImplementsFromUnitNormalConversion protocol.
     #
-    # (in the following: x=x and v=param.value)
+    # (in the following: x=x and v=param.get_value())
     if isinstance(prior, ImplementsFromUnitNormalConversion):
         # this is the fast-path
         x = prior.__evermore_from_unit_normal__(value)
@@ -129,7 +129,7 @@ def hessian_matrix(
         ... }
         >>> def loss_fn(pytree):
         ...     return jnp.sum(
-        ...         (pytree["a"].value - 1.0) ** 2 + (pytree["b"].value - 2.0) ** 2
+        ...         (pytree["a"].get_value() - 1.0) ** 2 + (pytree["b"].get_value() - 2.0) ** 2
         ...     )
         >>> evm.loss.hessian_matrix(loss_fn, params).shape
         (2, 2)
@@ -195,7 +195,7 @@ def fisher_information_matrix(
         ... }
         >>> def loss_fn(pytree):
         ...     return jnp.sum(
-        ...         (pytree["a"].value - 1.0) ** 2 + (pytree["b"].value - 2.0) ** 2
+        ...         (pytree["a"].get_value() - 1.0) ** 2 + (pytree["b"].get_value() - 2.0) ** 2
         ...     )
         >>> evm.loss.fisher_information_matrix(loss_fn, params).shape
         (2, 2)
@@ -233,7 +233,7 @@ def covariance_matrix(
         ... }
         >>> def loss_fn(pytree):
         ...     return jnp.sum(
-        ...         (pytree["a"].value - 1.0) ** 2 + (pytree["b"].value - 2.0) ** 2
+        ...         (pytree["a"].get_value() - 1.0) ** 2 + (pytree["b"].get_value() - 2.0) ** 2
         ...     )
         >>> evm.loss.covariance_matrix(loss_fn, params).shape
         (2, 2)
@@ -275,7 +275,7 @@ def cramer_rao_uncertainty(
         ... }
         >>> def loss_fn(pytree):
         ...     return jnp.sum(
-        ...         (pytree["a"].value - 1.0) ** 2 + (pytree["b"].value - 2.0) ** 2
+        ...         (pytree["a"].get_value() - 1.0) ** 2 + (pytree["b"].get_value() - 2.0) ** 2
         ...     )
         >>> uncertainties = evm.loss.cramer_rao_uncertainty(loss_fn, params)
         >>> {name: value.shape for name, value in uncertainties.items()}

@@ -21,15 +21,15 @@ def test_minuit_transform_round_trip():
         )
     }
 
-    original_value = params["bounded"].value.copy()
+    original_value = params["bounded"].get_value().copy()
 
     unconstrained = evm.transform.unwrap(params)
-    assert jnp.allclose(params["bounded"].value, original_value)
+    assert jnp.allclose(params["bounded"].get_value(), original_value)
     # value should now live in the unconstrained space
-    assert jnp.all(unconstrained["bounded"].value < jnp.array([jnp.pi / 2]))
+    assert jnp.all(unconstrained["bounded"].get_value() < jnp.array([jnp.pi / 2]))
 
     constrained = evm.transform.wrap(unconstrained)
-    assert jnp.allclose(constrained["bounded"].value, jnp.array([0.25]))
+    assert jnp.allclose(constrained["bounded"].get_value(), jnp.array([0.25]))
 
 
 def test_minuit_transform_raises_for_out_of_bounds():
@@ -56,12 +56,12 @@ def test_softplus_transform_round_trip():
         )
     }
 
-    original_value = params["positive"].value.copy()
+    original_value = params["positive"].get_value().copy()
 
     unconstrained = evm.transform.unwrap(params)
-    assert jnp.allclose(params["positive"].value, original_value)
+    assert jnp.allclose(params["positive"].get_value(), original_value)
     # inverse softplus should place value on the real line (negative allowed)
-    assert jnp.all(unconstrained["positive"].value < jnp.array([2.0]))
+    assert jnp.all(unconstrained["positive"].get_value() < jnp.array([2.0]))
 
     reconstrained = evm.transform.wrap(unconstrained)
-    assert jnp.allclose(reconstrained["positive"].value, jnp.array([2.0]))
+    assert jnp.allclose(reconstrained["positive"].get_value(), jnp.array([2.0]))

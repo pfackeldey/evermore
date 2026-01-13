@@ -53,7 +53,7 @@ def tree_stack(
         ...     evm.NormalParameter().scale_log_asymmetric(up=jnp.array([1.2]), down=jnp.array([0.8])),
         ... ]
         >>> stacked = evm.util.tree_stack(modifiers)
-        >>> stacked.parameter.value.shape
+        >>> stacked.parameter.get_value().shape
         (2, 1)
     """
     # check that all trees have the same structure

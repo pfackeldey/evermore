@@ -3,7 +3,6 @@ from __future__ import annotations
 import evermore
 
 project = evermore.__name__
-copyright = evermore.__copyright__
 author = evermore.__author__
 version = release = evermore.__version__
 

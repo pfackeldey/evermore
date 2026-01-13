@@ -175,7 +175,7 @@ class MinuitTransform(BaseParameterTransformation):
         ... }
         >>> unconstrained = tr.unwrap(params)
         >>> restored = tr.wrap(unconstrained)
-        >>> restored["a"].value == params["a"].value
+        >>> restored["a"].get_value() == params["a"].get_value()
         Array(True, dtype=bool)
     """
 
@@ -187,7 +187,7 @@ class MinuitTransform(BaseParameterTransformation):
             msg = f"{parameter} must have both lower and upper boundaries set, or none of them."
             raise ValueError(msg)
 
-        value = float_array(parameter.value)
+        value = float_array(parameter.get_value())
         lower = float_array(parameter.lower)
         upper = float_array(parameter.upper)
 
@@ -213,10 +213,7 @@ class MinuitTransform(BaseParameterTransformation):
         )
 
         # this formula turns user-provided "external" parameter values into "internal" values
-        new_value = jnp.arcsin(
-            2.0 * (value - lower) / (upper - lower)  # type: ignore[operator]
-            - 1.0
-        )
+        new_value = jnp.arcsin(2.0 * (value - lower) / (upper - lower) - 1.0)
         return parameter.replace(value=new_value)  # ty:ignore[invalid-return-type]
 
     def wrap(self, parameter: BaseParameter[V]) -> BaseParameter[V]:
@@ -247,14 +244,14 @@ class SoftPlusTransform(BaseParameterTransformation):
         ... }
         >>> unconstrained = tr.unwrap(params)
         >>> restored = tr.wrap(unconstrained)
-        >>> restored["b"].value
+        >>> restored["b"].get_value()
         Array(0.1, dtype=float32)
     """
 
     def unwrap(self, parameter: BaseParameter[V]) -> BaseParameter[V]:
         # from: https://github.com/danielward27/paramax/blob/main/paramax/utils.py
         """Applies the inverse softplus transformation after validating the value."""
-        value = float_array(parameter.value)
+        value = float_array(parameter.get_value())
 
         _safe_assert(_check_is_non_negative, value)
 
@@ -262,5 +259,5 @@ class SoftPlusTransform(BaseParameterTransformation):
         return parameter.replace(value=new_value)  # ty:ignore[invalid-return-type]
 
     def wrap(self, parameter: BaseParameter[V]) -> BaseParameter[V]:
-        new_value = jax.nn.softplus(float_array(parameter.value))
+        new_value = jax.nn.softplus(float_array(parameter.get_value()))
         return parameter.replace(value=new_value)  # ty:ignore[invalid-return-type]

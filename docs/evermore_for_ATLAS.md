@@ -121,7 +121,7 @@ import evermore as evm
 
 
 def fun(parameter: evm.Parameter, hist: Array) -> Array:
-    return hist + parameter.value * jnp.array([1.0, 1.5, 2.0])
+    return hist + parameter.get_value() * jnp.array([1.0, 1.5, 2.0])
 
 modifier = evm.Modifier(
     parameter=evm.NormalParameter(value=[0.0, 0.0, 0.0]),
@@ -333,7 +333,7 @@ import jax.numpy as jnp
 import evermore as evm
 
 
-# param.value is the shape factor, one value per bin
+# param.get_value() is the shape factor, one value per bin
 hist = jnp.array([10.0, 20.0, 30.0])
 param = evm.Parameter(value=[0.0, 0.0, 0.0])
 

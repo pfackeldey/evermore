@@ -53,7 +53,7 @@ def sample_from_covariance_matrix(
         >>> samples = evm.sample.sample_from_covariance_matrix(
         ...     rngs, params, covariance_matrix=cov, n_samples=3
         ... )
-        >>> samples["a"].value.shape
+        >>> samples["a"].get_value().shape
         (3, 1)
     """
     # get the value & make sure it has at least 1d so we insert a batch dim later
@@ -96,7 +96,7 @@ def sample_from_priors(
         params: PyTree containing the parameters to sample.
 
     Returns:
-        PyTree mirroring ``params`` with sampled values substituted in place of ``.value``.
+        PyTree mirroring ``params`` with sampled values substituted in place of ``.get_value()``.
 
     Examples:
         >>> import evermore as evm
@@ -107,7 +107,7 @@ def sample_from_priors(
         ...     "b": evm.NormalParameter(value=0.0),
         ... }
         >>> samples = evm.sample.sample_from_priors(nnx.Rngs(0), params)
-        >>> isinstance(samples["b"].value, jax.Array)
+        >>> isinstance(samples["b"].get_value(), jax.Array)
         True
     """
     graphdef, params_state, rest = nnx.split(params, is_parameter, ...)
@@ -118,7 +118,7 @@ def sample_from_priors(
             pdf = param.prior
 
             # Sample new value from the prior pdf
-            sampled_value = pdf.sample(rngs(), shape=param.value.shape)
+            sampled_value = pdf.sample(rngs(), shape=param.get_value().shape)
 
             # TODO: this is not correct I assume
             if isinstance(pdf, PoissonBase):

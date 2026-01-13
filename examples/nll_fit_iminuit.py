@@ -14,7 +14,7 @@ def fit(model, hists, observation):
     graphdef, dynamic, static = nnx.split(model, evm.filter.is_dynamic_parameter, ...)
     args = (graphdef, static, hists, observation)
 
-    # flatten parameter.value(s) for iminuit
+    # flatten parameter.get_value()(s) for iminuit
     values = nnx.pure(dynamic)
     flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)  # ty:ignore[possibly-missing-attribute]
 

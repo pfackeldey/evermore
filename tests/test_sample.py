@@ -30,11 +30,11 @@ def test_sample_from_covariance_matrix_preserves_structure():
     )
 
     assert sampled["meta"] == 42.0
-    assert sampled["a"].value.shape == (5, 1)
-    assert sampled["b"].value.shape == (5, 1)
+    assert sampled["a"].get_value().shape == (5, 1)
+    assert sampled["b"].get_value().shape == (5, 1)
     # original parameters remain unchanged
-    assert np.allclose(params["a"].value, jnp.array([1.0]))
-    assert np.allclose(params["b"].value, jnp.array([2.0]))
+    assert np.allclose(params["a"].get_value(), jnp.array([1.0]))
+    assert np.allclose(params["b"].get_value(), jnp.array([2.0]))
 
     # deterministic across identical seeds
     rngs_again = nnx.Rngs(0)
@@ -45,8 +45,8 @@ def test_sample_from_covariance_matrix_preserves_structure():
         n_samples=5,
     )
     np.testing.assert_allclose(
-        sampled["a"].value,
-        sampled_again["a"].value,
+        sampled["a"].get_value(),
+        sampled_again["a"].get_value(),
     )
 
 
@@ -63,14 +63,14 @@ def test_sample_from_priors_respects_priors_and_frozen_parameters():
     rngs = nnx.Rngs(123)
     sampled: PyTree[evm.Parameter] = evm.sample.sample_from_priors(rngs, params)
 
-    assert sampled["plain"].value == pytest.approx(3.0)
-    assert sampled["normal"].value.shape == (1,)
-    assert params["normal"].value == pytest.approx(0.0)
+    assert sampled["plain"].get_value() == pytest.approx(3.0)
+    assert sampled["normal"].get_value().shape == (1,)
+    assert params["normal"].get_value() == pytest.approx(0.0)
 
     # sampling with the same seed should be reproducible
     rngs_again = nnx.Rngs(123)
     sampled_again = evm.sample.sample_from_priors(rngs_again, params)
     np.testing.assert_allclose(
-        sampled["normal"].value,
-        sampled_again["normal"].value,
+        sampled["normal"].get_value(),
+        sampled_again["normal"].get_value(),
     )

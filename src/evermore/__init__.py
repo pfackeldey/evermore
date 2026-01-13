@@ -4,15 +4,7 @@ evermore: Differentiable (binned) likelihoods in JAX.
 
 from __future__ import annotations
 
-import datetime
-
 __author__ = "Peter Fackeldey"
-__email__ = "peter.fackeldey@princeton.edu"
-__copyright__ = f"Copyright {datetime.datetime.now().year}, Peter Fackeldey"
-__credits__ = ["Peter Fackeldey"]
-__contact__ = "https://github.com/pfackeldey/evermore"
-__license__ = "BSD-3-Clause"
-__status__ = "Development"
 __version__ = "0.4.1"
 
 

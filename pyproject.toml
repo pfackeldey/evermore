@@ -78,10 +78,7 @@ envs.default.dependencies = ["pytest", "pytest-cov"]
 minversion = "7"
 xfail_strict = true
 addopts = ["-ra", "--strict-config", "--strict-markers"]
-filterwarnings = [
-    "error",
-    "ignore::DeprecationWarning", # <- remove once equinox publishes a new release (see: https://github.com/patrick-kidger/equinox/commit/5a5bf287f73032201c34ff2c73e73573f8232739)
-]
+filterwarnings = ["error"]
 log_cli_level = "INFO"
 testpaths = ["tests"]
 

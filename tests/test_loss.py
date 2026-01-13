@@ -19,9 +19,9 @@ ScalarParamTree: tp.TypeAlias = PyTree[ScalarParam]
 
 def loss_fn(params: ScalarParamTree) -> Float[Scalar, ""]:
     return (
-        params["a"].value ** 2
-        + 2 * params["b"].value ** 2
-        + (params["a"].value + params["c"].value) ** 2
+        params["a"].get_value() ** 2
+        + 2 * params["b"].get_value() ** 2
+        + (params["a"].get_value() + params["c"].get_value()) ** 2
     )
 
 

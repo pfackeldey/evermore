@@ -24,7 +24,7 @@ def test_staterrors_masks_empty_bins():
 
     staterrors = evm.staterror.StatErrors(hist, variance)
     # apply a +0.5 sigma shift
-    staterrors.parameter.value = jnp.array([0.5, 0.5])
+    staterrors.parameter.set_value(jnp.array([0.5, 0.5]))
 
     modified = staterrors(hist)
 

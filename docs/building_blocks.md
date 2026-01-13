@@ -79,7 +79,7 @@ More information can be found in <project:#parameter-transformations>.
 
 Freeze a Parameter
 
-:   For the minimization of a likelihood it is necessary to differentiate with respect to the _differentiable_ part, i.e., the `.value` attributes, of a PyTree of `evm.Parameters`.
+:   For the minimization of a likelihood it is necessary to differentiate with respect to the _differentiable_ part, i.e., the `.get_value()` attributes, of a PyTree of `evm.Parameters`.
     Splitting this tree into the differentiable and non-differentiable part is done with `nnx.split(..., evm.filter.is_dynamic_parameter, ...)`. You can freeze a `evm.Parameter` by setting `frozen=True`, this will
     put the frozen parameter in the non-differentiable part.
 
@@ -99,7 +99,7 @@ Correlate a Parameter
     p1, p2, p3 = evm.parameter.correlate(p1, p2, p3)
 
     # now p1, p2, p3 are correlated, i.e., they share the same value
-    assert p1.value == p2.value == p3.value
+    assert p1.get_value() == p2.get_value() == p3.get_value()
     ```
 
     A more general case of correlating any PyTree of parameters is implemented as follows:
@@ -122,7 +122,7 @@ Correlate a Parameter
 
     # now correlated_params.mu and correlated_params.syst are correlated,
     # they share the same value
-    assert correlated_params.mu.value == correlated_params.syst.value
+    assert correlated_params.mu.get_value() == correlated_params.syst.get_value()
     ```
 
 
