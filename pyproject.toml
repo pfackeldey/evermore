@@ -11,7 +11,7 @@ description = "Differentiable (binned) likelihoods in JAX."
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14" # allow 3.14 once flax supports it
 classifiers = [
     "Development Status :: 1 - Planning",
     "Intended Audience :: Science/Research",
@@ -59,8 +59,8 @@ dev = [
     { include-group = "docs" },
     "ipython",
     "ruff",
-    "pre_commit",
-    "mypy",
+    "prek",
+    "ty",
 ]
 
 [project.urls]

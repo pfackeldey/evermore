@@ -171,7 +171,7 @@ class PoissonContinuous(PoissonBase):
 
 # alias for rounding literals
 DiscreteRounding = Literal["floor", "ceil", "closest"]
-known_roundings = frozenset(DiscreteRounding.__args__)  # type: ignore[attr-defined]
+known_roundings = frozenset(DiscreteRounding.__args__)
 
 
 def discrete_inv_cdf_search(
@@ -248,7 +248,7 @@ def discrete_inv_cdf_search(
                     0,
                 )
             case _:
-                msg = f"unknown rounding '{rounding}' mode, expected one of {', '.join(known_roundings)}"  # type: ignore[unreachable]
+                msg = f"unknown rounding '{rounding}' mode, expected one of {', '.join(known_roundings)}"
                 raise ValueError(msg)
 
         k += k_shift

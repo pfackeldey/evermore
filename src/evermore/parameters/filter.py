@@ -22,7 +22,7 @@ __all__ = [
 class IsFrozen:
     """Filter that selects parameters marked as frozen."""
 
-    def __call__(self, path, x):
+    def __call__(self, path, x) -> bool:
         del path  # unused
         return hasattr(x, "frozen") and x.frozen
 
@@ -37,7 +37,7 @@ class HasName:
 
     name: str
 
-    def __call__(self, path, x: BaseParameter):
+    def __call__(self, path, x: BaseParameter) -> bool:
         del path  # unused
         return hasattr(x, "name") and x.name == self.name
 
@@ -52,7 +52,7 @@ class HasTags:
 
     tags: frozenset[Hashable]
 
-    def __call__(self, path, x: BaseParameter):
+    def __call__(self, path, x: BaseParameter) -> bool:
         del path  # unused
         return hasattr(x, "tags") and self.tags <= x.tags
 

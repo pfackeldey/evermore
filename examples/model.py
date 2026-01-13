@@ -13,7 +13,7 @@ jax.config.update("jax_enable_x64", True)
 
 
 # type defs
-Hist1D: tp.TypeAlias = Float[Array, " nbins"]  # type: ignore[name-defined]
+Hist1D: tp.TypeAlias = Float[Array, " nbins"]
 Args: tp.TypeAlias = tuple[
     nnx.GraphDef,  # graphdef
     nnx.State,  # state

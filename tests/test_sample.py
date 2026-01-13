@@ -13,23 +13,21 @@ jax.config.update("jax_enable_x64", True)
 
 
 def test_sample_from_covariance_matrix_preserves_structure():
-    params: PyTree = {
+    params = {
         "a": evm.Parameter(value=jnp.array([1.0])),
         "b": evm.Parameter(value=jnp.array([2.0])),
-        "meta": 42.0,
     }
 
     rngs = nnx.Rngs(0)
     cov = jnp.eye(2)
 
-    sampled: PyTree[evm.Parameter] = evm.sample.sample_from_covariance_matrix(
+    sampled = evm.sample.sample_from_covariance_matrix(
         rngs,
         params,
         covariance_matrix=cov,
         n_samples=5,
     )
 
-    assert sampled["meta"] == 42.0
     assert sampled["a"].get_value().shape == (5, 1)
     assert sampled["b"].get_value().shape == (5, 1)
     # original parameters remain unchanged

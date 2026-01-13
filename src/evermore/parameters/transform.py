@@ -7,10 +7,9 @@ import jax
 import jax.numpy as jnp
 from flax import nnx
 from jax.experimental import checkify
-from jaxtyping import PyTree
 
 from evermore.parameters.filter import is_parameter
-from evermore.parameters.parameter import BaseParameter, V
+from evermore.parameters.parameter import PT, BaseParameter, V
 from evermore.util import float_array
 
 __all__ = [
@@ -85,7 +84,7 @@ def _check_is_non_negative(value: V) -> None:
     )
 
 
-def unwrap(params: PyTree[BaseParameter]) -> PyTree[BaseParameter]:
+def unwrap(params: PT) -> PT:
     """Applies registered transformations to move parameters into unconstrained space.
 
     Args:
@@ -106,7 +105,7 @@ def unwrap(params: PyTree[BaseParameter]) -> PyTree[BaseParameter]:
     return nnx.merge(graphdef, params_state_t, rest)
 
 
-def wrap(params: PyTree[BaseParameter]) -> PyTree[BaseParameter]:
+def wrap(params: PT) -> PT:
     """Applies registered transformations to move parameters back to constrained space.
 
     Args:

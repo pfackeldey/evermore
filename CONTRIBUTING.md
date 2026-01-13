@@ -32,20 +32,16 @@ uv run ruff check . --fix --show-fixes
 
 We use `ty` to statically type check the code.
 ```bash
-uvx ty check src/
+uv run ty check src/ tests/ examples/
 ```
 
 ### Check all files
 
 **Recommended before creating a commit**: to run all checks against all files,
-run the following command:
 
+run the following command with [`prek`](https://github.com/j178/prek):
 ```bash
-pre-commit run --all-files
-```
-or with [`prek`](https://github.com/j178/prek):
-```bash
-uvx prek -a .
+uv run prek -a .
 ```
 
 ### Build the documentation
@@ -54,4 +50,10 @@ To build the documentation, run the following command:
 
 ```bash
 uv run sphinx-build -M html ./docs ./docs/_build -W --keep-going
+```
+
+### Test that all examples run
+
+```bash
+for s in examples/*.py; do uv run $s; done
 ```

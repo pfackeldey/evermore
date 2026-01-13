@@ -324,5 +324,5 @@ def unroll(modifiers: Iterable[ModifierBase]) -> Iterator[ModifierBase]:
             yield mod
         else:
             # raise an error if the modifier is not a ModifierBase instance
-            msg = f"Modifier {mod} is not a ModifierBase instance."  # type: ignore[unreachable]
+            msg = f"Modifier {mod} is not a ModifierBase instance."
             raise TypeError(msg)

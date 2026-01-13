@@ -7,7 +7,7 @@ from flax import nnx
 from jaxtyping import Array, Float, PyTree
 
 from evermore.parameters.filter import is_dynamic_parameter, is_parameter
-from evermore.parameters.parameter import BaseParameter, V
+from evermore.parameters.parameter import PT, BaseParameter, V
 from evermore.pdf import BasePDF, ImplementsFromUnitNormalConversion, Normal
 
 __all__ = [
@@ -75,7 +75,7 @@ def get_log_probs(tree: PyTree[BaseParameter]) -> nnx.State:
 
         # constrained case:
         if not isinstance(param.prior, BasePDF):
-            msg = f"Prior must be a BasePDF object for a constrained BaseParameter (or 'None' for an unconstrained one), got {param.prior=} ({type(param.prior)=})"  # type: ignore[unreachable]
+            msg = f"Prior must be a BasePDF object for a constrained BaseParameter (or 'None' for an unconstrained one), got {param.prior=} ({type(param.prior)=})"
             raise ValueError(msg)
 
         x = _parameter_value_to_x(prior, param.get_value())
@@ -249,10 +249,7 @@ def covariance_matrix(
     return jnp.where(jnp.eye(cov.shape[0], dtype=cov.dtype), 1.0, cov)
 
 
-def cramer_rao_uncertainty(
-    loss_fn: tp.Callable,
-    tree: PyTree[BaseParameter],
-) -> PyTree[BaseParameter]:
+def cramer_rao_uncertainty(loss_fn: tp.Callable, tree: PT) -> PT:
     """Estimates Cramér-Rao uncertainties under the Laplace approximation.
 
     The uncertainties are the square roots of the diagonal of the Fisher

@@ -4,7 +4,7 @@ import typing as tp
 from collections.abc import Hashable
 
 from flax import nnx
-from jaxtyping import Array, ArrayLike, Float
+from jaxtyping import Array, ArrayLike, Float, PyTree
 
 from evermore.util import float_array
 
@@ -15,6 +15,7 @@ if tp.TYPE_CHECKING:
 
 
 __all__ = [
+    "PT",
     "BaseParameter",
     "NormalParameter",
     "Parameter",
@@ -209,3 +210,6 @@ class NormalParameter(Parameter[V]):
                 up_template=up_template, down_template=down_template
             ),
         )
+
+
+PT = tp.TypeVar("PT", bound=PyTree[BaseParameter])

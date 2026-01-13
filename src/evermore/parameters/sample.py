@@ -7,7 +7,7 @@ from flax import nnx
 from jaxtyping import Array, Float, PyTree
 
 from evermore.parameters.filter import is_dynamic_parameter, is_parameter
-from evermore.parameters.parameter import BaseParameter, V
+from evermore.parameters.parameter import PT, BaseParameter, V
 from evermore.pdf import BasePDF, PoissonBase
 
 __all__ = [
@@ -22,12 +22,12 @@ def __dir__():
 
 def sample_from_covariance_matrix(
     rngs: nnx.Rngs,
-    params: PyTree[BaseParameter],
+    params: PT,
     *,
     covariance_matrix: Float[Array, "nparams nparams"],
     mask: PyTree[bool] | None = None,
     n_samples: int = 1,
-) -> PyTree[BaseParameter]:
+) -> PT:
     """Samples new parameter configurations from a multivariate normal.
 
     Args:
@@ -86,9 +86,7 @@ def sample_from_covariance_matrix(
     return nnx.merge(graphdef, sampled_params_state, rest)
 
 
-def sample_from_priors(
-    rngs: nnx.Rngs, params: PyTree[BaseParameter]
-) -> PyTree[BaseParameter]:
+def sample_from_priors(rngs: nnx.Rngs, params: PT) -> PT:
     """Samples independent values from each parameter's prior distribution.
 
     Args:
