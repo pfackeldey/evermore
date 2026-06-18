@@ -11,7 +11,7 @@ description = "Differentiable (binned) likelihoods in JAX."
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 readme = "README.md"
-requires-python = ">=3.11,<3.14" # allow 3.14 once flax supports it
+requires-python = ">=3.11,<3.15"
 classifiers = [
     "Development Status :: 1 - Planning",
     "Intended Audience :: Science/Research",
@@ -23,6 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
     "Typing :: Typed",
 ]
