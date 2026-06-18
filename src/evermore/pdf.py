@@ -204,9 +204,9 @@ def discrete_inv_cdf_search(
     """
     # store masks for injecting exact values for known edge cases later on
     # inject 0 for x == 0
-    zero_mask = x == 0.0
+    zero_mask = jnp.isclose(x, 0.0)
     # inject inf for x == 1
-    inf_mask = x == 1.0
+    inf_mask = jnp.isclose(x, 1.0)
     # inject nan for ~(0 < x < 1) or non-finite values
     nan_mask = (x < 0.0) | (x > 1.0) | ~jnp.isfinite(x)
 
