@@ -97,7 +97,7 @@ def _ravel_pure_tree(
         tuple[Float[Array, "nparams"], tp.Callable]: Pair containing the flattened
             parameter values and a function that reconstructs the original PyTree.
     """
-    values = nnx.pure(tree)
+    values = nnx.as_pure(tree)
     flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
     return flat_values, unravel_fn
 
@@ -134,7 +134,7 @@ def hessian_matrix(
         >>> evm.loss.hessian_matrix(loss_fn, params).shape
         (2, 2)
     """
-    graphdef, dynamic, rest = nnx.split(tree, is_dynamic_parameter, ...)
+    graphdef, dynamic, rest = nnx.split(tree, is_dynamic_parameter, True)
     flat_values, unravel_fn = _ravel_pure_tree(dynamic)
 
     def _flat_loss(flat_values: Float[Array, "..."]) -> Float[Array, ""]:

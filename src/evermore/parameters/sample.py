@@ -57,8 +57,8 @@ def sample_from_covariance_matrix(
         (3, 1)
     """
     # get the value & make sure it has at least 1d so we insert a batch dim later
-    graphdef, params_state, rest = nnx.split(params, is_dynamic_parameter, ...)
-    values = jax.tree.map(jnp.atleast_1d, nnx.pure(params_state))
+    graphdef, params_state, rest = nnx.split(params, is_dynamic_parameter, True)
+    values = jax.tree.map(jnp.atleast_1d, nnx.as_pure(params_state))
     flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)
 
     # sample parameter sets from the correlation matrix (centered around `flat_values`)
@@ -108,7 +108,7 @@ def sample_from_priors(rngs: nnx.Rngs, params: PT) -> PT:
         >>> isinstance(samples["b"].get_value(), jax.Array)
         True
     """
-    graphdef, params_state, rest = nnx.split(params, is_parameter, ...)
+    graphdef, params_state, rest = nnx.split(params, is_parameter, True)
 
     def _sample_from_prior(path, param: BaseParameter[V]) -> BaseParameter[V]:
         del path  # unused

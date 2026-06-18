@@ -21,9 +21,9 @@ def _build_params():
 def test_is_dynamic_parameter_splits_out_frozen():
     params = _build_params()
 
-    graphdef, dynamic, static = nnx.split(params, filt.is_dynamic_parameter, ...)
+    graphdef, dynamic, static = nnx.split(params, filt.is_dynamic_parameter, True)
 
-    dynamic_pure = nnx.pure(dynamic)
+    dynamic_pure = nnx.as_pure(dynamic)
 
     assert "free" in dynamic_pure
     assert "frozen" not in dynamic_pure
