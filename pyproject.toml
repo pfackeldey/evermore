@@ -28,10 +28,10 @@ classifiers = [
 ]
 dynamic = ["version"] # version is set in src/evermore/__init__.py
 dependencies = [
-    "jax>=0.7.2", # jax.new_ref
-    "jaxlib",
+    "jax>=0.10.2", # jax.new_ref
+    "jaxlib>=0.10.2",
     "jaxtyping",
-    "flax>=0.12.1",
+    "flax>=0.12.7",
 ]
 
 [dependency-groups]
