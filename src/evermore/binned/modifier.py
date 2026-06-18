@@ -292,7 +292,7 @@ class Compose(ModifierBase):
             # the scale factors without having to compile the fully unrolled loop.
             dynamic_stack = tree_stack(states, broadcast_leaves=True)
 
-            def calc_sf(_hist, dynamic_stack, graphdef):
+            def calc_sf(graphdef, _hist, dynamic_stack):
                 stack = nnx.merge(graphdef, dynamic_stack)
                 return stack.offset_and_scale(_hist)
 
@@ -302,11 +302,15 @@ class Compose(ModifierBase):
             # If this is not the case, we should consider using `jax.lax.scan` instead.
             # See: https://github.com/jax-ml/jax/discussions/19114#discussioncomment-7996283
             vec_calc_sf = nnx.vmap(
-                jax.tree_util.Partial(calc_sf, graphdef=graphdef),
-                in_axes=(None, 0),  # vectorize over the batch axis of the dynamic_stack
+                calc_sf,
+                in_axes=(
+                    None,
+                    None,
+                    0,
+                ),  # vectorize over the batch axis of the dynamic_stack
                 out_axes=0,  # return a tree of scale factors
             )
-            os = vec_calc_sf(hist, dynamic_stack)
+            os = vec_calc_sf(graphdef, hist, dynamic_stack)
             scale *= jnp.prod(os.scale, axis=0)
             offset += jnp.sum(os.offset, axis=0)
 
