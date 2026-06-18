@@ -294,25 +294,29 @@ class Compose(ModifierBase):
 
             def calc_sf(graphdef, _hist, dynamic_stack):
                 stack = nnx.merge(graphdef, dynamic_stack)
-                return stack.offset_and_scale(_hist)
+                os = stack.offset_and_scale(_hist)
+                # return plain arrays instead of an nnx.Pytree to avoid tracer leaks
+                # when the vmapped function returns a graph node type on some Python/JAX
+                # combinations (see evermore#XXX).
+                return os.offset, os.scale
 
             # Vectorize over the first axis of the stack.
             # Using `jax.vmap` is the most efficient way to do this,
             # however it needs `hist` and `dynamic_stack` to fit into memory.
             # If this is not the case, we should consider using `jax.lax.scan` instead.
             # See: https://github.com/jax-ml/jax/discussions/19114#discussioncomment-7996283
-            vec_calc_sf = nnx.vmap(
+            vec_calc_sf = jax.vmap(
                 calc_sf,
                 in_axes=(
                     None,
                     None,
                     0,
                 ),  # vectorize over the batch axis of the dynamic_stack
-                out_axes=0,  # return a tree of scale factors
+                out_axes=(0, 0),  # return trees of offset/scale arrays
             )
-            os = vec_calc_sf(graphdef, hist, dynamic_stack)
-            scale *= jnp.prod(os.scale, axis=0)
-            offset += jnp.sum(os.offset, axis=0)
+            os_offsets, os_scales = vec_calc_sf(graphdef, hist, dynamic_stack)
+            scale *= jnp.prod(os_scales, axis=0)
+            offset += jnp.sum(os_offsets, axis=0)
 
         return OffsetAndScale(offset=offset, scale=scale).broadcast()
 
