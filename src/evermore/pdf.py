@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import typing as tp
 from collections.abc import Callable
 from typing import Literal, Protocol, runtime_checkable
 
@@ -275,4 +276,4 @@ def discrete_inv_cdf_search(
     k = jnp.where(inf_mask, jnp.inf, k)
     k = jnp.where(nan_mask, jnp.nan, k)
 
-    return k  # noqa: RET504
+    return tp.cast(V, k)

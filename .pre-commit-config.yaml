@@ -1,6 +1,7 @@
 ci:
   autoupdate_commit_msg: "chore: update pre-commit hooks"
   autofix_commit_msg: "style: pre-commit fixes"
+  skip: [ty]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -29,15 +30,11 @@ repos:
       # Run the formatter.
       - id: ruff-format
 
-  # TODO: replace with `ty` once it exists, see: https://github.com/astral-sh/ty/issues/269
-  # - repo: https://github.com/pre-commit/mirrors-mypy
-  #   rev: "v1.18.2"
-  #   hooks:
-  #     - id: mypy
-  #       files: src|tests
-  #       args: [--config-file=pyproject.toml]
-  #       additional_dependencies:
-  #         - pytest
+  - repo: https://github.com/astral-sh/ty-pre-commit
+    # ty version.
+    rev: v0.0.50
+    hooks:
+      - id: ty
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: "v0.11.0.1"

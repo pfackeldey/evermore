@@ -97,9 +97,9 @@ class Linear(BaseEffect):
 class VerticalTemplateMorphing(BaseEffect):
     def __init__(self, up_template: H, down_template: H):
         # + 1 sigma
-        self.up_template: H = float_array(up_template)
+        self.up_template = float_array(up_template)
         # - 1 sigma
-        self.down_template: H = float_array(down_template)
+        self.down_template = float_array(down_template)
 
     def vshift(self, value: V, hist: H) -> H:
         dx_sum = self.up_template + self.down_template - 2 * hist
@@ -126,8 +126,8 @@ class VerticalTemplateMorphing(BaseEffect):
 
 class AsymmetricExponential(BaseEffect):
     def __init__(self, up: H, down: H):
-        self.up: H = float_array(up)
-        self.down: H = float_array(down)
+        self.up = float_array(up)
+        self.down = float_array(down)
 
     def interpolate(self, value: V) -> V:
         # https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/be488af288361ef101859a398ae618131373cad7/src/ProcessNormalization.cc#L112-L129

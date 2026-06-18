@@ -61,7 +61,7 @@ dev = [
     "ipython",
     "ruff",
     "prek",
-    "ty",
+    "ty>=0.0.50",
 ]
 
 [project.urls]
@@ -143,3 +143,9 @@ unfixable = [
 ]
 flake8-unused-arguments.ignore-variadic-names = true
 isort.required-imports = ["from __future__ import annotations"]
+
+
+[tool.ty]
+# Match the original mypy scope and treat warnings as errors in pre-commit.
+src.include = ["src", "tests"]
+terminal.error-on-warning = true
