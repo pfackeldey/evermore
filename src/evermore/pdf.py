@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import abc
 import typing as tp
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Literal, Protocol, runtime_checkable
 
 import jax
 import jax.numpy as jnp
 from flax import nnx
-from jax._src.random import Shape
 from jax.scipy.special import digamma, gammaln, xlogy
 from jaxtyping import Array, Float, PRNGKeyArray
 
@@ -44,7 +43,7 @@ class BasePDF(nnx.Pytree):
     def inv_cdf(self, x: V) -> V: ...
 
     @abc.abstractmethod
-    def sample(self, key: PRNGKeyArray, shape: Shape) -> Float[Array, ...]: ...
+    def sample(self, key: PRNGKeyArray, shape: Sequence[int]) -> Float[Array, ...]: ...
 
     def prob(self, x: V, **kwargs) -> V:
         return jnp.exp(self.log_prob(x, **kwargs))  # ty:ignore[invalid-return-type]
@@ -71,7 +70,7 @@ class Normal(BasePDF):
     def __evermore_from_unit_normal__(self, x: V) -> V:
         return self.mean + self.width * x  # ty:ignore[invalid-return-type]
 
-    def sample(self, key: PRNGKeyArray, shape: Shape) -> Float[Array, ...]:
+    def sample(self, key: PRNGKeyArray, shape: Sequence[int]) -> Float[Array, ...]:
         # sample parameter from pdf
         return self.__evermore_from_unit_normal__(jax.random.normal(key, shape=shape))
 
@@ -126,7 +125,7 @@ class PoissonDiscrete(PoissonBase):
             rounding=rounding,
         )
 
-    def sample(self, key: PRNGKeyArray, shape: Shape) -> Float[Array, ...]:
+    def sample(self, key: PRNGKeyArray, shape: Sequence[int]) -> Float[Array, ...]:
         return jax.random.poisson(key, self.lamb, shape=shape)
 
 
@@ -157,17 +156,17 @@ class PoissonContinuous(PoissonBase):
 
     def cdf(self, x: V) -> V:
         err = f"{self.__class__.__name__} does not support cdf"
-        raise Exception(err)
+        raise NotImplementedError(err)
 
     def inv_cdf(self, x: V) -> V:
         err = f"{self.__class__.__name__} does not support inv_cdf"
-        raise Exception(err)
+        raise NotImplementedError(err)
 
     def sample(
-        self, key: PRNGKeyArray, shape: Shape | None = None
+        self, key: PRNGKeyArray, shape: Sequence[int] | None = None
     ) -> Float[Array, ...]:
         msg = f"{self.__class__.__name__} does not support sampling, use PoissonDiscrete instead"
-        raise Exception(msg)
+        raise NotImplementedError(msg)
 
 
 # alias for rounding literals

@@ -50,10 +50,18 @@ def test_covariance_matrix():
     cov = evm.loss.covariance_matrix(loss_fn, params)
 
     assert cov.shape == (3, 3)
+    expected = jnp.array([[0.5, 0.0, -0.5], [0.0, 0.25, 0.0], [-0.5, 0.0, 1.0]])
+    np.testing.assert_allclose(cov, expected, rtol=1e-6, atol=1e-8)
+
+
+def test_correlation_matrix():
+    corr = evm.loss.correlation_matrix(loss_fn, params)
+
+    assert corr.shape == (3, 3)
     expected = jnp.array(
         [[1.0, 0.0, -0.70710677], [0.0, 1.0, 0.0], [-0.70710677, 0.0, 1.0]]
     )
-    np.testing.assert_allclose(cov, expected, rtol=1e-6, atol=1e-8)
+    np.testing.assert_allclose(corr, expected, rtol=1e-6, atol=1e-8)
 
 
 def test_hessian_matrix():

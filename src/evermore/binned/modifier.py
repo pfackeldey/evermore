@@ -238,7 +238,16 @@ class TransformScale(ModifierBase):
 
 
 class Compose(ModifierBase):
-    """Combines multiple modifiers and applies them sequentially.
+    """Combines multiple modifiers and applies them in parallel.
+
+    Modifiers are grouped by their NNX graph structure and vectorized using XLA.
+    The combined effect multiplies all scale factors together and adds all offsets
+    to the input histogram. This corresponds to the standard HistFactory-style
+    combination of independent systematic effects.
+
+    Note: This is *parallel* composition, not sequential chaining. For pure
+    scale modifiers the two are equivalent, but when offsets are involved the
+    order-independent parallel combination is used.
 
     Args:
         *modifiers: Modifiers to compose. They are flattened if nested ``Compose`` instances are provided.

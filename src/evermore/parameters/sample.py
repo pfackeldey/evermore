@@ -8,7 +8,7 @@ from jaxtyping import Array, Float, PyTree
 
 from evermore.parameters.filter import is_dynamic_parameter, is_parameter
 from evermore.parameters.parameter import PT, BaseParameter, V
-from evermore.pdf import BasePDF, PoissonBase
+from evermore.pdf import BasePDF, Normal, PoissonBase, PoissonContinuous
 
 __all__ = [
     "sample_from_covariance_matrix",
@@ -34,7 +34,9 @@ def sample_from_covariance_matrix(
         rngs: ``nnx.Rngs`` container used to draw randomness.
         params: PyTree of parameters providing the mean values.
         covariance_matrix: Covariance matrix defining the multivariate normal.
-        mask: Optional PyTree indicating which parameters should be resampled.
+        mask: Optional PyTree of booleans matching the structure of ``params``.
+            Only parameters where the mask is ``True`` are resampled; the rest
+            keep their original values.
         n_samples: Number of samples to draw; adds a leading batch dimension when ``> 1``.
 
     Returns:
@@ -67,6 +69,13 @@ def sample_from_covariance_matrix(
         cov=covariance_matrix,
         shape=(n_samples,),
     )
+
+    # if a mask is provided, keep original values for masked-out parameters
+    if mask is not None:
+        flat_mask, _ = jax.flatten_util.ravel_pytree(mask)
+        flat_sampled_values = jnp.where(
+            flat_mask[None, :], flat_sampled_values, flat_values[None, :]
+        )
 
     # insert batch dim
     sampled_param_values = jax.vmap(unravel_fn)(flat_sampled_values)
@@ -115,12 +124,24 @@ def sample_from_priors(rngs: nnx.Rngs, params: PT) -> PT:
         if isinstance(param.prior, BasePDF):
             pdf = param.prior
 
+            if isinstance(pdf, PoissonContinuous):
+                msg = (
+                    f"Sampling from {type(pdf).__name__} priors is not supported; "
+                    "use PoissonDiscrete instead."
+                )
+                raise NotImplementedError(msg)
+
             # Sample new value from the prior pdf
             sampled_value = pdf.sample(rngs(), shape=param.get_value().shape)
 
-            # TODO: this is not correct I assume
             if isinstance(pdf, PoissonBase):
-                sampled_value = (sampled_value / pdf.lamb) - 1
+                # PoissonDiscrete priors expect the parameter value in unit-normal space.
+                # Convert the sampled Poisson count back to unit-normal space.
+                unit_normal = Normal(
+                    mean=jnp.zeros_like(sampled_value),
+                    width=jnp.ones_like(sampled_value),
+                )
+                sampled_value = unit_normal.inv_cdf(pdf.cdf(sampled_value))
 
             return param.replace(value=sampled_value)  # ty:ignore[invalid-return-type]
         # can't sample if there's:

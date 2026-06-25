@@ -23,7 +23,7 @@ def __dir__():
 
 
 def float_array(x: Any) -> Float[Array, "..."]:  # noqa: UP037
-    return jnp.asarray(x, dtype=jnp.result_type(jnp.float_))
+    return jnp.asarray(x, dtype=jnp.result_type(0.0))
 
 
 def sum_over_leaves(tree: PyTree) -> Array:

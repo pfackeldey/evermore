@@ -11,6 +11,7 @@ from evermore.parameters.parameter import PT, BaseParameter, V
 from evermore.pdf import BasePDF, ImplementsFromUnitNormalConversion, Normal
 
 __all__ = [
+    "correlation_matrix",
     "covariance_matrix",
     "cramer_rao_uncertainty",
     "fisher_information_matrix",
@@ -172,10 +173,10 @@ def fisher_information_matrix(
     loss_fn: tp.Callable,
     tree: PyTree[BaseParameter],
 ) -> Float[Array, "nparams nparams"]:
-    """Builds the Fisher information matrix under the Laplace approximation.
+    """Builds the observed Fisher information matrix under the Laplace approximation.
 
-    The Fisher matrix is obtained by evaluating the Hessian of ``loss_fn`` and
-    inverting it. Only differentiable parameters, as determined by
+    The observed Fisher information matrix is the Hessian of ``loss_fn`` evaluated
+    at the current parameter values. Only differentiable parameters, as determined by
     ``flax.nnx.split`` and ``evermore.filter.is_dynamic_parameter``, contribute.
 
     Args:
@@ -183,8 +184,8 @@ def fisher_information_matrix(
         tree: PyTree containing the parameters of interest.
 
     Returns:
-        Float[Array, "nparams nparams"]: Fisher information matrix evaluated at
-            the provided parameter values.
+        Float[Array, "nparams nparams"]: Observed Fisher information matrix
+            (i.e. the Hessian of ``loss_fn``) evaluated at the provided parameter values.
 
     Examples:
         >>> import evermore as evm
@@ -201,20 +202,54 @@ def fisher_information_matrix(
         (2, 2)
     """
     # calculate hessian
-    hessian = hessian_matrix(loss_fn, tree)
-    # invert to get the fisher information matrix under the Laplace assumption of normality
-    return jnp.linalg.inv(hessian)
+    return hessian_matrix(loss_fn, tree)
 
 
 def covariance_matrix(
     loss_fn: tp.Callable,
     tree: PyTree[BaseParameter],
 ) -> Float[Array, "nparams nparams"]:
-    """Derives a correlation matrix under the Laplace approximation.
+    """Derives the covariance matrix under the Laplace approximation.
 
-    The Fisher information matrix is inverted and re-scaled so that the
-    resulting matrix has unit diagonal entries. This corresponds to the
-    correlation matrix implied by the Laplace approximation.
+    The covariance matrix is obtained by inverting the observed Fisher information
+    matrix (i.e. the Hessian of ``loss_fn``).
+
+    Args:
+        loss_fn: Callable that accepts a PyTree of parameters and returns a scalar loss.
+        tree: PyTree containing the parameters of interest.
+
+    Returns:
+        Float[Array, "nparams nparams"]: Covariance matrix associated with the
+            supplied parameter PyTree.
+
+    Examples:
+        >>> import evermore as evm
+        >>> import jax.numpy as jnp
+        >>> params = {
+        ...     "a": evm.Parameter(value=jnp.array([1.0])),
+        ...     "b": evm.Parameter(value=jnp.array([2.0])),
+        ... }
+        >>> def loss_fn(pytree):
+        ...     return jnp.sum(
+        ...         (pytree["a"].get_value() - 1.0) ** 2 + (pytree["b"].get_value() - 2.0) ** 2
+        ...     )
+        >>> evm.loss.covariance_matrix(loss_fn, params).shape
+        (2, 2)
+    """
+    # calculate fisher information matrix
+    fisher_info = fisher_information_matrix(loss_fn, tree)
+    # invert to get the covariance matrix under the Laplace assumption of normality
+    return jnp.linalg.inv(fisher_info)
+
+
+def correlation_matrix(
+    loss_fn: tp.Callable,
+    tree: PyTree[BaseParameter],
+) -> Float[Array, "nparams nparams"]:
+    """Derives the correlation matrix under the Laplace approximation.
+
+    The covariance matrix is inverted and re-scaled so that the resulting matrix
+    has unit diagonal entries.
 
     Args:
         loss_fn: Callable that accepts a PyTree of parameters and returns a scalar loss.
@@ -235,25 +270,25 @@ def covariance_matrix(
         ...     return jnp.sum(
         ...         (pytree["a"].get_value() - 1.0) ** 2 + (pytree["b"].get_value() - 2.0) ** 2
         ...     )
-        >>> evm.loss.covariance_matrix(loss_fn, params).shape
+        >>> evm.loss.correlation_matrix(loss_fn, params).shape
         (2, 2)
     """
-    # calculate fisher information matrix
-    fisher = fisher_information_matrix(loss_fn, tree)
+    # calculate covariance matrix
+    cov = covariance_matrix(loss_fn, tree)
 
-    # normalize via D^-1 @ fisher @ D^-1 with D being the diagnonal standard deviation matrix
-    d = jnp.sqrt(jnp.diagonal(fisher))
-    cov = fisher / jnp.outer(d, d)
+    # normalize via D^-1 @ cov @ D^-1 with D being the diagonal standard deviation matrix
+    d = jnp.sqrt(jnp.diagonal(cov))
+    corr = cov / jnp.outer(d, d)
 
     # to avoid numerical issues, fix the diagonal to 1
-    return jnp.where(jnp.eye(cov.shape[0], dtype=cov.dtype), 1.0, cov)
+    return jnp.where(jnp.eye(corr.shape[0], dtype=corr.dtype), 1.0, corr)
 
 
 def cramer_rao_uncertainty(loss_fn: tp.Callable, tree: PT) -> PT:
     """Estimates Cramér-Rao uncertainties under the Laplace approximation.
 
-    The uncertainties are the square roots of the diagonal of the Fisher
-    information matrix for the provided parameter PyTree.
+    The uncertainties are the square roots of the diagonal of the covariance
+    matrix for the provided parameter PyTree.
 
     Args:
         loss_fn: Callable that accepts a PyTree of parameters and returns a scalar loss.
@@ -280,6 +315,6 @@ def cramer_rao_uncertainty(loss_fn: tp.Callable, tree: PT) -> PT:
     """
     _, unravel_fn = _ravel_pure_tree(tree)
 
-    # calculate fisher information matrix
-    fisher_info = fisher_information_matrix(loss_fn, tree)
-    return unravel_fn(jnp.sqrt(jnp.diag(fisher_info)))
+    # calculate covariance matrix
+    cov = covariance_matrix(loss_fn, tree)
+    return unravel_fn(jnp.sqrt(jnp.diag(cov)))

@@ -17,7 +17,7 @@ Hist1D = tp.TypeVar("Hist1D", bound=Float[Array, " nbins"])
 class ModelWithStatErrors(nnx.Module):
     def __init__(self, hists: PyTree[Hist1D], variances: PyTree[Hist1D]) -> None:
         self.staterrors = nnx.Dict(
-            jax.tree.map(evm.staterror.StatErrors, hists, histsw2)
+            jax.tree.map(evm.staterror.StatErrors, hists, variances)
         )
 
     def __call__(self, hists: PyTree[Hist1D]) -> PyTree[Hist1D]:

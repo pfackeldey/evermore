@@ -78,3 +78,23 @@ def test_Compose():
 
     composition = modifier1 @ modifier2
     np.testing.assert_allclose(composition(hist), jnp.array([1.1, 2.2, 3.3]))
+
+
+def test_Compose_parallel_semantics():
+    """Compose uses parallel combination: product of scales, sum of offsets."""
+    scale_param = evm.Parameter(value=2.0, name="scale")
+    morph_param = evm.NormalParameter(value=1.0, name="morph")
+
+    scale_mod = scale_param.scale()
+    morph_mod = morph_param.morphing(
+        up_template=jnp.array([12.0]),
+        down_template=jnp.array([8.0]),
+    )
+
+    hist = jnp.array([10.0])
+    composition = scale_mod @ morph_mod
+
+    # parallel composition: scale * (hist + offset), not scale * hist + offset
+    morph_offset = morph_mod.offset_and_scale(hist).offset
+    expected = 2.0 * (hist + morph_offset)
+    np.testing.assert_allclose(composition(hist), expected)
