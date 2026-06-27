@@ -112,8 +112,8 @@ params = {
 graphdef, dynamic, static = nnx.split(
     params, evm.filter.is_dynamic_parameter, ...
 )
-print(f"{nnx.pure(dynamic)=}")
-print(f"{nnx.pure(static)=}")
+print(f"{nnx.as_pure(dynamic)=}")
+print(f"{nnx.as_pure(static)=}")
 
 
 # loss's first argument is only the dynamic part of the parameter PyTree!
@@ -158,19 +158,19 @@ tree = {
 
 params_state, _ = nnx.state(tree, evm.filter.is_parameter, ...)
 print("evm.filter.is_parameter:")
-nnx.display(nnx.pure(params_state))
+nnx.display(nnx.as_pure(params_state))
 
 print("\nevm.filter.is_frozen:")
-nnx.display(nnx.pure(params_state.filter(evm.filter.is_frozen)))
+nnx.display(nnx.as_pure(params_state.filter(evm.filter.is_frozen)))
 
 print("\nevm.filter.is_not_frozen:")
-nnx.display(nnx.pure(params_state.filter(evm.filter.is_not_frozen)))
+nnx.display(nnx.as_pure(params_state.filter(evm.filter.is_not_frozen)))
 
 print("\nevm.filter.HasName('mu'):")
-nnx.display(nnx.pure(params_state.filter(evm.filter.HasName("mu"))))
+nnx.display(nnx.as_pure(params_state.filter(evm.filter.HasName("mu"))))
 
 print("\nevm.filter.HasTags({'theory'}):")
-nnx.display(nnx.pure(params_state.filter(evm.filter.HasTags(tags))))
+nnx.display(nnx.as_pure(params_state.filter(evm.filter.HasTags(tags))))
 ```
 
 `nnx.split` also accepts a `filter` argument, and lets you partition any PyTree as you want.

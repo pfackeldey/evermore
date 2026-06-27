@@ -15,7 +15,7 @@ def fit(model, hists, observation):
     args = (graphdef, static, hists, observation)
 
     # flatten parameter.get_value()(s) for iminuit
-    values = nnx.pure(dynamic)
+    values = nnx.as_pure(dynamic)
     flat_values, unravel_fn = jax.flatten_util.ravel_pytree(values)  # ty:ignore[possibly-missing-attribute]
 
     # wrap loss that works on flat array
@@ -41,4 +41,4 @@ if __name__ == "__main__":
     bestfit_params = fit(model, hists, observation)
 
     print("Bestfit parameter:")
-    wl.pprint(nnx.pure(bestfit_params), short_arrays=False)
+    wl.pprint(nnx.as_pure(bestfit_params), short_arrays=False)

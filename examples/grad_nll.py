@@ -19,6 +19,6 @@ if __name__ == "__main__":
     grads = nnx.grad(loss_fn)(dynamic)
     print("Gradients:")
     wl.pprint(
-        nnx.pure(grads),
+        nnx.as_pure(grads),
         short_arrays=False,
     )
