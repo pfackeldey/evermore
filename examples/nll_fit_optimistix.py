@@ -31,4 +31,4 @@ if __name__ == "__main__":
     bestfit_params = fit(model, hists, observation)
 
     print("Bestfit parameter:")
-    wl.pprint(nnx.pure(bestfit_params), short_arrays=False)
+    wl.pprint(nnx.as_pure(bestfit_params), short_arrays=False)
