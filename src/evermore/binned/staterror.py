@@ -38,15 +38,15 @@ class StatErrors(ModifierBase):
     """
 
     eps: Float[Scalar, ""]
-    n_entries: Float[Array, "..."]  # noqa: UP037
-    non_empty_mask: Bool[Array, "..."]  # noqa: UP037
-    relative_error: Float[Array, "..."]  # noqa: UP037
-    parameter: NormalParameter[Float[Array, "..."]]  # noqa: UP037
+    n_entries: Float[Array, "..."]  # ruff:ignore[quoted-annotation]
+    non_empty_mask: Bool[Array, "..."]  # ruff:ignore[quoted-annotation]
+    relative_error: Float[Array, "..."]  # ruff:ignore[quoted-annotation]
+    parameter: NormalParameter[Float[Array, "..."]]  # ruff:ignore[quoted-annotation]
 
     def __init__(
         self,
-        hist: Float[Array, "..."],  # noqa: UP037
-        variance: Float[Array, "..."],  # noqa: UP037
+        hist: Float[Array, "..."],  # ruff:ignore[quoted-annotation]
+        variance: Float[Array, "..."],  # ruff:ignore[quoted-annotation]
     ):
         # make sure they are of dtype float
         hist, variance = jax.tree.map(float_array, (hist, variance))
