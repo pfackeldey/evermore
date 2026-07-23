@@ -57,7 +57,7 @@ def nll(dynamic_params, args):
     expectations = model(params, hists)
 
     # first product of Eq. 1 (Poisson term)
-    loss_val = evm.pdf.Poisson(lamb=evm.util.sum_over_leaves(expectations)).log_prob(
+    loss_val = evm.pdf.PoissonContinuous(lamb=evm.util.sum_over_leaves(expectations)).log_prob(
         observation
     ).sum()
 
