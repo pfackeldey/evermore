@@ -41,7 +41,7 @@ from evermore.binned import (  # ruff:ignore[module-import-not-at-top-of-file]
     modifier,
     staterror,
 )
-from evermore.binned.modifier import (
+from evermore.binned.modifier import (  # ruff:ignore[module-import-not-at-top-of-file]
     Modifier,
 )
 from evermore.parameters import (  # ruff:ignore[module-import-not-at-top-of-file]
