@@ -22,7 +22,7 @@ def __dir__():
     return __all__
 
 
-def float_array(x: Any) -> Float[Array, "..."]:  # noqa: UP037
+def float_array(x: Any) -> Float[Array, "..."]:  # ruff:ignore[quoted-annotation]
     return jnp.asarray(x, dtype=jnp.result_type(0.0))
 
 
@@ -31,7 +31,7 @@ def sum_over_leaves(tree: PyTree) -> Array:
 
 
 def tree_stack(
-    trees: list[PyTree[Shaped[Array, "..."]]],  # noqa: UP037
+    trees: list[PyTree[Shaped[Array, "..."]]],  # ruff:ignore[quoted-annotation]
     *,
     broadcast_leaves: bool = False,
 ) -> PyTree[Shaped[Array, "batch_dim ..."]]:

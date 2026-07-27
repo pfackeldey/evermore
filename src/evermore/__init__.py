@@ -35,16 +35,22 @@ def __dir__():
     return __all__
 
 
-from evermore import loss, pdf, util  # noqa: E402
-from evermore.binned import effect, modifier, staterror  # noqa: E402
-from evermore.binned.modifier import Modifier  # noqa: E402
-from evermore.parameters import (  # noqa: E402
+from evermore import loss, pdf, util  # ruff:ignore[module-import-not-at-top-of-file]
+from evermore.binned import (  # ruff:ignore[module-import-not-at-top-of-file]
+    effect,
+    modifier,
+    staterror,
+)
+from evermore.binned.modifier import (  # ruff:ignore[module-import-not-at-top-of-file]
+    Modifier,
+)
+from evermore.parameters import (  # ruff:ignore[module-import-not-at-top-of-file]
     filter,
     parameter,
     sample,
     transform,
 )
-from evermore.parameters.parameter import (  # noqa: E402
+from evermore.parameters.parameter import (  # ruff:ignore[module-import-not-at-top-of-file]
     BaseParameter,
     NormalParameter,
     Parameter,

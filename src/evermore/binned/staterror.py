@@ -38,30 +38,28 @@ class StatErrors(ModifierBase):
     """
 
     eps: Float[Scalar, ""]
-    n_entries: Float[Array, "..."]  # noqa: UP037
-    non_empty_mask: Bool[Array, "..."]  # noqa: UP037
-    relative_error: Float[Array, "..."]  # noqa: UP037
-    parameter: NormalParameter[Float[Array, "..."]]  # noqa: UP037
+    n_entries: Float[Array, "..."]  # ruff:ignore[quoted-annotation]
+    non_empty_mask: Bool[Array, "..."]  # ruff:ignore[quoted-annotation]
+    relative_error: Float[Array, "..."]  # ruff:ignore[quoted-annotation]
+    parameter: NormalParameter[Float[Array, "..."]]  # ruff:ignore[quoted-annotation]
 
     def __init__(
         self,
-        hist: Float[Array, "..."],  # noqa: UP037
-        variance: Float[Array, "..."],  # noqa: UP037
+        hist: Float[Array, "..."],  # ruff:ignore[quoted-annotation]
+        variance: Float[Array, "..."],  # ruff:ignore[quoted-annotation]
     ):
         # make sure they are of dtype float
         hist, variance = jax.tree.map(float_array, (hist, variance))
 
         self.eps = cast(Float[Scalar, ""], jnp.finfo(variance.dtype).eps)
 
+        nonzero_variance = variance > 0.0
         self.n_entries = jnp.where(
-            ~jnp.isclose(variance, 0.0),
-            (
-                hist**2
-                / (variance + jnp.where(~jnp.isclose(variance, 0.0), 0.0, self.eps))
-            ),
+            nonzero_variance,
+            (hist**2 / (variance + jnp.where(nonzero_variance, 0.0, self.eps))),
             0.0,
         )
-        self.non_empty_mask = ~jnp.isclose(self.n_entries, 0.0)
+        self.non_empty_mask = self.n_entries > 0.0
         self.relative_error = jnp.where(
             self.non_empty_mask,
             1.0
