@@ -53,15 +53,13 @@ class StatErrors(ModifierBase):
 
         self.eps = cast(Float[Scalar, ""], jnp.finfo(variance.dtype).eps)
 
+        nonzero_variance = variance > 0.0
         self.n_entries = jnp.where(
-            ~jnp.isclose(variance, 0.0),
-            (
-                hist**2
-                / (variance + jnp.where(~jnp.isclose(variance, 0.0), 0.0, self.eps))
-            ),
+            nonzero_variance,
+            (hist**2 / (variance + jnp.where(nonzero_variance, 0.0, self.eps))),
             0.0,
         )
-        self.non_empty_mask = ~jnp.isclose(self.n_entries, 0.0)
+        self.non_empty_mask = self.n_entries > 0.0
         self.relative_error = jnp.where(
             self.non_empty_mask,
             1.0
