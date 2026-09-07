@@ -104,14 +104,14 @@ ignore_missing_imports = true
 preview = true
 ignore = [
     "PLR",  # Design related pylint codes
-    "E501", # Line too long
+    "line-too-long", # Line too long
     # "B006",   # converts default args to 'None'
-    "I002",    # isort: "from __future__ import annotations"
-    "ISC001",  # flake8-implicit-str-concat: Implicit string concatenation"
-    "PLC0415", # `import` should be at the top-level of a file
-    "PLW3201", # Dunder method `...` has no special meaning in Python 3
-    "RUF052",  # Local dummy variable `...` is accessed
-    "F722",    # jaxtyping: `Float32[Array, "b c"]` (https://docs.kidger.site/jaxtyping/faq/#flake8-or-ruff-are-throwing-an-error)
+    "missing-required-import",    # isort: "from __future__ import annotations"
+    "single-line-implicit-string-concatenation",  # flake8-implicit-str-concat: Implicit string concatenation"
+    "import-outside-top-level", # `import` should be at the top-level of a file
+    "bad-dunder-method-name", # Dunder method `...` has no special meaning in Python 3
+    "used-dummy-variable",  # Local dummy variable `...` is accessed
+    "forward-annotation-syntax-error",    # jaxtyping: `Float32[Array, "b c"]` (https://docs.kidger.site/jaxtyping/faq/#flake8-or-ruff-are-throwing-an-error)
 ]
 select = [
     "E",
@@ -135,10 +135,10 @@ select = [
     "UP",   # pyupgrade
     "YTT",  # flake8-2020
     "EXE",  # flake8-executable
-    "E303", # Too many blank lines
+    "too-many-blank-lines", # Too many blank lines
 ]
 unfixable = [
-    "F841", # Would remove unused variables
+    "unused-variable", # Would remove unused variables
 ]
 flake8-unused-arguments.ignore-variadic-names = true
 isort.required-imports = ["from __future__ import annotations"]

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import typing as tp
-
 import jax
 import jax.numpy as jnp
 from flax import nnx
@@ -13,8 +11,8 @@ jax.config.update("jax_enable_x64", True)
 
 
 # type defs
-Hist1D: tp.TypeAlias = Float[Array, " nbins"]
-Args: tp.TypeAlias = tuple[
+type Hist1D = Float[Array, " nbins"]
+type Args = tuple[
     nnx.GraphDef,  # graphdef
     nnx.State,  # state
     PyTree[Hist1D],  # hists
