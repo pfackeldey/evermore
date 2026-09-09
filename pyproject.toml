@@ -30,37 +30,37 @@ dynamic = ["version"] # version is set in src/evermore/__init__.py
 dependencies = [
     "jax>=0.10.2", # jax.new_ref
     "jaxlib>=0.10.2",
-    "jaxtyping",
+    "jaxtyping>=0.3.11",
     "flax>=0.12.9",
 ]
 
 [dependency-groups]
-test = ["pytest >=7", "pytest-cov >=3"]
+test = ["pytest >= 9", "pytest-cov >=7"]
 examples = [
-    "iminuit",
-    "jaxtyping",
-    "optax",
-    "optimistix",
-    "wadler_lindig",
+    "iminuit>=2.32.0", # check
+    "jaxtyping>=0.3.11",
+    "optax>=0.2.8",
+    "optimistix>=0.1.0",
+    "wadler_lindig>=0.1.7",
 ]
 docs = [
-    "sphinx",
-    "myst-parser",
-    "myst-nb",
-    "sphinx_copybutton",
-    "sphinx_autodoc_typehints",
-    "sphinx-book-theme",
-    "sphinx-design",
-    "sphinx-togglebutton",
+    "sphinx>=9.1.0",
+    "myst-parser>=5.1.0",
+    "myst-nb>=1.4.0",
+    "sphinx_copybutton>=0.5.2",
+    "sphinx_autodoc_typehints>=3.13.5",
+    "sphinx-book-theme>=1.4.0",
+    "sphinx-design>=0.7.0",
+    "sphinx-togglebutton>=0.4.5",
 ]
 dev = [
     { include-group = "test" },
     { include-group = "examples" },
     { include-group = "docs" },
-    "ipython",
-    "ruff",
-    "prek",
-    "ty>=0.0.50",
+    "ipython>=9.17.0",
+    "ruff>=0.16.6",
+    "prek>=0.5.2",
+    "ty>=0.0.79",
 ]
 
 [project.urls]
@@ -75,7 +75,7 @@ version.path = "src/evermore/__init__.py"
 envs.default.dependencies = ["pytest", "pytest-cov"]
 
 [tool.pytest.ini_options]
-minversion = "7"
+minversion = "9"
 xfail_strict = true
 addopts = ["-ra", "--strict-config", "--strict-markers"]
 filterwarnings = ["error"]
