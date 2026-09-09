@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import typing as tp
-
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -13,8 +11,8 @@ import evermore as evm
 jax.config.update("jax_enable_x64", True)
 
 
-ScalarParam: tp.TypeAlias = evm.Parameter[Float[Scalar, ""]]
-ScalarParamTree: tp.TypeAlias = PyTree[ScalarParam]
+type ScalarParam = evm.Parameter[Float[Scalar, ""]]
+type ScalarParamTree = PyTree[ScalarParam]
 
 
 def loss_fn(params: ScalarParamTree) -> Float[Scalar, ""]:

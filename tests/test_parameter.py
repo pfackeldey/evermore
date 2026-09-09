@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import typing as tp
-
 import jax
 import pytest
 from jaxtyping import Float, Scalar
@@ -11,7 +9,7 @@ from evermore.pdf import Normal
 
 jax.config.update("jax_enable_x64", True)
 
-ScalarParam: tp.TypeAlias = evm.Parameter[Float[Scalar, ""]]
+type ScalarParam = evm.Parameter[Float[Scalar, ""]]
 
 
 def test_Parameter():
