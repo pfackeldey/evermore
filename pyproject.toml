@@ -37,7 +37,7 @@ dependencies = [
 [dependency-groups]
 test = ["pytest >= 9", "pytest-cov >=7"]
 examples = [
-    "iminuit>=2.32.0", # check
+    "iminuit>=2.32.0",
     "jaxtyping>=0.3.11",
     "optax>=0.2.8",
     "optimistix>=0.1.0",
