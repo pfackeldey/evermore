@@ -31,7 +31,7 @@ dependencies = [
     "jax>=0.10.2", # jax.new_ref
     "jaxlib>=0.10.2",
     "jaxtyping>=0.3.11",
-    "flax>=0.12.9",
+    "flax>=0.12.10",
 ]
 
 [dependency-groups]
