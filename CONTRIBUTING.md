@@ -19,6 +19,11 @@ Use pytest to run the unit checks:
 ```bash
 uv run pytest .
 ```
+and
+```bash
+uv run pytest --resolution lowest-direct .
+```
+to test against the lower bounds of dependencies.
 
 ### Linting
 
