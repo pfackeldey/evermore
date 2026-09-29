@@ -56,7 +56,7 @@ jobs:
 
       - name: Test package w/ lowest-direct resolution
         run: >-
-          uv run pytest -ra --cov --cov-report=xml --cov-report=term
+          uv run --resolution lowest-direct pytest -ra --cov --cov-report=xml --cov-report=term
           --durations=20
 
       # - name: Upload coverage report
