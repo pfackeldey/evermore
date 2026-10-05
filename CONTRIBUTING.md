@@ -21,7 +21,7 @@ uv run pytest .
 ```
 and
 ```bash
-uv run pytest --resolution lowest-direct .
+uv run --resolution lowest-direct pytest .
 ```
 to test against the lower bounds of dependencies.
 
