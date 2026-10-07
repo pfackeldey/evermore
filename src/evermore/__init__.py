@@ -5,7 +5,7 @@ evermore: Differentiable (binned) likelihoods in JAX.
 from __future__ import annotations
 
 __author__ = "Peter Fackeldey"
-__version__ = "0.4.1"
+__version__ = "0.4.2"
 
 
 # expose public API
