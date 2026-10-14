@@ -1,4 +1,4 @@
-evermore>=0.4.1
+evermore>=0.4.2
 iminuit
 jaxtyping
 optax
