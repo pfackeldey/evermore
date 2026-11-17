@@ -117,7 +117,7 @@ class VerticalTemplateMorphing(BaseEffect):
                 abs_value,
                 jnp.polyval(_asym_poly, value * value),
             )
-        )  # ty:ignore[invalid-return-type]
+        )  # ty:ignore[invalid-explicit-return]
 
     def __call__(self, value: V, hist: H) -> OffsetAndScale:
         offset = self.vshift(value, hist=hist)
@@ -142,7 +142,7 @@ class AsymmetricExponential(BaseEffect):
         alpha = 0.125 * twox * (twox2 * (3 * twox2 - 10.0) + 15.0)
         return jnp.where(
             jnp.abs(value) >= 0.5, jnp.where(value >= 0, hi, lo), avg + alpha * halfdiff
-        )  # ty:ignore[invalid-return-type]
+        )  # ty:ignore[invalid-explicit-return]
 
     def __call__(self, value: V, hist: H) -> OffsetAndScale:
         interp = self.interpolate(value)

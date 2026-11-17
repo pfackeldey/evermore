@@ -194,7 +194,7 @@ class MinuitTransform(BaseParameterTransformation):
         _safe_assert(_check_is_finite, lower)
         _safe_assert(_check_is_finite, upper)
 
-        return value, lower, upper  # ty:ignore[invalid-return-type]
+        return value, lower, upper  # ty:ignore[invalid-explicit-return]
 
     def unwrap(self, parameter: BaseParameter[V]) -> BaseParameter[V]:
         # short-cut
@@ -213,7 +213,7 @@ class MinuitTransform(BaseParameterTransformation):
 
         # this formula turns user-provided "external" parameter values into "internal" values
         new_value = jnp.arcsin(2.0 * (value - lower) / (upper - lower) - 1.0)
-        return parameter.replace(value=new_value)  # ty:ignore[invalid-return-type]
+        return parameter.replace(value=new_value)  # ty:ignore[invalid-explicit-return]
 
     def wrap(self, parameter: BaseParameter[V]) -> BaseParameter[V]:
         # short-cut
@@ -224,7 +224,7 @@ class MinuitTransform(BaseParameterTransformation):
 
         # this formula turns "internal" parameter values into "external" values
         new_value = lower + (upper - lower) / 2.0 * (jnp.sin(value) + 1.0)
-        return parameter.replace(value=new_value)  # ty:ignore[invalid-return-type]
+        return parameter.replace(value=new_value)  # ty:ignore[invalid-explicit-return]
 
 
 class SoftPlusTransform(BaseParameterTransformation):
@@ -255,8 +255,8 @@ class SoftPlusTransform(BaseParameterTransformation):
         _safe_assert(_check_is_non_negative, value)
 
         new_value = jnp.log(-jnp.expm1(-value)) + value
-        return parameter.replace(value=new_value)  # ty:ignore[invalid-return-type]
+        return parameter.replace(value=new_value)  # ty:ignore[invalid-explicit-return]
 
     def wrap(self, parameter: BaseParameter[V]) -> BaseParameter[V]:
         new_value = jax.nn.softplus(float_array(parameter.get_value()))
-        return parameter.replace(value=new_value)  # ty:ignore[invalid-return-type]
+        return parameter.replace(value=new_value)  # ty:ignore[invalid-explicit-return]

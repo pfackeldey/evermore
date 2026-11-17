@@ -143,7 +143,7 @@ def sample_from_priors(rngs: nnx.Rngs, params: PT) -> PT:
                 )
                 sampled_value = unit_normal.inv_cdf(pdf.cdf(sampled_value))
 
-            return param.replace(value=sampled_value)  # ty:ignore[invalid-return-type]
+            return param.replace(value=sampled_value)  # ty:ignore[invalid-explicit-return]
         # can't sample if there's:
         # - no pdf to sample from
         return param
