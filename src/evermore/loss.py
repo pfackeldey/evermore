@@ -72,7 +72,7 @@ def get_log_probs(tree: PyTree[BaseParameter]) -> nnx.State:
         prior: BasePDF | None = param.prior
         # unconstrained case is easy:
         if prior is None:
-            return jnp.zeros_like(param.get_value())  # ty:ignore[invalid-return-type]
+            return jnp.zeros_like(param.get_value())  # ty: ignore[invalid-explicit-return]
 
         # constrained case:
         if not isinstance(param.prior, BasePDF):

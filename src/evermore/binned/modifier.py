@@ -52,7 +52,7 @@ class ModifierBase(nnx.Module):
 
     def __call__(self: ModifierBase, hist: H) -> H:
         os = self.offset_and_scale(hist=hist)
-        return os.scale * (hist + os.offset)  # ty:ignore[invalid-return-type]
+        return os.scale * (hist + os.offset)  # ty:ignore[invalid-explicit-return]
 
     def __matmul__(self: ModifierBase, other: ModifierBase) -> Compose:
         return Compose(self, other)
